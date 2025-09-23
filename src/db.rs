@@ -18,6 +18,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             password_hash TEXT NOT NULL,
             created_at DATETIME NOT NULL,
             last_login DATETIME
+            is_admin BOOLEAN NOT NULL DEFAULT 0
         )
         "#,
     )
