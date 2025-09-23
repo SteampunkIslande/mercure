@@ -1,6 +1,8 @@
+mod admin;
 mod auth;
 mod protected;
 
+pub use admin::*;
 pub use auth::*;
 pub use protected::*;
 

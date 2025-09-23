@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - Création d'utilisateur</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        input {
+            padding: 8px;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .error {
+            color: red;
+            display: none;
+        }
+
+        .success {
+            color: green;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Administration - Création d'utilisateur</h1>
+        <form id="registerForm">
+            <div class="form-group">
+                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" required>
+            </div>
+            <div class="form-group">
+                <input type="password" id="password" name="password" placeholder="Mot de passe" required>
+            </div>
+            <div class="error" id="error-message"></div>
+            <div class="success" id="success-message"></div>
+            <button type="submit" class="btn">Créer l'utilisateur</button>
+        </form>
+        <a href="/me" class="btn" style="background-color: #6c757d;">Retour au tableau de bord</a>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/admin/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    errorDiv.style.display = 'none';
+                    successDiv.style.display = 'block';
+                    successDiv.textContent = 'Utilisateur créé avec succès';
+                    document.getElementById('registerForm').reset();
+                } else {
+                    successDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = data.message || 'Erreur lors de la création';
+                }
+            } catch (error) {
+                successDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Erreur de connexion au serveur';
+            }
+        });
+    </script>
+</body>
+
+</html>

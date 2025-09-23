@@ -1,4 +1,5 @@
 use rocket::State;
+use rocket::fs::NamedFile;
 use rocket::http::{Cookie, CookieJar};
 use rocket::serde::json::Json;
 use rocket::{get, post};
@@ -37,27 +38,18 @@ pub async fn login(
     Ok(Json(ApiResponse::success(user)))
 }
 
-#[post("/register", data = "<user>")]
-pub async fn register(
-    user: Json<NewUser>,
-    pool: &State<SqlitePool>,
-) -> Result<Json<ApiResponse<User>>, AuthError> {
-    // Vérifier si l'utilisateur existe déjà
-    if let Some(_) = User::find_by_username(&user.username, pool).await? {
-        return Ok(Json(ApiResponse::error("Username already exists")));
-    }
-
-    let user = User::create(user.into_inner(), pool).await?;
-    Ok(Json(ApiResponse::success(user)))
-}
-
 #[post("/logout")]
 pub fn logout(cookies: &CookieJar<'_>) -> Json<ApiResponse<()>> {
     cookies.remove_private(Cookie::build("user_id"));
     Json(ApiResponse::success(()))
 }
 
-#[get("/welcome")]
-pub fn welcome() -> &'static str {
-    "Bienvenue sur Mercure! Veuillez vous connecter."
+#[get("/")]
+pub async fn welcome_page() -> Option<NamedFile> {
+    NamedFile::open("templates/welcome.html").await.ok()
+}
+
+#[get("/login")]
+pub async fn login_page() -> Option<NamedFile> {
+    NamedFile::open("templates/login.html").await.ok()
 }

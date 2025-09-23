@@ -13,6 +13,7 @@ pub struct User {
     password_hash: String,
     pub created_at: OffsetDateTime,
     pub last_login: Option<OffsetDateTime>,
+    pub is_admin: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,8 +32,8 @@ impl User {
         // Insérer l'utilisateur
         sqlx::query(
             r#"
-            INSERT INTO users (username, password_hash, created_at)
-            VALUES (?, ?, ?)
+            INSERT INTO users (username, password_hash, created_at, is_admin)
+            VALUES (?, ?, ?, false)
             "#,
         )
         .bind(&new_user.username)
@@ -45,7 +46,7 @@ impl User {
         // Récupérer l'utilisateur créé
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login
+            SELECT id, username, password_hash, created_at, last_login, is_admin
             FROM users WHERE username = ?
             "#,
         )
@@ -60,7 +61,7 @@ impl User {
     pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<Option<User>, AuthError> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login
+            SELECT id, username, password_hash, created_at, last_login, is_admin
             FROM users WHERE id = ?
             "#,
         )
@@ -78,7 +79,7 @@ impl User {
     ) -> Result<Option<User>, AuthError> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login
+            SELECT id, username, password_hash, created_at, last_login, is_admin
             FROM users WHERE username = ?
             "#,
         )
