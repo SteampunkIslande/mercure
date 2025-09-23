@@ -12,8 +12,8 @@ pub enum AuthError {
     InvalidCredentials,
     #[error("Database error: {0}")]
     DatabaseError(String),
-    #[error("Token error")]
-    TokenError,
+    #[error("Token error: {0}")]
+    TokenError(String),
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {
@@ -23,11 +23,9 @@ impl<'r> Responder<'r, 'static> for AuthError {
         match self {
             AuthError::InvalidCredentials => response.status(Status::Unauthorized),
             AuthError::DatabaseError(_) => response.status(Status::InternalServerError),
-            AuthError::TokenError => response.status(Status::Unauthorized),
+            AuthError::TokenError(_) => response.status(Status::Unauthorized),
         };
 
         response.ok()
     }
 }
-
-pub type AuthResult<T> = Result<T, AuthError>;

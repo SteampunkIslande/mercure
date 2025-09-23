@@ -7,7 +7,7 @@ use sqlx::SqlitePool;
 
 use super::ApiResponse;
 use crate::auth::AuthError;
-use crate::models::{NewUser, User};
+use crate::models::User;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct LoginRequest {

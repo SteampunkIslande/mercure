@@ -6,7 +6,7 @@ use mercure::{
 use std::process;
 
 #[derive(Parser)]
-#[command(name = "admin")]
+#[command(name = "mercure-admin")]
 #[command(about = "Outil d'administration des utilisateurs", long_about = None)]
 struct Cli {
     #[command(subcommand)]

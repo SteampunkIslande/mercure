@@ -1,9 +1,5 @@
-use rocket::futures::stream::Forward;
-use rocket::http::CookieJar;
 use rocket::http::Status;
-use rocket::outcome::IntoOutcome;
 use rocket::request::{FromRequest, Outcome, Request};
-use rocket::response::Redirect;
 use sqlx::SqlitePool;
 
 use super::AuthError;
@@ -27,10 +23,9 @@ async fn user_from_cookie<'r>(request: &'r Request<'_>) -> Result<User, AuthErro
 
     match cookies.get_private("user_id") {
         Some(cookie) => {
-            let user_id: i64 = cookie
-                .value()
-                .parse()
-                .map_err(|err| AuthError::TokenError)?;
+            let user_id: i64 = cookie.value().parse().map_err(|err| {
+                AuthError::TokenError(format!("Could not parse int from cookie: {}", err))
+            })?;
             User::find_by_id(user_id, pool)
                 .await?
                 .ok_or(AuthError::DatabaseError(format!(
@@ -38,7 +33,9 @@ async fn user_from_cookie<'r>(request: &'r Request<'_>) -> Result<User, AuthErro
                     user_id
                 )))
         }
-        None => Err(AuthError::TokenError),
+        None => Err(AuthError::TokenError(
+            "Could not find cookie with key `user_id`".to_string(),
+        )),
     }
 }
 
@@ -50,11 +47,7 @@ impl<'r> FromRequest<'r> for Authenticated {
         // Vérifie si l'utilisateur est authentifié via un cookie de session
         match user_from_cookie(request).await {
             Ok(user) => Outcome::Success(Authenticated { user }),
-            Err(_) => Outcome::Error((Status::Unauthorized, AuthError::TokenError)),
+            Err(err) => Outcome::Error((Status::Unauthorized, err)),
         }
     }
-}
-
-pub fn is_authenticated(cookies: &CookieJar<'_>) -> bool {
-    cookies.get_private("user_id").is_some()
 }
