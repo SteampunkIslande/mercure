@@ -35,3 +35,13 @@ pub async fn register_page(auth: Authenticated) -> Option<rocket::fs::NamedFile>
         .await
         .ok()
 }
+
+#[get("/landing_page")]
+pub async fn admin_landing_page(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
+    if !auth.user.is_admin {
+        return None;
+    }
+    rocket::fs::NamedFile::open("templates/admin/landing_page.html")
+        .await
+        .ok()
+}

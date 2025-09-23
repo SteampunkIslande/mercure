@@ -1,3 +1,5 @@
+use rocket::fs::NamedFile;
+
 #[macro_use]
 extern crate rocket;
 
@@ -5,6 +7,11 @@ mod auth;
 mod db;
 mod models;
 mod routes;
+
+#[catch(401)]
+pub async fn unauthorized() -> Option<NamedFile> {
+    NamedFile::open("templates/unauthorized.html").await.ok()
+}
 
 #[launch]
 async fn rocket() -> _ {
@@ -15,28 +22,25 @@ async fn rocket() -> _ {
 
     rocket::build()
         .manage(pool)
+        .register("/", catchers![unauthorized])
         .mount(
-            "/",
+            "/mercure",
             routes![
-                // Routes HTML publiques
+                // Routes génériques: Gestion de l'authentification
                 routes::welcome_page,
-                routes::login_page,
+                routes::login_get,
+                routes::logout,
             ],
         )
         .mount(
             "/api",
             routes![
-                // Routes publiques
-                routes::public_route,
-                // Routes d'authentification
-                routes::login,
-                routes::logout,
-                // Routes protégées
-                routes::me,
-                routes::protected_route,
                 // Routes admin
                 routes::register,
                 routes::register_page,
+                routes::admin_landing_page,
+                // Route login de l'API
+                routes::login_post
             ],
         )
 }

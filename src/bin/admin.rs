@@ -1,3 +1,4 @@
+use bcrypt::{DEFAULT_COST, hash};
 use clap::{Parser, Subcommand};
 use mercure::{
     db,
@@ -92,14 +93,13 @@ async fn main() {
             match User::find_by_username(&username, &pool).await {
                 Ok(Some(_)) => {
                     // Hasher le nouveau mot de passe
-                    let password_hash =
-                        match bcrypt::hash(password.as_bytes(), bcrypt::DEFAULT_COST) {
-                            Ok(hash) => hash,
-                            Err(e) => {
-                                eprintln!("Erreur lors du hashage du mot de passe : {}", e);
-                                process::exit(1);
-                            }
-                        };
+                    let password_hash = match hash(password.as_bytes(), DEFAULT_COST) {
+                        Ok(hash) => hash,
+                        Err(e) => {
+                            eprintln!("Erreur lors du hashage du mot de passe : {}", e);
+                            process::exit(1);
+                        }
+                    };
 
                     // Mettre à jour le mot de passe
                     if let Err(e) =

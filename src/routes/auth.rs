@@ -1,8 +1,7 @@
 use rocket::State;
-use rocket::fs::NamedFile;
 use rocket::http::{Cookie, CookieJar};
+use rocket::post;
 use rocket::serde::json::Json;
-use rocket::{get, post};
 use sqlx::SqlitePool;
 
 use super::ApiResponse;
@@ -16,7 +15,7 @@ pub struct LoginRequest {
 }
 
 #[post("/login", data = "<login>")]
-pub async fn login(
+pub async fn login_post(
     login: Json<LoginRequest>,
     cookies: &CookieJar<'_>,
     pool: &State<SqlitePool>,
@@ -36,20 +35,4 @@ pub async fn login(
     cookies.add_private(Cookie::new("user_id", user.id.to_string()));
 
     Ok(Json(ApiResponse::success(user)))
-}
-
-#[post("/logout")]
-pub fn logout(cookies: &CookieJar<'_>) -> Json<ApiResponse<()>> {
-    cookies.remove_private(Cookie::build("user_id"));
-    Json(ApiResponse::success(()))
-}
-
-#[get("/")]
-pub async fn welcome_page() -> Option<NamedFile> {
-    NamedFile::open("templates/welcome.html").await.ok()
-}
-
-#[get("/login")]
-pub async fn login_page() -> Option<NamedFile> {
-    NamedFile::open("templates/login.html").await.ok()
 }

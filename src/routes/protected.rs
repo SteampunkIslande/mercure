@@ -4,6 +4,8 @@ use rocket::serde::json::Json;
 use super::ApiResponse;
 use crate::auth::Authenticated;
 
+// Aucun intérêt.
+
 #[get("/me")]
 pub async fn me(auth: Authenticated) -> Json<ApiResponse<String>> {
     Json(ApiResponse::success(format!(
