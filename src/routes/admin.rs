@@ -7,17 +7,17 @@ use crate::auth::{AuthError, Authenticated};
 use crate::models::{NewUser, User};
 
 #[post("/register", data = "<user>")]
-pub async fn register(
+pub async fn register_post(
     user: Json<NewUser>,
     pool: &State<SqlitePool>,
     auth: Authenticated,
 ) -> Result<Json<ApiResponse<User>>, AuthError> {
-    // Vérifier si l'utilisateur est admin
+    // Ensure user is admin
     if !auth.user.is_admin {
         return Ok(Json(ApiResponse::error("Accès non autorisé")));
     }
 
-    // Vérifier si l'utilisateur existe déjà
+    // Make sure the user doesn't already exist
     if let Some(_) = User::find_by_username(&user.username, pool).await? {
         return Ok(Json(ApiResponse::error("Ce nom d'utilisateur existe déjà")));
     }
@@ -26,22 +26,24 @@ pub async fn register(
     Ok(Json(ApiResponse::success(user)))
 }
 
+/// Route to show the admin a page to register new user.
 #[get("/register")]
-pub async fn register_page(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
+pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
     if !auth.user.is_admin {
         return None;
     }
-    rocket::fs::NamedFile::open("templates/admin/register.html")
+    rocket::fs::NamedFile::open("static/admin/register.html")
         .await
         .ok()
 }
 
+/// Admin landing page
 #[get("/landing_page")]
-pub async fn admin_landing_page(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
+pub async fn admin_landing_page_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
     if !auth.user.is_admin {
         return None;
     }
-    rocket::fs::NamedFile::open("templates/admin/landing_page.html")
+    rocket::fs::NamedFile::open("static/admin/landing_page.html")
         .await
         .ok()
 }

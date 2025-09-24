@@ -1,5 +1,9 @@
 mod guard;
 
+use std::io::Cursor;
+
+use super::routes::ApiResponse;
+
 pub use guard::*;
 
 use rocket::http::Status;
@@ -10,6 +14,8 @@ use rocket::response::{self, Responder, Response};
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
+    #[error("Unknown user")]
+    UnknownUser,
     #[error("Database error: {0}")]
     DatabaseError(String),
     #[error("Token error: {0}")]
@@ -19,13 +25,27 @@ pub enum AuthError {
 impl<'r> Responder<'r, 'static> for AuthError {
     fn respond_to(self, _: &'r Request<'_>) -> response::Result<'static> {
         let mut response = Response::build();
-
-        match self {
-            AuthError::InvalidCredentials => response.status(Status::Unauthorized),
-            AuthError::DatabaseError(_) => response.status(Status::InternalServerError),
-            AuthError::TokenError(_) => response.status(Status::Unauthorized),
+        let body = match self {
+            AuthError::InvalidCredentials => {
+                response.status(Status::Unauthorized);
+                ApiResponse::<String>::error("Invalid credentials".to_string())
+            }
+            AuthError::DatabaseError(e) => {
+                response.status(Status::InternalServerError);
+                ApiResponse::<String>::error(format!("Database error: {e}"))
+            }
+            AuthError::TokenError(e) => {
+                response.status(Status::Unauthorized);
+                ApiResponse::<String>::error(format!("Token error: {e}"))
+            }
+            AuthError::UnknownUser => {
+                response.status(Status::Unauthorized);
+                ApiResponse::<String>::error(format!("Unknown user"))
+            }
         };
 
+        let body_string = rocket::serde::json::to_string(&body).unwrap();
+        response.sized_body(body_string.len(), Cursor::new(body_string));
         response.ok()
     }
 }

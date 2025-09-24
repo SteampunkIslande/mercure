@@ -1,4 +1,5 @@
-use rocket::fs::NamedFile;
+use rocket::fs::{FileServer, NamedFile};
+use rocket_dyn_templates::Template;
 
 #[macro_use]
 extern crate rocket;
@@ -10,7 +11,7 @@ mod routes;
 
 #[catch(401)]
 pub async fn unauthorized() -> Option<NamedFile> {
-    NamedFile::open("templates/unauthorized.html").await.ok()
+    NamedFile::open("static/unauthorized.html").await.ok()
 }
 
 #[launch]
@@ -23,24 +24,34 @@ async fn rocket() -> _ {
     rocket::build()
         .manage(pool)
         .register("/", catchers![unauthorized])
+        .mount("/static", FileServer::from("./static"))
         .mount(
             "/mercure",
             routes![
-                // Routes génériques: Gestion de l'authentification
-                routes::welcome_page,
+                // Routes génériques: accueil et authentification
+                routes::welcome_page_get,
                 routes::login_get,
-                routes::logout,
+                routes::logout_get,
+                // Création de formulaire
+                routes::newform_get
             ],
         )
         .mount(
-            "/api",
+            "/mercure/admin",
             routes![
-                // Routes admin
-                routes::register,
-                routes::register_page,
-                routes::admin_landing_page,
-                // Route login de l'API
-                routes::login_post
+                // Routes pour affichage dans le navigateur de l'admin
+                routes::register_get,
+                routes::admin_landing_page_get
             ],
         )
+        .mount(
+            "/mercure/api",
+            routes![
+                // Routes pour le backend: renvoie toujours du JSON
+                routes::register_post,
+                routes::login_post,
+                routes::newform_post
+            ],
+        )
+        .attach(Template::fairing())
 }

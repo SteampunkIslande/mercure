@@ -32,7 +32,7 @@ impl User {
         // Insérer l'utilisateur
         sqlx::query(
             r#"
-            INSERT INTO users (username, password_hash, created_at, is_admin)
+            INSERT INTO Users (username, password_hash, created_at, is_admin)
             VALUES (?, ?, ?, false)
             "#,
         )
@@ -47,7 +47,7 @@ impl User {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, password_hash, created_at, last_login, is_admin
-            FROM users WHERE username = ?
+            FROM Users WHERE username = ?
             "#,
         )
         .bind(&new_user.username)
@@ -62,7 +62,7 @@ impl User {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, password_hash, created_at, last_login, is_admin
-            FROM users WHERE id = ?
+            FROM Users WHERE id = ?
             "#,
         )
         .bind(id)
@@ -80,7 +80,7 @@ impl User {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, username, password_hash, created_at, last_login, is_admin
-            FROM users WHERE username = ?
+            FROM Users WHERE username = ?
             "#,
         )
         .bind(username)
@@ -101,7 +101,7 @@ impl User {
 
         sqlx::query(
             r#"
-            UPDATE users SET last_login = ? WHERE id = ?
+            UPDATE Users SET last_login = ? WHERE id = ?
             "#,
         )
         .bind(now)

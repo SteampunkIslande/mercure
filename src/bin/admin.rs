@@ -65,7 +65,7 @@ async fn main() {
                 Ok(user) => {
                     if admin {
                         // Mettre à jour l'utilisateur comme administrateur
-                        if let Err(e) = sqlx::query("UPDATE users SET is_admin = true WHERE id = ?")
+                        if let Err(e) = sqlx::query("UPDATE Users SET is_admin = true WHERE id = ?")
                             .bind(user.id)
                             .execute(&pool)
                             .await
@@ -103,7 +103,7 @@ async fn main() {
 
                     // Mettre à jour le mot de passe
                     if let Err(e) =
-                        sqlx::query("UPDATE users SET password_hash = ? WHERE username = ?")
+                        sqlx::query("UPDATE Users SET password_hash = ? WHERE username = ?")
                             .bind(&password_hash)
                             .bind(&username)
                             .execute(&pool)
