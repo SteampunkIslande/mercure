@@ -18,8 +18,8 @@
             <div class="form-group">
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
-            <div class="error" id="error-message"></div>
-            <div class="success" id="success-message"></div>
+            <div class="error" id="error-message" style="display: none;"></div>
+            <div class="success" id="success-message" style="display: none;"></div>
             <button type="submit" class="btn">Créer l'utilisateur</button>
         </form>
         <a href="/mercure/admin/landing_page" class="btn" style="background-color: #6c757d;">Retour au tableau de
@@ -54,11 +54,17 @@
                     successDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = data.message || 'Erreur lors de la création';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 2000);
                 }
             } catch (error) {
                 successDiv.style.display = 'none';
                 errorDiv.style.display = 'block';
                 errorDiv.textContent = 'Erreur de connexion au serveur';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
             }
         });
     </script>

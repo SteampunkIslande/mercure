@@ -46,10 +46,16 @@
                     const data = await response.json();
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = data.message || 'Erreur de connexion';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 2000);
                 }
             } catch (error) {
                 errorDiv.style.display = 'block';
                 errorDiv.textContent = 'Erreur de connexion au serveur';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
             }
         });
     </script>

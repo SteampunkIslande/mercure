@@ -70,14 +70,16 @@
             const textarea = document.getElementById(`var_content_${index}`);
 
             if (typeSelect.value) {
-                valuesDiv.style.display = 'block';
+                valuesDiv.style.display = 'inline';
 
                 if (typeSelect.value === 'FromValuesList') {
+                    textarea.style.display = 'inline';
                     textarea.placeholder = 'Entrez les valeurs séparées par des virgules (ex: val1,val2,val3)';
                 } else if (typeSelect.value === 'Constant') {
+                    textarea.style.display = 'inline';
                     textarea.placeholder = 'Entrez la valeur constante';
                 } else if (typeSelect.value === 'RunDefined') {
-                    textarea.placeholder = 'Entrez la description/nom de la variable définie à l\'exécution';
+                    textarea.style.display = 'none';
                 }
             } else {
                 valuesDiv.style.display = 'none';
@@ -132,24 +134,27 @@
             <h3>Variables définies par l'utilisateur</h3>
             <div id="user-vars-container">
                 <div class="user-var-item">
-                    <label for="var_name_0">Nom de la variable :</label>
-                    <input type="text" id="var_name_0" name="user_defined_vars[0][name]" required>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label for="var_name_0">Nom de la variable :</label>
+                        <input type="text" id="var_name_0" name="user_defined_vars[0][name]" required>
 
-                    <label for="var_type_0">Type :</label>
-                    <select id="var_type_0" name="user_defined_vars[0][type]" onchange="updateVarType(0)" required>
-                        <option value="">-- Sélectionnez un type --</option>
-                        <option value="FromValuesList">Liste de valeurs</option>
-                        <option value="Constant">Constante</option>
-                        <option value="RunDefined">Défini à l'exécution</option>
-                    </select>
-
-                    <div id="var_values_0" style="display:none;">
-                        <label for="var_content_0">Contenu :</label>
-                        <textarea id="var_content_0" name="user_defined_vars[0][content]"
-                            placeholder="Pour liste de valeurs: val1,val2,val3 | Pour constante/run-defined: une seule valeur"></textarea>
+                        <label for="var_type_0">Type :</label>
+                        <select id="var_type_0" name="user_defined_vars[0][type]" onchange="updateVarType(0)" required>
+                            <option value="">-- Sélectionnez un type --</option>
+                            <option value="FromValuesList">Liste de valeurs</option>
+                            <option value="Constant">Constante</option>
+                            <option value="RunDefined">Défini à l'exécution</option>
+                        </select>
                     </div>
 
-                    <button type="button" onclick="removeUserVar(0)">Supprimer</button>
+                    <div id="var_values_0" style="margin-top: 10px;">
+                        <label for="var_content_0">Contenu :</label>
+                        <textarea id="var_content_0" name="user_defined_vars[0][content]"
+                            placeholder="Pour liste de valeurs: val1,val2,val3 | Pour constante/run-defined: une seule valeur"
+                            style="width: 100%; resize: none;" rows="5"></textarea>
+                    </div>
+
+                    <button type="button" onclick="removeUserVar(0)" style="margin-top: 10px;">Supprimer</button>
                 </div>
             </div>
             <button type="button" onclick="addUserVar()">Ajouter une variable</button>
