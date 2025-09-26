@@ -51,13 +51,16 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
             Ok(groups) => groups,
             Err(_) => Vec::new(), // Return empty vector on error
         };
-        let s = list_folders_with_launchers("pipelines");
+        if groups.is_empty() {
+            return Template::render("admin/newgroup_redirect", context! {});
+        }
+        let pipelines_struct = list_folders_with_launchers("pipelines");
 
         Template::render(
             "admin/newform",
             context! {
-                pipelines_struct: s,
-                groups: groups
+                pipelines_struct,
+                groups
             },
         )
     }
