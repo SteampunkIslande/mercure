@@ -11,7 +11,9 @@ mod routes;
 
 #[catch(401)]
 pub async fn unauthorized() -> Option<NamedFile> {
-    NamedFile::open("static/unauthorized.html").await.ok()
+    NamedFile::open("static/errors/unauthorized.html")
+        .await
+        .ok()
 }
 
 #[launch]

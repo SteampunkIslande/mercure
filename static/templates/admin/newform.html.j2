@@ -98,7 +98,7 @@
 </head>
 
 <body>
-    <h1>Nouveau formulaire de pipeline</h1>
+    <h1 class="title">Nouveau formulaire de pipeline</h1>
     <form method="POST" action="/mercure/api/newform">
         <div>
             <label for="pipeline_name">Pipeline :</label>
@@ -136,7 +136,7 @@
         </fieldset>
 
         <div>
-            <h3>Variables définies par l'utilisateur</h3>
+            <h3 class="title">Variables définies par l'utilisateur</h3>
             <div id="user-vars-container">
             </div>
             <button type="button" onclick="addUserVar()">Ajouter une variable</button>
@@ -145,7 +145,7 @@
 
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
-        <button type="submit" class="btn" formaction="/mercure/api/newform">Envoyer</button>
+        <button type="submit" class="btn btn-primary" formaction="/mercure/api/newform">Envoyer</button>
     </div>
 
     <script>

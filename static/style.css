@@ -4,6 +4,47 @@ body {
     margin: 0 auto;
     padding: 2rem;
     line-height: 1.6;
+    color: #333;
+}
+
+h1,
+h2,
+h3 {
+    font-family: 'Arial Black', sans-serif;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+p {
+    font-size: 1rem;
+    color: #555;
+    margin-bottom: 1rem;
+}
+
+.btn {
+    display: inline-block;
+    cursor: pointer;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    margin: 10px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
 }
 
 .container {
@@ -36,14 +77,22 @@ body {
 
 
 
-.btn {
+.btn-primary {
     display: inline-block;
     padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
     text-decoration: none;
     border-radius: 5px;
     margin: 10px;
+    font-weight: bold;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
 }
 
 .btn:hover {

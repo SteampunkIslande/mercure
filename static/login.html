@@ -10,7 +10,7 @@
 
 <body>
     <div class="container">
-        <h1>Connexion</h1>
+        <h1 class="title">Connexion</h1>
         <form id="loginForm">
             <div class="form-group">
                 <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" required>
@@ -18,15 +18,14 @@
             <div class="form-group">
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
-            <div class="error" id="error-message"></div>
-            <button type="submit" class="btn">Se connecter</button>
+            <div class="error" id="error-message" style="display: none;"></div>
         </form>
-        <a href="/" class="btn" style="background-color: #6c757d;">Retour</a>
+        <a id="loginButton" class="btn btn-primary" onclick="onConnect()">Se connecter</a>
+        <a href="/mercure" class="btn btn-secondary">Retour</a>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        async function onConnect() {
             const errorDiv = document.getElementById('error-message');
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -57,7 +56,10 @@
                     errorDiv.style.display = 'none';
                 }, 2000);
             }
-        });
+        }
+        window.onload = function () {
+            document.getElementById('loginForm').reset();
+        };
     </script>
 </body>
 
