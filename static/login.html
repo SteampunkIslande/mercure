@@ -40,14 +40,13 @@
                     body: JSON.stringify({ username, password })
                 });
 
-                // const data = await response.json();
-
-                // if (data.success) {
-                //     window.location.href = '/api/me';
-                // } else {
-                //     errorDiv.style.display = 'block';
-                //     errorDiv.textContent = data.message || 'Erreur de connexion';
-                // }
+                if (response.ok) {
+                    window.location.href = response.url;
+                } else {
+                    const data = await response.json();
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = data.message || 'Erreur de connexion';
+                }
             } catch (error) {
                 errorDiv.style.display = 'block';
                 errorDiv.textContent = 'Erreur de connexion au serveur';
