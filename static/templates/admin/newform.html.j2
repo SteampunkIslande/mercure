@@ -7,7 +7,7 @@
     <link rel="stylesheet" type="text/css" href="/static/style.css">
     <title>Nouveau formulaire de pipeline</title>
     <script>
-        let userVarCounter = 1;
+        let userVarCounter = 0;
 
         function updateValues() {
             var schema = {{ pipelines_struct | tojson
@@ -42,15 +42,15 @@
                 
                 <label for="var_type_${userVarCounter}">Type :</label>
                 <select id="var_type_${userVarCounter}" name="user_defined_vars[${userVarCounter}][type]" onchange="updateVarType(${userVarCounter})" required>
-                    <option value="">-- Sélectionnez un type --</option>
-                    <option value="FromValuesList">Liste de valeurs</option>
+                    <option value="">-- Sélectionnez un type de variable --</option>
+                    <option value="FromValuesList">Liste de valeurs autorisées</option>
                     <option value="Constant">Constante</option>
-                    <option value="RunDefined">Défini à l'exécution</option>
+                    <option value="RunDefined">Défini à l'exécution (libre)</option>
                 </select>
                 
                 <div id="var_values_${userVarCounter}" style="display:none;">
-                    <label for="var_content_${userVarCounter}">Contenu :</label>
-                    <textarea id="var_content_${userVarCounter}" name="user_defined_vars[${userVarCounter}][content]" placeholder="Pour liste de valeurs: val1,val2,val3 | Pour constante/run-defined: une seule valeur"></textarea>
+                    <label id="var_content_label_${userVarCounter}" for="var_content_${userVarCounter}">Contenu :</label>
+                    <textarea id="var_content_${userVarCounter}" name="user_defined_vars[${userVarCounter}][content]" placeholder="" style="width: 100%; resize: none;" rows="5"></textarea>
                 </div>
                 
                 <button type="button" onclick="removeUserVar(${userVarCounter})">Supprimer</button>
@@ -68,25 +68,30 @@
             const typeSelect = document.getElementById(`var_type_${index}`);
             const valuesDiv = document.getElementById(`var_values_${index}`);
             const textarea = document.getElementById(`var_content_${index}`);
+            const contentLabel = document.getElementById(`var_content_label_${index}`);
 
             if (typeSelect.value) {
-                valuesDiv.style.display = 'inline';
+                valuesDiv.style.display = 'block';
+                contentLabel.style.display = 'inline';
 
                 if (typeSelect.value === 'FromValuesList') {
                     textarea.style.display = 'inline';
-                    textarea.placeholder = 'Entrez les valeurs séparées par des virgules (ex: val1,val2,val3)';
+                    textarea.placeholder = 'Entrez une valeur par ligne';
                 } else if (typeSelect.value === 'Constant') {
                     textarea.style.display = 'inline';
                     textarea.placeholder = 'Entrez la valeur constante';
                 } else if (typeSelect.value === 'RunDefined') {
                     textarea.style.display = 'none';
+                    contentLabel.style.display = 'none';
                 }
             } else {
                 valuesDiv.style.display = 'none';
+                contentLabel.style.display = 'none';
             }
         }
 
         window.onload = function () {
+            addUserVar();
             updateValues();
         };
     </script>
@@ -133,37 +138,16 @@
         <div>
             <h3>Variables définies par l'utilisateur</h3>
             <div id="user-vars-container">
-                <div class="user-var-item">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <label for="var_name_0">Nom de la variable :</label>
-                        <input type="text" id="var_name_0" name="user_defined_vars[0][name]" required>
-
-                        <label for="var_type_0">Type :</label>
-                        <select id="var_type_0" name="user_defined_vars[0][type]" onchange="updateVarType(0)" required>
-                            <option value="">-- Sélectionnez un type --</option>
-                            <option value="FromValuesList">Liste de valeurs</option>
-                            <option value="Constant">Constante</option>
-                            <option value="RunDefined">Défini à l'exécution</option>
-                        </select>
-                    </div>
-
-                    <div id="var_values_0" style="margin-top: 10px;">
-                        <label for="var_content_0">Contenu :</label>
-                        <textarea id="var_content_0" name="user_defined_vars[0][content]"
-                            placeholder="Pour liste de valeurs: val1,val2,val3 | Pour constante/run-defined: une seule valeur"
-                            style="width: 100%; resize: none;" rows="5"></textarea>
-                    </div>
-
-                    <button type="button" onclick="removeUserVar(0)" style="margin-top: 10px;">Supprimer</button>
-                </div>
             </div>
             <button type="button" onclick="addUserVar()">Ajouter une variable</button>
         </div>
-
-        <div>
-            <button type="submit">Envoyer</button>
-        </div>
     </form>
+
+    <!-- Centered submit button at the bottom of the page -->
+    <div style="text-align: center; margin-top: 20px;">
+        <button type="submit" class="btn" formaction="/mercure/api/newform">Envoyer</button>
+    </div>
+
     <script>
         // Show/hide launcher container based on pipeline selection
         document.getElementById('pipeline_name').addEventListener('change', function () {
