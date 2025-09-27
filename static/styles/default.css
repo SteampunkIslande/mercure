@@ -76,6 +76,28 @@ p {
 }
 
 
+/* Banner styles */
+.banner {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.banner-content {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.banner-text {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
 
 .btn-primary {
     display: inline-block;
