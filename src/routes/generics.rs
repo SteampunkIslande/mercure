@@ -7,12 +7,12 @@ use super::ApiResponse;
 
 #[get("/")]
 pub async fn welcome_page_get() -> Option<NamedFile> {
-    NamedFile::open("static/welcome.html").await.ok()
+    NamedFile::open("static/common/welcome.html").await.ok()
 }
 
 #[get("/login")]
 pub async fn login_get() -> Option<NamedFile> {
-    NamedFile::open("static/login.html").await.ok()
+    NamedFile::open("static/common/login.html").await.ok()
 }
 
 #[get("/logout")]

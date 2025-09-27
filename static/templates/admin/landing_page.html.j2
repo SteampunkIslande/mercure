@@ -5,13 +5,13 @@
     <meta charset="UTF-8">
     <title>Admin Landing Page</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
 </head>
 
 <body>
     <div class="container">
-        <h1>Welcome, Admin</h1>
-        <p>Manage users and settings from this dashboard.</p>
+        <h1>Bienvenue, {{ user.username }}</h1>
+        <p>Ce tableau de bord est votre interface de gestion.</p>
         <div class="nav">
             <a href="/mercure/admin/register">Créer un utilisateur</a>
         </div>

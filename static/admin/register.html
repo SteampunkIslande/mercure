@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Administration - Création d'utilisateur</title>
-    <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
 </head>
 
 <body>
@@ -13,17 +13,22 @@
         <h1>Administration - Création d'utilisateur</h1>
         <form id="registerForm">
             <div class="form-group">
+                <label for="username">Nom d'utilisateur:</label>
                 <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" required>
             </div>
             <div class="form-group">
+                <label for="email">Adresse e-mail:</label>
+                <input type="email" id="email" name="email" placeholder="Adresse e-mail" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
             <div class="error" id="error-message" style="display: none;"></div>
             <div class="success" id="success-message" style="display: none;"></div>
             <button type="submit" class="btn">Créer l'utilisateur</button>
+            <a href="/mercure/admin/landing_page" class="btn btn-secondary">Retour au tableau de bord</a>
         </form>
-        <a href="/mercure/admin/landing_page" class="btn" style="background-color: #6c757d;">Retour au tableau de
-            bord</a>
     </div>
 
     <script>
