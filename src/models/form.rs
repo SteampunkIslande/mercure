@@ -24,7 +24,7 @@ pub struct HgFormDef {
     pub launcher_name: String,
     pub form_name: String,
     pub groups: Vec<Group>,
-    pub user_defined_vars: HashMap<String, UserDefinedVar>,
+    pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
 }
 
 /// Created by users.
@@ -60,6 +60,8 @@ pub struct HgForm {
 /// - if type is `Constant`, column `value` will be its value
 /// - if type is `RunDefined`, columns `value` will be `NULL`.
 impl HgFormDef {
+    /// Add new form definition to the database
+    /// Each form will be used as a template for actual runs
     pub async fn new_form_def(
         new_formdef: HgFormDef,
         pool: &SqlitePool,
@@ -93,47 +95,49 @@ impl HgFormDef {
             .await?;
         }
 
-        // Insert user_defined_vars into UDV table
-        for (varname, udv) in &new_formdef.user_defined_vars {
-            match udv {
-                UserDefinedVar::FromValuesList { allowed } => {
-                    let values = allowed.join("\n");
-                    sqlx::query(
-                        r#"
+        if let Some(user_defined_vars) = &new_formdef.user_defined_vars {
+            // Insert user_defined_vars into UDV table
+            for (varname, udv) in user_defined_vars {
+                match udv {
+                    UserDefinedVar::FromValuesList { allowed } => {
+                        let values = allowed.join("\n");
+                        sqlx::query(
+                            r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, ?, 'FromValuesList')
                         "#,
-                    )
-                    .bind(form_id)
-                    .bind(varname)
-                    .bind(values)
-                    .execute(pool)
-                    .await?;
-                }
-                UserDefinedVar::Constant(val) => {
-                    sqlx::query(
-                        r#"
+                        )
+                        .bind(form_id)
+                        .bind(varname)
+                        .bind(values)
+                        .execute(pool)
+                        .await?;
+                    }
+                    UserDefinedVar::Constant(val) => {
+                        sqlx::query(
+                            r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, ?, 'Constant')
                         "#,
-                    )
-                    .bind(form_id)
-                    .bind(varname)
-                    .bind(val)
-                    .execute(pool)
-                    .await?;
-                }
-                UserDefinedVar::RunDefined => {
-                    sqlx::query(
-                        r#"
+                        )
+                        .bind(form_id)
+                        .bind(varname)
+                        .bind(val)
+                        .execute(pool)
+                        .await?;
+                    }
+                    UserDefinedVar::RunDefined => {
+                        sqlx::query(
+                            r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, NULL, 'RunDefined')
                         "#,
-                    )
-                    .bind(form_id)
-                    .bind(varname)
-                    .execute(pool)
-                    .await?;
+                        )
+                        .bind(form_id)
+                        .bind(varname)
+                        .execute(pool)
+                        .await?;
+                    }
                 }
             }
         }
@@ -165,7 +169,7 @@ mod tests {
             launcher_name: "Nextflow".to_string(),
             form_name: "RNASeqForm".to_string(),
             groups: vec![],
-            user_defined_vars,
+            user_defined_vars: Some(user_defined_vars),
         };
 
         let json = serde_json::to_string_pretty(&form_def).unwrap();

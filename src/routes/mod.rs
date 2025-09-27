@@ -1,12 +1,14 @@
 mod admin;
 mod auth;
 mod generics;
+mod listgroups;
 mod newform;
 mod newgroup;
 
 pub use admin::*;
 pub use auth::*;
 pub use generics::*;
+pub use listgroups::*;
 pub use newform::*;
 pub use newgroup::*;
 

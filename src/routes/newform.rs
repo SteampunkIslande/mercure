@@ -75,6 +75,7 @@ pub async fn newform_post(
             "You are not allowed to create new form, only admins can!".to_string(),
         ));
     }
+    eprintln!("{:?}", form);
     Json(ApiResponse::success(format!("{:?}", form)))
 
     // match HgFormDef::new_form_def(form.0, pool).await {

@@ -53,7 +53,8 @@ async fn rocket() -> _ {
                 routes::register_post,
                 routes::login_post,
                 routes::newform_post,
-                routes::newgroup_get
+                routes::newgroup_get,
+                routes::list_groups
             ],
         )
         .attach(Template::fairing())
