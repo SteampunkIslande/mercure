@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx;
 use sqlx::{Row, SqlitePool};
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Group {
     pub id: i64,
     pub name: String,
@@ -26,5 +26,22 @@ impl Group {
             .collect();
 
         Ok(groups)
+    }
+
+    /// Adds a new group to the database and returns its ID
+    pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO Groups (group_name)
+            VALUES (?)
+            RETURNING group_id
+            "#,
+        )
+        .bind(group_name)
+        .fetch_one(pool)
+        .await?;
+
+        let group_id: i64 = row.try_get("group_id")?;
+        Ok(group_id)
     }
 }

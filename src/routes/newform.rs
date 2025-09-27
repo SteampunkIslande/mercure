@@ -51,9 +51,6 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
             Ok(groups) => groups,
             Err(_) => Vec::new(), // Return empty vector on error
         };
-        if groups.is_empty() {
-            return Template::render("admin/newgroup_redirect", context! {});
-        }
         let pipelines_struct = list_folders_with_launchers("pipelines");
 
         Template::render(
@@ -78,8 +75,10 @@ pub async fn newform_post(
             "You are not allowed to create new form, only admins can!".to_string(),
         ));
     }
-    match HgFormDef::new_form_def(form.0, pool).await {
-        Ok(()) => Json(ApiResponse::success("".to_string())),
-        Err(e) => Json(ApiResponse::error(format!("{e}"))),
-    }
+    Json(ApiResponse::success(format!("{:?}", form)))
+
+    // match HgFormDef::new_form_def(form.0, pool).await {
+    //     Ok(()) => Json(ApiResponse::success("".to_string())),
+    //     Err(e) => Json(ApiResponse::error(format!("{e}"))),
+    // }
 }

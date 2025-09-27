@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::groups::Group;
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum UserDefinedVar {
     FromValuesList {
         allowed: Vec<String>,
@@ -18,7 +18,7 @@ pub enum UserDefinedVar {
 /// Struct used to define a form template
 /// Only read from JSON, defined within the browser
 /// See newform.html.jinja2 for more info
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct HgFormDef {
     pub pipeline_name: String,
     pub launcher_name: String,
@@ -138,5 +138,44 @@ impl HgFormDef {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_print_hgformdef_as_json() {
+        let mut user_defined_vars = HashMap::new();
+        user_defined_vars.insert(
+            "species".to_string(),
+            UserDefinedVar::FromValuesList {
+                allowed: vec!["human".to_string(), "mouse".to_string()],
+            },
+        );
+        user_defined_vars.insert(
+            "project".to_string(),
+            UserDefinedVar::Constant("CancerStudy".to_string()),
+        );
+        user_defined_vars.insert("batch".to_string(), UserDefinedVar::RunDefined);
+
+        let form_def = HgFormDef {
+            pipeline_name: "RNASeq".to_string(),
+            launcher_name: "Nextflow".to_string(),
+            form_name: "RNASeqForm".to_string(),
+            groups: vec![],
+            user_defined_vars,
+        };
+
+        let json = serde_json::to_string_pretty(&form_def).unwrap();
+        println!("{json}");
+        // Optionally, assert that JSON contains expected fields
+        assert!(json.contains("RNASeqForm"));
+        assert!(json.contains("species"));
+        assert!(json.contains("FromValuesList"));
+
+        let roundtrip_test: HgFormDef = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip_test, form_def);
     }
 }

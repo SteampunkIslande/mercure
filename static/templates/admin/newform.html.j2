@@ -95,11 +95,205 @@
             updateValues();
         };
     </script>
+
+    <script>
+        function onSubmit() {
+            if (pendingGroups.length > 0) {
+                const pendingGroupPromises = pendingGroups.map(groupName => {
+                    return fetch(`/mercure/api/newgroup/${encodeURIComponent(groupName)}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Erreur lors de la création du groupe : ${groupName}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.data.group_id && data.data.group_name) {
+                                // Add the new group to the selected groups
+                                const groupsContainer = document.getElementById("groups-container");
+                                const groupDiv = document.createElement("div");
+                                groupDiv.className = "group-checkbox";
+                                groupDiv.innerHTML = `
+                                <input type="checkbox" id="group_${data.data.group_id}" name="selected_groups" value="${data.data.group_id}" checked>
+                                <label for="group_${data.data.group_id}">${data.data.group_name} (ID: ${data.data.group_id})</label>
+                            `;
+                                groupsContainer.appendChild(groupDiv);
+                            } else {
+                                throw new Error(`Réponse invalide pour le groupe : ${groupName}`);
+                            }
+                        });
+                });
+
+                Promise.all(pendingGroupPromises)
+                    .then(() => {
+                        pendingGroups = []; // Clear pending groups after successful creation
+                        submitForm(); // Proceed with form submission
+                    })
+                    .catch(error => {
+                        alert(error.message);
+                    });
+
+                return; // Prevent immediate form submission
+            }
+
+            submitForm(); // Proceed if no pending groups
+        }
+
+        function submitForm() {
+            const pipelineName = document.getElementById("pipeline_name").value;
+            const launcherName = document.getElementById("launcher_name").value;
+            const formName = document.getElementById("form_name").value;
+
+            const selectedGroups = Array.from(
+                document.querySelectorAll('input[name="selected_groups"]:checked')
+            ).map((input) => {
+                const groupId = input.value;
+                const groupName = input.nextElementSibling?.textContent?.trim() || "Nom inconnu";
+                return { id: groupId, name: groupName };
+            });
+
+            const userVars = {};
+            document.querySelectorAll(".user-var-item").forEach((item) => {
+                const varName = item.querySelector('input[type="text"]').value;
+                const varType = item.querySelector("select").value;
+                const varContent = item.querySelector("textarea")?.value || null;
+
+                if (varType === "FromValuesList") {
+                    userVars[varName] = { allowed: varContent.split("\n") };
+                } else if (varType === "Constant") {
+                    userVars[varName] = [varContent];
+                } else if (varType === "RunDefined") {
+                    userVars[varName] = null;
+                }
+            });
+
+            const formData = {
+                pipeline_name: pipelineName,
+                launcher_name: launcherName,
+                form_name: formName,
+                groups: selectedGroups,
+                user_defined_vars: userVars,
+            };
+
+            fetch("/mercure/api/newform", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(formData),
+            })
+                .then((response) => {
+                    if (response.ok) {
+                        alert("Formulaire soumis avec succès.");
+                    } else {
+                        alert("Erreur lors de la soumission du formulaire.");
+                    }
+                })
+                .catch((error) => {
+                    console.error("Erreur:", error);
+                    alert("Erreur lors de la soumission du formulaire.");
+                });
+        }
+
+        //const newGroupName = document.getElementById("new_group_name").value.trim();
+        //
+        //if (newGroupName) {
+        //    fetch("/mercure/api/newgroup", {
+        //        method: "GET",
+        //    })
+        //        .then((response) => {
+        //            if (!response.ok) {
+        //                throw new Error("Erreur lors de la création du nouveau groupe.");
+        //            }
+        //            return response.json();
+        //        })
+        //        .then((data) => {
+        //            if (data.group_id && data.group_name) {
+        //                // Add the new group to the selected groups
+        //                const groupsContainer = document.getElementById("groups-container");
+        //                const groupDiv = document.createElement("div");
+        //                groupDiv.className = "group-checkbox";
+        //                groupDiv.innerHTML = `
+        //                    <input type="checkbox" id="group_${data.group_id}" name="selected_groups" value="${data.group_id}" checked>
+        //                    <label for="group_${data.group_id}">${data.group_name} (ID: ${data.group_id})</label>
+        //                `;
+        //                groupsContainer.appendChild(groupDiv);
+        //            } else {
+        //                throw new Error("Réponse invalide du serveur.");
+        //            }
+        //        })
+        //        .catch((error) => {
+        //            alert(error.message);
+        //            return; // Stop form submission
+        //        });
+        //}
+
+        const pipelineName = document.getElementById("pipeline_name").value;
+        const launcherName = document.getElementById("launcher_name").value;
+        const formName = document.getElementById("form_name").value;
+
+        const selectedGroups = Array.from(
+            document.querySelectorAll('input[name="selected_groups"]:checked')
+        ).map((input) => {
+            const groupId = input.value;
+            const groupName = input.nextElementSibling?.textContent?.trim() || "Nom inconnu";
+            return { id: groupId, name: groupName };
+        });
+
+        const newGroupName = document.getElementById("new_group_name").value.trim();
+        if (newGroupName) {
+            selectedGroups.push({ id: null, name: newGroupName });
+        }
+
+        const userVars = {};
+        document.querySelectorAll(".user-var-item").forEach((item) => {
+            const varName = item.querySelector('input[type="text"]').value;
+            const varType = item.querySelector("select").value;
+            const varContent = item.querySelector("textarea")?.value || null;
+
+            if (varType === "FromValuesList") {
+                userVars[varName] = { allowed: varContent.split("\n") };
+            } else if (varType === "Constant") {
+                userVars[varName] = [varContent];
+            } else if (varType === "RunDefined") {
+                userVars[varName] = null;
+            }
+        });
+
+        const formData = {
+            pipeline_name: pipelineName,
+            launcher_name: launcherName,
+            form_name: formName,
+            groups: selectedGroups,
+            user_defined_vars: userVars,
+        };
+
+        fetch("/mercure/api/newform", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+        })
+            .then((response) => {
+                if (response.ok) {
+                    alert("Formulaire soumis avec succès.");
+                } else {
+                    alert("Erreur lors de la soumission du formulaire.");
+                }
+            })
+            .catch((error) => {
+                console.error("Erreur:", error);
+                alert("Erreur lors de la soumission du formulaire.");
+            });
+
+    </script>
+
 </head>
 
 <body>
     <h1 class="title">Nouveau formulaire de pipeline</h1>
-    <form method="POST" action="/mercure/api/newform">
+    <form>
         <div>
             <label for="pipeline_name">Pipeline :</label>
             <select id="pipeline_name" name="pipeline_name" onchange="updateValues()" required>
@@ -132,6 +326,49 @@
                     <label for="group_{{ group.group_id }}">{{ group.group_name }} (ID: {{ group.group_id }})</label>
                 </div>
                 {% endfor %}
+                <div>
+                    <label for="new_group_name">Créer un nouveau groupe :</label>
+                    <input type="text" id="new_group_name" name="new_group_name" placeholder="Nom du nouveau groupe">
+                    <button type="button" onclick="addNewGroup()">Ajouter</button>
+                </div>
+                <script>
+                    let pendingGroups = [];
+
+                    function addNewGroup() {
+                        const newGroupName = document.getElementById("new_group_name").value.trim();
+                        if (!newGroupName) {
+                            alert("Veuillez entrer un nom pour le nouveau groupe.");
+                            return;
+                        }
+
+                        // Check for duplicate group names
+                        const existingGroups = Array.from(document.querySelectorAll('input[name="selected_groups"]'))
+                            .map(input => input.nextElementSibling?.textContent?.trim());
+
+                        if (existingGroups.includes(newGroupName)) {
+                            alert("Ce nom de groupe existe déjà. Veuillez en choisir un autre.");
+                            return;
+                        }
+
+                        // Add to pending groups
+                        pendingGroups.push(newGroupName);
+
+                        // Create a new group element
+                        const groupsContainer = document.getElementById("groups-container");
+                        const groupId = `new_group_${Date.now()}`; // Unique ID based on timestamp
+                        const groupDiv = document.createElement("div");
+                        groupDiv.className = "group-checkbox";
+                        groupDiv.innerHTML = `
+                            <input type="checkbox" id="${groupId}" name="selected_groups" value="${groupId}" checked>
+                            <label for="${groupId}">${newGroupName} (Nouveau)</label>
+                        `;
+                        groupsContainer.appendChild(groupDiv);
+
+                        // Clear the input field
+                        document.getElementById("new_group_name").value = "";
+                    }
+
+                </script>
             </div>
         </fieldset>
 
@@ -145,7 +382,7 @@
 
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
-        <button type="submit" class="btn btn-primary" formaction="/mercure/api/newform">Envoyer</button>
+        <button class="btn btn-primary" onclick="onSubmit()">Envoyer</button>
     </div>
 
     <script>

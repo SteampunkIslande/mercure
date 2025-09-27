@@ -52,7 +52,8 @@ async fn rocket() -> _ {
                 // Routes pour le backend: renvoie toujours du JSON
                 routes::register_post,
                 routes::login_post,
-                routes::newform_post
+                routes::newform_post,
+                routes::newgroup_get
             ],
         )
         .attach(Template::fairing())

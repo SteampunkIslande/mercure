@@ -2,11 +2,13 @@ mod admin;
 mod auth;
 mod generics;
 mod newform;
+mod newgroup;
 
 pub use admin::*;
 pub use auth::*;
 pub use generics::*;
 pub use newform::*;
+pub use newgroup::*;
 
 #[derive(Debug, serde::Serialize)]
 pub struct ApiResponse<T> {
