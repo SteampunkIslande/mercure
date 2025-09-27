@@ -12,10 +12,12 @@
     <div class="container">
         <h1 class="title">Connexion</h1>
         <form id="loginForm">
-            <div class="form-group">
-                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" required>
+            <div>
+                <label for="usermail">Adresse e-mail:</label>
+                <input type="text" id="usermail" name="usermail" placeholder="Adresse e-mail" required>
             </div>
-            <div class="form-group">
+            <div>
+                <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
             <div class="error" id="error-message" style="display: none;"></div>
@@ -27,7 +29,7 @@
     <script>
         async function onConnect() {
             const errorDiv = document.getElementById('error-message');
-            const username = document.getElementById('username').value;
+            const usermail = document.getElementById('usermail').value;
             const password = document.getElementById('password').value;
 
             try {
@@ -36,7 +38,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ usermail, password })
                 });
 
                 if (response.ok) {

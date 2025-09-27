@@ -12,30 +12,31 @@
     <div class="container">
         <h1>Administration - Création d'utilisateur</h1>
         <form id="registerForm">
-            <div class="form-group">
+            <div>
                 <label for="username">Nom d'utilisateur:</label>
-                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" required>
+                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" autocomplete="off" required>
             </div>
-            <div class="form-group">
-                <label for="email">Adresse e-mail:</label>
-                <input type="email" id="email" name="email" placeholder="Adresse e-mail" required>
+            <div>
+                <label for="usermail">Adresse e-mail:</label>
+                <input type="email" id="usermail" name="usermail" placeholder="Adresse e-mail" autocomplete="off" required>
             </div>
-            <div class="form-group">
+            <div>
                 <label for="password">Mot de passe:</label>
-                <input type="password" id="password" name="password" placeholder="Mot de passe" required>
+                <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="off" required>
             </div>
             <div class="error" id="error-message" style="display: none;"></div>
             <div class="success" id="success-message" style="display: none;"></div>
-            <button type="submit" class="btn">Créer l'utilisateur</button>
+            <button id="createUserButton" class="btn btn-primary">Créer l'utilisateur</button>
             <a href="/mercure/admin/landing_page" class="btn btn-secondary">Retour au tableau de bord</a>
         </form>
     </div>
 
     <script>
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        document.getElementById('createUserButton').addEventListener('click', async (e) => {
             e.preventDefault();
             const errorDiv = document.getElementById('error-message');
             const successDiv = document.getElementById('success-message');
+            const usermail = document.getElementById('usermail').value;
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
@@ -45,7 +46,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ usermail, username, password })
                 });
 
                 const data = await response.json();
@@ -72,6 +73,15 @@
                 }, 2000);
             }
         });
+
+        function init() {
+            document.getElementById('registerForm').reset();
+        }
+
+        window.onload = function () {
+            init();
+        };
+
     </script>
 </body>
 

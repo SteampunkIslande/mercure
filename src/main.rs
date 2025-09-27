@@ -18,13 +18,7 @@ pub async fn unauthorized() -> Option<NamedFile> {
 
 #[launch]
 async fn rocket() -> _ {
-    // Initialiser la base de données
-    let pool = db::init_db()
-        .await
-        .expect("Impossible d'initialiser la base de données");
-
-    rocket::build()
-        .manage(pool)
+    let rocket_app = rocket::build()
         .register("/", catchers![unauthorized])
         .mount("/static", FileServer::from("./static"))
         .mount(
@@ -57,5 +51,14 @@ async fn rocket() -> _ {
                 routes::list_groups
             ],
         )
-        .attach(Template::fairing())
+        .attach(Template::fairing());
+
+    // Initialiser la base de données
+    let pool = db::init_db(&rocket_app)
+        .await
+        .expect("Impossible d'initialiser la base de données");
+
+    let rocket_app = rocket_app.manage(pool);
+
+    rocket_app
 }

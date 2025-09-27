@@ -8,6 +8,7 @@ use crate::auth::AuthError;
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct User {
     pub id: i64,
+    pub usermail: String,
     pub username: String,
     #[serde(skip_serializing)]
     password_hash: String,
@@ -18,6 +19,7 @@ pub struct User {
 
 #[derive(Debug, Deserialize)]
 pub struct NewUser {
+    pub usermail: String,
     pub username: String,
     pub password: String,
 }
@@ -32,10 +34,11 @@ impl User {
         // Insérer l'utilisateur
         sqlx::query(
             r#"
-            INSERT INTO Users (username, password_hash, created_at, is_admin)
-            VALUES (?, ?, ?, false)
+            INSERT INTO Users (usermail, username, password_hash, created_at, is_admin)
+            VALUES (?, ?, ?, ?, false)
             "#,
         )
+        .bind(&new_user.usermail)
         .bind(&new_user.username)
         .bind(&password_hash)
         .bind(now)
@@ -46,11 +49,11 @@ impl User {
         // Récupérer l'utilisateur créé
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login, is_admin
-            FROM Users WHERE username = ?
+            SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
+            FROM Users WHERE usermail = ?
             "#,
         )
-        .bind(&new_user.username)
+        .bind(&new_user.usermail)
         .fetch_one(pool)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
@@ -61,7 +64,7 @@ impl User {
     pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<Option<User>, AuthError> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login, is_admin
+            SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
             FROM Users WHERE id = ?
             "#,
         )
@@ -73,17 +76,17 @@ impl User {
         Ok(user)
     }
 
-    pub async fn find_by_username(
-        username: &str,
+    pub async fn find_by_usermail(
+        usermail: &str,
         pool: &SqlitePool,
     ) -> Result<Option<User>, AuthError> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT id, username, password_hash, created_at, last_login, is_admin
-            FROM Users WHERE username = ?
+            SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
+            FROM Users WHERE usermail = ?
             "#,
         )
-        .bind(username)
+        .bind(usermail)
         .fetch_optional(pool)
         .await
         .map_err(|e| AuthError::DatabaseError(e.to_string()))?;

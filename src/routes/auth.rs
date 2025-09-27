@@ -11,7 +11,7 @@ use rocket::uri;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct LoginRequest {
-    username: String,
+    usermail: String,
     password: String,
 }
 
@@ -22,7 +22,7 @@ pub async fn login_post(
     cookies: &CookieJar<'_>,
     pool: &State<SqlitePool>,
 ) -> Result<Redirect, AuthError> {
-    let mut user = User::find_by_username(&login.username, pool)
+    let mut user = User::find_by_usermail(&login.usermail, pool)
         .await?
         .ok_or(AuthError::UnknownUser)?;
 

@@ -4,7 +4,7 @@ use mercure::{
     db,
     models::user::{NewUser, User},
 };
-use std::process;
+use std::{path::PathBuf, process};
 
 #[derive(Parser)]
 #[command(name = "mercure-admin")]
@@ -12,12 +12,19 @@ use std::process;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Database path
+    #[arg(short, long)]
+    database: PathBuf,
 }
 
 #[derive(Subcommand)]
 enum Commands {
     /// Créer un nouvel utilisateur
     CreateUser {
+        /// Adrese email
+        #[arg(short = 'm', long = "mail")]
+        usermail: String,
         /// Nom d'utilisateur
         #[arg(short, long)]
         username: String,
@@ -32,7 +39,7 @@ enum Commands {
     ResetPassword {
         /// Nom d'utilisateur
         #[arg(short, long)]
-        username: String,
+        usermail: String,
         /// Nouveau mot de passe
         #[arg(short, long)]
         password: String,
@@ -43,7 +50,7 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
 
-    let pool = match db::init_db().await {
+    let pool = match db::init_db_from_url(&cli.database.to_string_lossy()).await {
         Ok(pool) => pool,
         Err(e) => {
             eprintln!(
@@ -56,11 +63,16 @@ async fn main() {
 
     match cli.command {
         Commands::CreateUser {
+            usermail,
             username,
             password,
             admin,
         } => {
-            let new_user = NewUser { username, password };
+            let new_user = NewUser {
+                usermail,
+                username,
+                password,
+            };
             match User::create(new_user, &pool).await {
                 Ok(user) => {
                     if admin {
@@ -88,9 +100,9 @@ async fn main() {
                 }
             }
         }
-        Commands::ResetPassword { username, password } => {
+        Commands::ResetPassword { usermail, password } => {
             // Vérifier si l'utilisateur existe
-            match User::find_by_username(&username, &pool).await {
+            match User::find_by_usermail(&usermail, &pool).await {
                 Ok(Some(_)) => {
                     // Hasher le nouveau mot de passe
                     let password_hash = match hash(password.as_bytes(), DEFAULT_COST) {
@@ -103,9 +115,9 @@ async fn main() {
 
                     // Mettre à jour le mot de passe
                     if let Err(e) =
-                        sqlx::query("UPDATE Users SET password_hash = ? WHERE username = ?")
+                        sqlx::query("UPDATE Users SET password_hash = ? WHERE usermail = ?")
                             .bind(&password_hash)
-                            .bind(&username)
+                            .bind(&usermail)
                             .execute(&pool)
                             .await
                     {
@@ -115,11 +127,11 @@ async fn main() {
 
                     println!(
                         "Mot de passe mis à jour avec succès pour l'utilisateur {}",
-                        username
+                        usermail
                     );
                 }
                 Ok(None) => {
-                    eprintln!("Utilisateur non trouvé : {}", username);
+                    eprintln!("Utilisateur non trouvé : {}", usermail);
                     process::exit(1);
                 }
                 Err(e) => {

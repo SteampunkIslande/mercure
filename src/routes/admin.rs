@@ -20,8 +20,8 @@ pub async fn register_post(
     }
 
     // Make sure the user doesn't already exist
-    if let Some(_) = User::find_by_username(&user.username, pool).await? {
-        return Ok(Json(ApiResponse::error("Ce nom d'utilisateur existe déjà")));
+    if let Some(_) = User::find_by_usermail(&user.usermail, pool).await? {
+        return Ok(Json(ApiResponse::error("Cet utilisateur existe déjà")));
     }
 
     let user = User::create(user.into_inner(), pool).await?;

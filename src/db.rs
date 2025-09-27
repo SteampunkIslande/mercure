@@ -1,3 +1,4 @@
+use rocket::Build;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         r#"
         CREATE TABLE IF NOT EXISTS Users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usermail TEXT NOT NULL UNIQUE,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             created_at DATETIME NOT NULL,
@@ -95,9 +97,16 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
-    let database_url = "sqlite://mercure.db";
-    let pool = create_pool(database_url).await?;
+pub async fn init_db(app: &rocket::Rocket<Build>) -> Result<SqlitePool, sqlx::Error> {
+    let figment = app.figment();
+    let database_url: String = figment.extract_inner("mercure_db").expect(
+        "No database URL configured. Please set field `mercure_db` (should start with sqlite://",
+    );
+    init_db_from_url(&database_url).await
+}
+
+pub async fn init_db_from_url(url: &str) -> Result<SqlitePool, sqlx::Error> {
+    let pool = create_pool(url).await?;
     run_migrations(&pool).await?;
     Ok(pool)
 }
