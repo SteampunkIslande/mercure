@@ -120,10 +120,16 @@
                 return { id: groupId, name: groupName };
             });
 
-            const userVars = {};
+            userVars = {};
             document.querySelectorAll(".user-var-item").forEach((item) => {
                 const varName = item.querySelector('input[type="text"]').value;
                 const varType = item.querySelector("select").value;
+
+                // Skip items with empty varName or varType
+                if (!varName.trim() || !varType.trim()) {
+                    return;
+                }
+
                 const varContent = item.querySelector("textarea")?.value || null;
 
                 userVars[varName] = {};
@@ -138,6 +144,8 @@
                 }
 
             });
+
+            // userVars should be null if empty, for serialization reasons
 
             if (Object.keys(userVars).length === 0) {
                 userVars = null;
@@ -220,7 +228,7 @@
 
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
-        <button class="btn btn-primary" onclick="onSubmit()">Envoyer</button>
+        <button class="btn btn-primary" onclick="onSubmit()">Créer</button>
     </div>
 
     <script>
