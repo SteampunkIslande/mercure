@@ -6,6 +6,8 @@ use super::ApiResponse;
 use crate::auth::{AuthError, Authenticated};
 use crate::models::{NewUser, User};
 
+use rocket_dyn_templates::{Template, context};
+
 #[post("/register", data = "<user>")]
 pub async fn register_post(
     user: Json<NewUser>,
@@ -39,11 +41,12 @@ pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> 
 
 /// Admin landing page
 #[get("/landing_page")]
-pub async fn admin_landing_page_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
+pub async fn admin_landing_page_get(auth: Authenticated) -> Option<Template> {
     if !auth.user.is_admin {
         return None;
     }
-    rocket::fs::NamedFile::open("static/admin/landing_page.html")
-        .await
-        .ok()
+    Some(Template::render(
+        "admin/landing_page",
+        context! {user:auth.user},
+    ))
 }
