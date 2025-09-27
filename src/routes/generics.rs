@@ -1,9 +1,8 @@
 use rocket::fs::NamedFile;
 use rocket::get;
 use rocket::http::{Cookie, CookieJar};
-use rocket::serde::json::Json;
-
-use super::ApiResponse;
+use rocket::response::Redirect;
+use rocket::uri;
 
 #[get("/")]
 pub async fn welcome_page_get() -> Option<NamedFile> {
@@ -16,7 +15,7 @@ pub async fn login_get() -> Option<NamedFile> {
 }
 
 #[get("/logout")]
-pub fn logout_get(cookies: &CookieJar<'_>) -> Json<ApiResponse<()>> {
+pub fn logout_get(cookies: &CookieJar<'_>) -> Redirect {
     cookies.remove_private(Cookie::build("user_id"));
-    Json(ApiResponse::success(()))
+    Redirect::to(uri!("/mercure"))
 }
