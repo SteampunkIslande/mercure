@@ -42,13 +42,13 @@ pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> 
 // Group::get_user_groups(pool, auth.user.id)
 
 /// Admin landing page
-#[get("/landing_page")]
-pub async fn admin_landing_page_get(auth: Authenticated) -> Option<Template> {
+#[get("/dashboard")]
+pub async fn admin_dashboard_get(auth: Authenticated) -> Option<Template> {
     if !auth.user.is_admin {
         return None;
     }
     Some(Template::render(
-        "admin/landing_page",
+        "admin/dashboard",
         context! {user:auth.user},
     ))
 }

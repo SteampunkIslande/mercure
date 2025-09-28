@@ -26,7 +26,7 @@ pub fn logout_get(cookies: &CookieJar<'_>) -> Redirect {
 #[get("/success?<origin>&<message>")]
 pub fn success_page_get(authenticated: Authenticated, origin: String, message: String) -> Template {
     let home_uri = if authenticated.user.is_admin {
-        "/mercure/admin/landing_page"
+        "/mercure/admin/dashboard"
     } else {
         "/mercure/home"
     };

@@ -37,7 +37,7 @@ async fn rocket() -> _ {
             routes![
                 // Routes pour affichage dans le navigateur de l'admin
                 routes::register_get,
-                routes::admin_landing_page_get,
+                routes::admin_dashboard_get,
                 // Création de formulaire
                 routes::newform_get,
                 //Edition d'un formulaire
@@ -69,8 +69,6 @@ async fn rocket() -> _ {
     let pool = db::init_db(&rocket_app)
         .await
         .expect("Impossible d'initialiser la base de données");
-
-    
 
     rocket_app.manage(pool)
 }

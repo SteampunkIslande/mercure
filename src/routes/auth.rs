@@ -37,7 +37,7 @@ pub async fn login_post(
 
     if user.is_admin {
         eprintln!("User is admin");
-        Ok(Redirect::to(uri!("/mercure/admin/landing_page")))
+        Ok(Redirect::to(uri!("/mercure/admin/dashboard")))
     } else {
         eprintln!("User is not admin");
         Ok(Redirect::to(uri!("/mercure/home")))
