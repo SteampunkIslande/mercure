@@ -23,6 +23,8 @@ pub struct HgFormDef {
     pub pipeline_name: String,
     pub launcher_name: String,
     pub form_name: String,
+    pub enabled: bool,
+    pub version: i32,
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
 }
@@ -69,14 +71,16 @@ impl HgFormDef {
         // Insert into Formdef table
         let form_id: i64 = sqlx::query(
             r#"
-            INSERT INTO Formdef (pipeline_name, launcher_name, form_name)
-            VALUES (?, ?, ?)
+            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
         )
         .bind(&new_formdef.pipeline_name)
         .bind(&new_formdef.launcher_name)
         .bind(&new_formdef.form_name)
+        .bind(new_formdef.enabled)
+        .bind(new_formdef.version)
         .fetch_one(pool)
         .await?
         .try_get(0usize)?;
@@ -168,6 +172,8 @@ mod tests {
             pipeline_name: "RNASeq".to_string(),
             launcher_name: "Nextflow".to_string(),
             form_name: "RNASeqForm".to_string(),
+            enabled: true,
+            version: 1,
             groups: vec![],
             user_defined_vars: Some(user_defined_vars),
         };

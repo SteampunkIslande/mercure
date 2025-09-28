@@ -44,7 +44,9 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             form_id INTEGER PRIMARY KEY AUTOINCREMENT,
             pipeline_name TEXT NOT NULL,
             launcher_name TEXT NOT NULL,
-            form_name TEXT NOT NULL
+            form_name TEXT NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            version INTEGER NOT NULL DEFAULT 1
         )
         "#,
     )
