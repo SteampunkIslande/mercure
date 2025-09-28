@@ -108,7 +108,7 @@ impl HgFormDef {
             "#,
         )
         .bind(&new_formdef.form_name)
-        .bind(&new_formdef.version)
+        .bind(new_formdef.version)
         .fetch_one(pool)
         .await
         {

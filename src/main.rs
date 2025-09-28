@@ -70,7 +70,7 @@ async fn rocket() -> _ {
         .await
         .expect("Impossible d'initialiser la base de données");
 
-    let rocket_app = rocket_app.manage(pool);
+    
 
-    rocket_app
+    rocket_app.manage(pool)
 }

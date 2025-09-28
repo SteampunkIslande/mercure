@@ -40,7 +40,7 @@ impl<'r> Responder<'r, 'static> for AuthError {
             }
             AuthError::UnknownUser => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<u8>::error(format!("Utilisateur inconnu"))
+                ApiResponse::<u8>::error("Utilisateur inconnu".to_string())
             }
         };
 
