@@ -24,43 +24,38 @@ async fn rocket() -> _ {
         .mount(
             "/mercure",
             routes![
-                // Routes génériques: accueil et authentification
-                routes::welcome_page_get,
-                routes::login_get,
-                routes::logout_get,
-                // Une page pour rediriger les utilisateurs en cas de succès
-                routes::success_page_get
+                routes::frontend::welcome_page_get,
+                routes::frontend::login_get,
+                routes::backend::logout_get,
+                routes::frontend::success_page_get
             ],
         )
         .mount(
             "/mercure/admin",
+            //Routes réservées à l'admin
             routes![
-                // Routes pour affichage dans le navigateur de l'admin
-                routes::register_get,
-                routes::admin_dashboard_get,
-                // Création de formulaire
-                routes::newform_get,
-                //Edition d'un formulaire
-                routes::editform_get,
-                //Liste de tous les formulaires
-                routes::show_forms_get
+                routes::frontend::register_get,
+                routes::frontend::admin_dashboard_get,
+                routes::frontend::newform_get,
+                routes::frontend::editform_get,
+                routes::frontend::show_forms_get
             ],
         )
         .mount(
             "/mercure/api",
             routes![
                 // Routes pour le backend: renvoie toujours du JSON
-                routes::register_post,
-                routes::login_post,
-                routes::newform_post,
-                routes::newgroup_get,
-                routes::list_groups,
-                routes::get_form,
-                routes::get_all_forms,
+                routes::backend::register_post,
+                routes::backend::login_post,
+                routes::backend::newform_post,
+                routes::backend::newgroup_get,
+                routes::backend::list_groups,
+                routes::backend::get_form_from_id,
+                routes::backend::get_all_forms_for_group,
                 // Simple GET pour mettre un formulaire en production
-                routes::enable_form,
+                routes::backend::enable_form,
                 // Simple GET pour retirer un formulaire du service
-                routes::disable_form
+                routes::backend::disable_form
             ],
         )
         .attach(Template::fairing());

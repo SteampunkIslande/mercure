@@ -63,7 +63,7 @@
     <script>
         const userGroups = {{ user_groups | tojson }};
         userGroups.forEach(group => {
-            fetch(`/mercure/api/forms/group/${group.id}`)
+            fetch(`/mercure/api/forms/groups/${group.id}`)
                 .then(response => response.json())
                 .then(forms => {
                     const container = document.getElementById(`forms-container-${group.id}`);

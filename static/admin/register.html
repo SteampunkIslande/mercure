@@ -62,6 +62,9 @@
                     errorDiv.style.display = 'none';
                     successDiv.style.display = 'block';
                     successDiv.textContent = 'Utilisateur créé avec succès';
+                    setTimeout(() => {
+                        successDiv.style.display = 'none';
+                    }, 2000);
                     document.getElementById('registerForm').reset();
                 } else {
                     successDiv.style.display = 'none';

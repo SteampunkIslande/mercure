@@ -4,6 +4,9 @@ use sqlx::SqlitePool;
 
 use crate::{auth::Authenticated, models::Group, routes::ApiResponse};
 
+/// API endpoint to create a new group from its name
+///
+/// ROUTE: /mercure/api/newgroup/<group_name>
 #[get("/newgroup/<group_name>")]
 pub async fn newgroup_get(
     auth: Authenticated,

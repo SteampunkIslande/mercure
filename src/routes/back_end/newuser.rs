@@ -1,13 +1,14 @@
 use rocket::serde::json::Json;
-use rocket::{State, get, post};
+use rocket::{State, post};
 use sqlx::SqlitePool;
 
-use super::ApiResponse;
+use super::super::ApiResponse;
 use crate::auth::{AuthError, Authenticated};
 use crate::models::{NewUser, User};
 
-use rocket_dyn_templates::{Template, context};
-
+/// API endpoint for admins to register new users
+///
+/// ROUTE: /mercure/api/register
 #[post("/register", data = "<user>")]
 pub async fn register_post(
     user: Json<NewUser>,
@@ -28,27 +29,4 @@ pub async fn register_post(
     Ok(Json(ApiResponse::success(user)))
 }
 
-/// Route to show the admin a page to register new user.
-#[get("/register")]
-pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
-    if !auth.user.is_admin {
-        return None;
-    }
-    rocket::fs::NamedFile::open("static/admin/register.html")
-        .await
-        .ok()
-}
-
 // Group::get_user_groups(pool, auth.user.id)
-
-/// Admin landing page
-#[get("/dashboard")]
-pub async fn admin_dashboard_get(auth: Authenticated) -> Option<Template> {
-    if !auth.user.is_admin {
-        return None;
-    }
-    Some(Template::render(
-        "admin/dashboard",
-        context! {user:auth.user},
-    ))
-}

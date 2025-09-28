@@ -76,6 +76,19 @@ p {
 }
 
 .info {
+    border: 1.5px solid #2f2fd3;
+    background-color: #eaecfd;
+    color: #1c1cb7;
+    padding: 1rem;
+    border-radius: 6px;
+    margin: 1rem 0;
+    font-weight: bold;
+    animation-duration: 10s;
+    animation-iteration-count: 1;
+    animation-name: fadeout;
+}
+
+.success {
     border: 1.5px solid #2fd32f;
     background-color: #eafdec;
     color: #1cb71c;

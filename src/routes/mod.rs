@@ -1,20 +1,15 @@
-mod admin;
-mod auth;
-mod formedit;
-mod generics;
-mod getform;
-mod listgroups;
-mod newform;
-mod newgroup;
+mod back_end;
+mod front_end;
 
-pub use admin::*;
-pub use auth::*;
-pub use formedit::*;
-pub use generics::*;
-pub use getform::*;
-pub use listgroups::*;
-pub use newform::*;
-pub use newgroup::*;
+// Back-end re-export
+pub mod backend {
+    pub use super::back_end::*;
+}
+
+// Front-end re-export
+pub mod frontend {
+    pub use super::front_end::*;
+}
 
 #[derive(Debug, serde::Serialize)]
 pub struct ApiResponse<T> {

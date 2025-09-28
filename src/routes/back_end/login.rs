@@ -15,7 +15,6 @@ pub struct LoginRequest {
     password: String,
 }
 
-/// Route to try logging in from post request
 #[post("/login", data = "<login>")]
 pub async fn login_post(
     login: Json<LoginRequest>,
