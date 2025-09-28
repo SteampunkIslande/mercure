@@ -11,7 +11,6 @@
     <script>
 
         let userVarCounter = 0;
-        let pendingGroups = [];
 
         function updateLauncherField() {
             var schema = {{ pipelines_struct | tojson
@@ -45,7 +44,6 @@
 
         function init() {
             userVarCounter = 0;
-            pendingGroups = [];
         }
     </script>
 
@@ -54,6 +52,7 @@
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
             const formName = document.getElementById("form_name").value;
+            const version = document.getElementById("version").value;
 
             const selectedGroups = Array.from(
                 document.querySelectorAll('input[name="selected_groups"]:checked')
@@ -68,7 +67,6 @@
                 const varName = item.querySelector('input[type="text"]').value;
                 const varType = item.querySelector("select").value;
 
-                // Skip items with empty varName or varType
                 if (!varName.trim() || !varType.trim()) {
                     return;
                 }
@@ -85,10 +83,7 @@
                 if (varType === "Constant") {
                     userVars[varName][varType] = varContent;
                 }
-
             });
-
-            // userVars should be null if empty, for serialization reasons
 
             if (Object.keys(userVars).length === 0) {
                 userVars = null;
@@ -100,6 +95,8 @@
                 form_name: formName,
                 groups: selectedGroups,
                 user_defined_vars: userVars,
+                enabled: true,
+                version: parseInt(version) || -1
             };
 
             fetch("/mercure/api/newform", {
@@ -111,16 +108,26 @@
             })
                 .then((response) => {
                     if (response.ok) {
-                        window.location.href = `/mercure/success?origin=${encodeURIComponent("/mercure/admin/newform")}&message=${encodeURIComponent(response)}`;
+                        return response.json(); // Extract JSON from the response
                     } else {
-                        document.getElementById("error-message").textContent = "Erreur lors de la soumission du formulaire. Veuillez vérifier les champs.";
-                        document.getElementById("error-message").style.display = "block";
+                        throw new Error("Erreur lors de la soumission du formulaire.");
                     }
+                })
+                .then((data) => {
+                    if (!data.success) {
+                        throw new Error(`Erreur: ${data.message}`);
+                    }
+                    const message = data.data || "Opération réussie"; // Retrieve the message
+                    window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
                 })
                 .catch((error) => {
                     console.error("Erreur:", error);
-                    document.getElementById("error-message").textContent = "Erreur lors de la soumission du formulaire. Veuillez vérifier les champs.";
-                    document.getElementById("error-message").style.display = "block";
+                    const errorDiv = document.getElementById("error-message");
+                    errorDiv.textContent = error;
+                    errorDiv.style.display = "block";
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 2000);
                 });
         }
     </script>
@@ -129,7 +136,13 @@
 
 <body>
     <h1 class="title">Nouveau formulaire de pipeline</h1>
+    <div id="error-message" style="display: none;" class="error">
+    </div>
     <form>
+        <div>
+            <label for="version">Version :</label>
+            <input type="number" id="version" name="version" required>
+        </div>
         <div>
             <label for="pipeline_name">Pipeline :</label>
             <select id="pipeline_name" name="pipeline_name" onchange="updateLauncherField()" required>

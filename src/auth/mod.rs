@@ -28,19 +28,19 @@ impl<'r> Responder<'r, 'static> for AuthError {
         let body = match self {
             AuthError::InvalidCredentials => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<String>::error("Mote de passe invalide".to_string())
+                ApiResponse::<u8>::error("Mote de passe invalide".to_string())
             }
             AuthError::DatabaseError(e) => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<String>::error(format!("Erreur de la base de données: {e}"))
+                ApiResponse::<u8>::error(format!("Erreur de la base de données: {e}"))
             }
             AuthError::TokenError(e) => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<String>::error(format!("Erreur de token: {e}"))
+                ApiResponse::<u8>::error(format!("Erreur de token: {e}"))
             }
             AuthError::UnknownUser => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<String>::error(format!("Utilisateur inconnu"))
+                ApiResponse::<u8>::error(format!("Utilisateur inconnu"))
             }
         };
 

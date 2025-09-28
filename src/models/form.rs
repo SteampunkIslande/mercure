@@ -3,6 +3,8 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
+use crate::models::ModelError;
+
 use super::groups::Group;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
@@ -67,8 +69,30 @@ impl HgFormDef {
     pub async fn new_form_def(
         new_formdef: HgFormDef,
         pool: &SqlitePool,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), super::ModelError> {
         // Insert into Formdef table
+
+        if new_formdef.version < 0 {
+            return Err(ModelError::FormError(String::from(
+                "La version doit être définie et supérieure à 0",
+            )));
+        }
+        if new_formdef.form_name.is_empty() {
+            return Err(ModelError::FormError(String::from(
+                "Le formulaire doit avoir un nom",
+            )));
+        }
+        if new_formdef.pipeline_name.is_empty() {
+            return Err(ModelError::FormError(String::from(
+                "Pas de pipeline défini!",
+            )));
+        }
+        if new_formdef.launcher_name.is_empty() {
+            return Err(ModelError::FormError(String::from(
+                "Pas de launcher défini!",
+            )));
+        }
+
         let form_id: i64 = sqlx::query(
             r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
