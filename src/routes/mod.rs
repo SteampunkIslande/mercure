@@ -1,13 +1,17 @@
 mod admin;
 mod auth;
+mod formedit;
 mod generics;
+mod getform;
 mod listgroups;
 mod newform;
 mod newgroup;
 
 pub use admin::*;
 pub use auth::*;
+pub use formedit::*;
 pub use generics::*;
+pub use getform::*;
 pub use listgroups::*;
 pub use newform::*;
 pub use newgroup::*;

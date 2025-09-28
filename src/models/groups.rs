@@ -28,6 +28,29 @@ impl Group {
         Ok(groups)
     }
 
+    pub async fn get_user_groups(
+        pool: &SqlitePool,
+        user_id: i64,
+    ) -> Result<Vec<Group>, sqlx::Error> {
+        Ok(sqlx::query(
+            r#"SELECT g.group_name, gh.group_id, gh.user_id
+FROM Groups g
+JOIN GroupHasUser gh ON g.group_id = gh.group_id
+WHERE gh.user_id = ?; "#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .filter_map(|row| {
+            Some(Group {
+                id: row.try_get("group_id").ok()?,
+                name: row.try_get("group_name").ok()?,
+            })
+        })
+        .collect())
+    }
+
     /// Adds a new group to the database and returns its ID
     pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64, sqlx::Error> {
         let row = sqlx::query(

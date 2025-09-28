@@ -75,6 +75,19 @@ p {
     animation-name: fadeout;
 }
 
+.info {
+    border: 1.5px solid #2fd32f;
+    background-color: #eafdec;
+    color: #1cb71c;
+    padding: 1rem;
+    border-radius: 6px;
+    margin: 1rem 0;
+    font-weight: bold;
+    animation-duration: 10s;
+    animation-iteration-count: 1;
+    animation-name: fadeout;
+}
+
 
 /* Banner styles */
 .banner {
@@ -136,4 +149,46 @@ label {
   font-size: 1rem;
     color: #555;
     margin-bottom: 1rem;
+}
+
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons that are used to open the tab content */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+
+.tablinks {
+  display: inline-block;
+  margin-right: 10px; /* Optional: adds space between buttons */
+  border: none;
+  cursor: pointer;
 }

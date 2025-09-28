@@ -39,6 +39,8 @@ pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> 
         .ok()
 }
 
+// Group::get_user_groups(pool, auth.user.id)
+
 /// Admin landing page
 #[get("/landing_page")]
 pub async fn admin_landing_page_get(auth: Authenticated) -> Option<Template> {

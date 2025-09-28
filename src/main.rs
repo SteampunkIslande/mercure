@@ -28,8 +28,6 @@ async fn rocket() -> _ {
                 routes::welcome_page_get,
                 routes::login_get,
                 routes::logout_get,
-                // Création de formulaire
-                routes::newform_get,
                 // Une page pour rediriger les utilisateurs en cas de succès
                 routes::success_page_get
             ],
@@ -39,7 +37,13 @@ async fn rocket() -> _ {
             routes![
                 // Routes pour affichage dans le navigateur de l'admin
                 routes::register_get,
-                routes::admin_landing_page_get
+                routes::admin_landing_page_get,
+                // Création de formulaire
+                routes::newform_get,
+                //Edition d'un formulaire
+                routes::editform_get,
+                //Liste de tous les formulaires
+                routes::show_forms_get
             ],
         )
         .mount(
@@ -50,7 +54,13 @@ async fn rocket() -> _ {
                 routes::login_post,
                 routes::newform_post,
                 routes::newgroup_get,
-                routes::list_groups
+                routes::list_groups,
+                routes::get_form,
+                routes::get_all_forms,
+                // Simple GET pour mettre un formulaire en production
+                routes::enable_form,
+                // Simple GET pour retirer un formulaire du service
+                routes::disable_form
             ],
         )
         .attach(Template::fairing());

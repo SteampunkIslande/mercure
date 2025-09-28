@@ -8,6 +8,7 @@
     <title>Nouveau formulaire de pipeline</title>
     <script src="/static/scripts/newform_addgroup.js"></script>
     <script src="/static/scripts/userdefvars_edit.js"></script>
+    <script src="/static/scripts/utils.js"></script>
     <script>
 
         let userVarCounter = 0;
@@ -35,16 +36,108 @@
         }
         }
 
-        window.onload = function () {
+        window.onload = async function () {
             init();
             addUserVar();
             load_groups();
             updateLauncherField();
+            {%if formid %}
+            await fetchFormDefinition();
+            {% endif %}
         };
 
         function init() {
             userVarCounter = 0;
         }
+
+        // Only fetch form definition in case we are in edit mode
+        {%if formid %}
+
+        async function fetchFormDefinition() {
+
+            const formId = "{{ formid }}"; // Read formid from template context
+
+            const endpoint = `/mercure/api/forms/${formId}`;
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error("Erreur lors de la récupération du formulaire.");
+                }
+
+                const res = await response.json();
+                const formDefinition = res.data;
+
+                // Update form fields based on the fetched definition
+                if (formDefinition.pipeline_name) {
+                    document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
+                    updateLauncherField(); // Update launcher options
+                }
+
+                if (formDefinition.launcher_name) {
+                    document.getElementById("launcher_name").value = formDefinition.launcher_name;
+                }
+
+                if (formDefinition.version) {
+                    document.getElementById("version").value = formDefinition.version;
+                }
+
+                if (formDefinition.form_name) {
+                    document.getElementById("form_name").value = formDefinition.form_name;
+                }
+
+                if (formDefinition.groups && Array.isArray(formDefinition.groups)) {
+                    const groupsContainer = document.getElementById("groups-container");
+                    formDefinition.groups.forEach(group => {
+                        const groupDiv = document.getElementById(`group_${group.id}`)
+                        groupDiv.setAttribute("checked", null);
+                    });
+                }
+
+                if (formDefinition.user_defined_vars) {
+                    const userVarsContainer = document.getElementById("user-vars-container");
+                    userVarsContainer.innerHTML = ""; // Clear existing user vars
+                    userVarCounter = 0;
+
+                    Object.entries(formDefinition.user_defined_vars).forEach(([varName, varDetails], index) => {
+                        addUserVar();
+                        document.getElementById(`var_name_${index}`).value = varName;
+                        if (isVarTypeOf(varDetails, Object)) {
+                            if (varDetails.Constant) {
+                                document.getElementById(`var_type_${index}`).value = "Constant";
+                                document.getElementById(`var_values_${index}`).style.display = "block";
+                                document.getElementById(`var_content_${index}`).value = varDetails.Constant;
+                            }
+                            if (varDetails.FromValuesList) {
+                                document.getElementById(`var_type_${index}`).value = "FromValuesList";
+                                document.getElementById(`var_values_${index}`).style.display = "block";
+                                document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
+                            }
+                        }
+                        else {
+                            // Seule exception, si on n'a ni valeurs permises, ni valeur constante, c'est que c'est une variable définie au lancement
+                            document.getElementById(`var_type_${index}`).value = "RunDefined";
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Erreur:", error);
+                const errorDiv = document.getElementById("error-message");
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = "block";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 8000);
+            }
+        }
+
+        {% endif %}
     </script>
 
     <script>
@@ -190,9 +283,13 @@
         </div>
     </form>
 
-    <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
         <button class="btn btn-primary" onclick="submitForm()">Créer</button>
+    </div>
+    <!-- Centered submit button at the bottom of the page -->
+    <div style="text-align: center; margin-top: 20px;">
+        <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
+        <a class="btn btn-secondary" href="/mercure/admin/landing_page">Retour au tableau de bord</a>
     </div>
 
     <script>

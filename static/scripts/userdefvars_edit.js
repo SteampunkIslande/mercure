@@ -19,7 +19,7 @@ function addUserVar() {
                     <textarea id="var_content_${userVarCounter}" name="user_defined_vars[${userVarCounter}][content]" placeholder="" style="width: 100%; resize: none;" rows="5"></textarea>
                 </div>
                 
-                <button type="button" onclick="removeUserVar(${userVarCounter})">Supprimer</button>
+                <button type="button" onclick="removeUserVar(${userVarCounter})" style="display: inline">Supprimer</button>
             `;
   container.appendChild(div);
   userVarCounter++;

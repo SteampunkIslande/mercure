@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<String, Vec<String>> {
+pub fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<String, Vec<String>> {
     let mut result = HashMap::new();
 
     if let Ok(entries) = fs::read_dir(&base_dir) {
@@ -42,7 +42,8 @@ fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<String, V
     result
 }
 
-#[get("/admin/newform")]
+/// Route: /mercure/admin/newform
+#[get("/newform")]
 pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Template {
     if !auth.user.is_admin {
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
@@ -57,9 +58,50 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
             "admin/newform",
             context! {
                 pipelines_struct,
-                groups
+                groups,
+                formid: None::<i64>
             },
         )
+    }
+}
+
+/// Route: /mercure/api/disable/<formid>
+#[get("/disable/<formid>")]
+pub async fn disable_form(
+    auth: Authenticated,
+    pool: &State<SqlitePool>,
+    formid: i64,
+) -> Json<ApiResponse<String>> {
+    if !auth.user.is_admin {
+        return Json(ApiResponse::error(
+            "You cannot disable a form, only admins can!".to_string(),
+        ));
+    }
+    match HgFormDef::disable_form(pool, formid).await {
+        Ok(()) => Json(ApiResponse::success(
+            "Formulaire désactivé avec succès".to_string(),
+        )),
+        Err(e) => Json(ApiResponse::error(format!("{e}"))),
+    }
+}
+
+/// Route: /mercure/api/enable/<formid>
+#[get("/enable/<formid>")]
+pub async fn enable_form(
+    auth: Authenticated,
+    pool: &State<SqlitePool>,
+    formid: i64,
+) -> Json<ApiResponse<String>> {
+    if !auth.user.is_admin {
+        return Json(ApiResponse::error(
+            "You cannot enable a form, only admins can!".to_string(),
+        ));
+    }
+    match HgFormDef::enable_form(pool, formid).await {
+        Ok(()) => Json(ApiResponse::success(
+            "Formulaire activé avec succès".to_string(),
+        )),
+        Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }
 }
 

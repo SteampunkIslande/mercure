@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Forms</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <script src="/static/scripts/utils.js"></script>
+    <style>
+    </style>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Liste des formulaires par groupe</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="error" id="error-message" style="display: none;"></div>
+    <div class="info" id="info-message" style="display: none;"></div>
+    <div class="tab">
+        {% for group in user_groups %}
+
+        <button id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active {% endif %}"
+            onclick="openTab(event,{{ group.id }})">{{ group.name
+            }}</button>
+        {% endfor %}
+    </div>
+
+    {% for group in user_groups %}
+    <div id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block" {% endif %}>
+    </div>
+    {% endfor %}
+
+    <script>
+        function openTab(evt, group_id) {
+            // Declare all variables
+            var i, tabcontent, tablinks;
+
+            // Get all elements with class="tabcontent" and hide them
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            // Get all elements with class="tablinks" and remove the class "active"
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            document.getElementById(`forms-container-${group_id}`).style.display = "block";
+            evt.currentTarget.className += " active";
+        } 
+    </script>
+
+    <script>
+        const userGroups = {{ user_groups | tojson }};
+        userGroups.forEach(group => {
+            fetch(`/mercure/api/forms/group/${group.id}`)
+                .then(response => response.json())
+                .then(forms => {
+                    const container = document.getElementById(`forms-container-${group.id}`);
+                    forms.data.forEach(form => {
+                        const formBox = document.createElement('div');
+                        formBox.className = 'form-box';
+
+                        formBox.innerHTML = `
+                            <h3>${form.form_name} (version ${form.version})</h3>
+                            <div class="actions">
+                                <label>
+                                    <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
+                                    Actif
+                                </label>
+                                <button title='Editer ${form.formid}' onclick="editForm('${form.formid}')">Edit</button>
+                            </div>
+                        `;
+
+                        container.appendChild(formBox);
+                    });
+                })
+                .catch(error => console.error('Error fetching forms:', error));
+        });
+
+        function editForm(formId) {
+            // Redirect to the form edit page
+            window.location.href = `/mercure/admin/editform/${formId}`;
+        }
+        function toggleFormActive(e, formId) {
+            let toggle = e.target.checked ? "enable" : "disable";
+            fetch(`/mercure/api/${toggle}/${formId}`)
+                .then(response => response.json())
+                .then(
+                    data => {
+                        if (data.success) {
+                            const infodiv = document.getElementById("info-message")
+                            infodiv.style.display = "block";
+                            infodiv.textContent = data.data;
+                            setTimeout(() => {
+                                infodiv.style.display = 'none';
+                            }, 2000);
+                        }
+                        else {
+                            const errordiv = document.getElementById("error-message")
+                            errordiv.style.display = "block";
+                            errordiv.textContent = data.message;
+                            setTimeout(() => {
+                                errordiv.style.display = 'none';
+                            }, 2000);
+                        }
+                    }
+                ).catch(error => {
+                    const errordiv = document.getElementById("error-message")
+                    errordiv.style.display = "block";
+                    errordiv.textContent = error;
+                    setTimeout(() => {
+                        errordiv.style.display = 'none';
+                    }, 2000);
+                })
+                ;
+        }
+    </script>
+    <a href="/mercure/admin/landing_page" class="btn btn-secondary">Retour au tableau de bord</a>
+</body>
+
+</html>

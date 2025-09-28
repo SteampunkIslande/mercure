@@ -7,6 +7,14 @@ use crate::models::ModelError;
 
 use super::groups::Group;
 
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct HgFormListItem {
+    pub formid: i64,
+    pub enabled: bool,
+    pub form_name: String,
+    pub version: i64,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum UserDefinedVar {
     FromValuesList {
@@ -127,6 +135,7 @@ impl HgFormDef {
 
         // Insert groups into FormdefHasGroup table
         for group in &new_formdef.groups {
+            eprintln!("{}", group.id);
             sqlx::query(
                 r#"
                 INSERT INTO FormdefHasGroup (form_id, group_id)
@@ -186,6 +195,147 @@ impl HgFormDef {
             }
         }
         Ok(())
+    }
+
+    pub async fn get_formdef_from_id(
+        pool: &SqlitePool,
+        id: i64,
+    ) -> Result<HgFormDef, super::ModelError> {
+        if id < 0 {
+            return Err(ModelError::FormError(String::from(
+                "ID de formulaire invalide",
+            )));
+        }
+        let row = sqlx::query(
+            r#"
+        SELECT * FROM Formdef WHERE form_id = ?
+        "#,
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await?;
+        Self::formdef_from_row(&row, pool).await
+    }
+
+    pub async fn disable_form(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+        UPDATE Formdef SET enabled=0 WHERE form_id = ?
+        "#,
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn enable_form(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+        UPDATE Formdef SET enabled=1 WHERE form_id = ?
+        "#,
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    // pub async fn get_all_form_defs(pool: &SqlitePool) -> Result<Vec<HgFormDef>, super::ModelError> {
+    //     Ok(join_all(
+    //         sqlx::query(
+    //             r#"
+    //     SELECT * FROM Formdef
+    //     "#,
+    //         )
+    //         .fetch_all(pool)
+    //         .await?
+    //         .iter()
+    //         .map(async |row| Self::formdef_from_row(row, pool).await),
+    //     )
+    //     .await
+    //     .into_iter()
+    //     .collect::<Result<Vec<HgFormDef>, ModelError>>()?)
+    // }
+
+    pub async fn get_form_list_items_for_group(
+        pool: &SqlitePool,
+        group_id: i64,
+    ) -> Result<Vec<HgFormListItem>, super::ModelError> {
+        let rows:Vec<_> = sqlx::query(
+                r#"
+        SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN GroupHasUser gu ON gu.group_id = fg.group_id JOIN Groups g ON g.group_id = gu.group_id WHERE fg.group_id = ?
+        "#,
+            ).bind(group_id)
+            .fetch_all(pool)
+            .await?.into_iter().filter_map(|row|Some(HgFormListItem{
+                form_name: row.try_get("form_name").ok()?,
+                formid: row.try_get("form_id").ok()?,
+                enabled: row.try_get("enabled").ok()?,
+                version: row.try_get("version").ok()?
+            })).collect();
+        Ok(rows)
+    }
+
+    async fn formdef_from_row(
+        row: &sqlx::sqlite::SqliteRow,
+        pool: &SqlitePool,
+    ) -> Result<HgFormDef, super::ModelError> {
+        let mut def = HgFormDef::default();
+        let form_id: i64 = row.try_get("form_id")?;
+
+        def.pipeline_name = row.try_get("pipeline_name")?;
+        def.launcher_name = row.try_get("launcher_name")?;
+        def.form_name = row.try_get("form_name")?;
+        def.enabled = row.try_get("enabled")?;
+        def.version = row.try_get("version")?;
+
+        def.groups = sqlx::query(
+            r#"SELECT g.group_id,g.group_name FROM Groups g JOIN FormdefHasGroup fg ON g.group_id=fg.group_id WHERE fg.form_id = ? "#,
+        )
+        .bind(form_id)
+        .fetch_all(pool).
+        await?.
+        iter().
+        filter_map(
+        |row|
+        Some(Group{ id: row.try_get("group_id").ok()?, name:row.try_get("group_name").ok()? }))
+        .collect();
+
+        def.user_defined_vars = Some(
+            sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
+                .bind(form_id)
+                .fetch_all(pool)
+                .await?
+                .iter()
+                .filter_map(|row| {
+                    let udv = match row.try_get("type").ok()? {
+                        "FromValuesList" => (
+                            row.try_get("varname").ok()?,
+                            UserDefinedVar::FromValuesList {
+                                allowed: row
+                                    .try_get::<String, &str>("default_values")
+                                    .ok()?
+                                    .split("\n")
+                                    .map(String::from)
+                                    .collect(),
+                            },
+                        ),
+                        "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
+                        "Constant" => (
+                            row.try_get("varname").ok()?,
+                            UserDefinedVar::Constant(row.try_get("default_values").ok()?),
+                        ),
+                        _ => {
+                            return None;
+                        }
+                    };
+                    Some(udv)
+                })
+                .collect(),
+        );
+
+        Ok(def)
     }
 }
 

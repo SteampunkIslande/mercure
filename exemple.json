@@ -1,0 +1,13 @@
+{
+  "pipeline_name": "smaug-v3-cpu",
+  "launcher_name": "default_launcher.sh",
+  "form_name": "Smaug lent",
+  "enabled": true,
+  "version": 1,
+  "groups": [{ "id": 1, "name": "Génétique" }],
+  "user_defined_vars": {
+    "BED": { "FromValuesList": { "allowed": ["A", "B", "C", "D"] } },
+    "PANEL_NAME": { "Constant": "PNEUMO" },
+    "RUN_NAME": "RunDefined"
+  }
+}
