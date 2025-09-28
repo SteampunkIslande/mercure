@@ -3,14 +3,20 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Success</title>
+    <title>Succès</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
 </head>
 
 <body>
-    <h1>Succès!</h1>
-    <p>
-        {{ message }}
-    </p>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">{{ message }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">Déconnexion</a>
+            </div>
+        </div>
+    </div>
     <ul>
         <li><a href="{{ origin }}">Retourner à la page précédente</a></li>
         <li><a href="{{ home }}">Retourner à l'accueil</a></li>

@@ -115,7 +115,7 @@
                 })
                 .then((data) => {
                     if (!data.success) {
-                        throw new Error(`Erreur: ${data.message}`);
+                        throw new Error(data.message);
                     }
                     const message = data.data || "Opération réussie"; // Retrieve the message
                     window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
@@ -127,7 +127,7 @@
                     errorDiv.style.display = "block";
                     setTimeout(() => {
                         errorDiv.style.display = 'none';
-                    }, 2000);
+                    }, 8000);
                 });
         }
     </script>
@@ -135,14 +135,17 @@
 </head>
 
 <body>
-    <h1 class="title">Nouveau formulaire de pipeline</h1>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Nouveau formulaire de pipeline</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">Déconnexion</a>
+            </div>
+        </div>
+    </div>
     <div id="error-message" style="display: none;" class="error">
     </div>
     <form>
-        <div>
-            <label for="version">Version :</label>
-            <input type="number" id="version" name="version" required>
-        </div>
         <div>
             <label for="pipeline_name">Pipeline :</label>
             <select id="pipeline_name" name="pipeline_name" onchange="updateLauncherField()" required>
@@ -152,12 +155,15 @@
                 {% endfor %}
             </select>
         </div>
-
         <div id="launcher-container" style="display:none;">
             <label for="launcher_name">Launcher :</label>
             <select id="launcher_name" name="launcher_name" required>
                 <!-- Options will be populated by JS -->
             </select>
+        </div>
+        <div>
+            <label for="version">Version :</label>
+            <input type="number" id="version" name="version" required>
         </div>
 
         <div>

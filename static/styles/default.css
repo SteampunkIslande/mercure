@@ -70,7 +70,7 @@ p {
     border-radius: 6px;
     margin: 1rem 0;
     font-weight: bold;
-    animation-duration: 3s;
+    animation-duration: 10s;
     animation-iteration-count: 1;
     animation-name: fadeout;
 }

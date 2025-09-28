@@ -72,9 +72,9 @@ impl HgFormDef {
     ) -> Result<(), super::ModelError> {
         // Insert into Formdef table
 
-        if new_formdef.version < 0 {
+        if new_formdef.version <= 0 {
             return Err(ModelError::FormError(String::from(
-                "La version doit être définie et supérieure à 0",
+                "La version doit être définie et supérieure ou égale à 1",
             )));
         }
         if new_formdef.form_name.is_empty() {
@@ -90,6 +90,22 @@ impl HgFormDef {
         if new_formdef.launcher_name.is_empty() {
             return Err(ModelError::FormError(String::from(
                 "Pas de launcher défini!",
+            )));
+        }
+
+        // Make sure the (form_name,version) is unique!
+        if let Ok(_) = sqlx::query(
+            r#"
+            SELECT * FROM Formdef WHERE form_name = ? AND version = ?
+            "#,
+        )
+        .bind(&new_formdef.form_name)
+        .bind(&new_formdef.version)
+        .fetch_one(pool)
+        .await
+        {
+            return Err(ModelError::FormError(String::from(
+                "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
             )));
         }
 
