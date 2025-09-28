@@ -102,7 +102,7 @@ impl HgFormDef {
         }
 
         // Make sure the (form_name,version) is unique!
-        if let Ok(_) = sqlx::query(
+        if (sqlx::query(
             r#"
             SELECT * FROM Formdef WHERE form_name = ? AND version = ?
             "#,
@@ -110,7 +110,7 @@ impl HgFormDef {
         .bind(&new_formdef.form_name)
         .bind(new_formdef.version)
         .fetch_one(pool)
-        .await
+        .await).is_ok()
         {
             return Err(ModelError::FormError(String::from(
                 "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",

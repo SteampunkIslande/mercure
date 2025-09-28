@@ -15,10 +15,7 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
     if !auth.user.is_admin {
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
     } else {
-        let groups = match Group::get_groups_with_ids(pool).await {
-            Ok(groups) => groups,
-            Err(_) => Vec::new(), // Return empty vector on error
-        };
+        let groups = (Group::get_groups_with_ids(pool).await).unwrap_or_default();
         let pipelines_struct = list_folders_with_launchers("pipelines");
 
         Template::render(

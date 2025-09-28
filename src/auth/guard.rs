@@ -9,7 +9,7 @@ pub struct Authenticated {
     pub user: User,
 }
 
-async fn user_from_cookie<'r>(request: &'r Request<'_>) -> Result<User, AuthError> {
+async fn user_from_cookie(request: &Request<'_>) -> Result<User, AuthError> {
     let cookies = request.cookies();
 
     let pool = match request.rocket().state::<SqlitePool>() {

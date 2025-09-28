@@ -20,7 +20,7 @@ pub async fn register_post(
     }
 
     // Make sure the user doesn't already exist
-    if let Some(_) = User::find_by_usermail(&user.usermail, pool).await? {
+    if (User::find_by_usermail(&user.usermail, pool).await?).is_some() {
         return Ok(Json(ApiResponse::error("Cet utilisateur existe déjà")));
     }
 
