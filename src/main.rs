@@ -29,7 +29,9 @@ async fn rocket() -> _ {
                 routes::login_get,
                 routes::logout_get,
                 // Création de formulaire
-                routes::newform_get
+                routes::newform_get,
+                // Une page pour rediriger les utilisateurs en cas de succès
+                routes::success_page_get
             ],
         )
         .mount(

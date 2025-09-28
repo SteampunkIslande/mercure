@@ -168,14 +168,17 @@
             })
                 .then((response) => {
                     if (response.ok) {
-                        alert("Formulaire soumis avec succès.");
+                        // Go to a POST endpoint, and send origin, and message (Formulaire soumis avec succès)
+                        window.location.href = `/mercure/success?origin=${encodeURIComponent("/mercure/admin/newform")}&message=${encodeURIComponent(response)}`;
                     } else {
-                        alert("Erreur lors de la soumission du formulaire.");
+                        document.getElementById("error-message").textContent = "Erreur lors de la soumission du formulaire. Veuillez vérifier les champs.";
+                        document.getElementById("error-message").style.display = "block";
                     }
                 })
                 .catch((error) => {
                     console.error("Erreur:", error);
-                    alert("Erreur lors de la soumission du formulaire.");
+                    document.getElementById("error-message").textContent = "Erreur lors de la soumission du formulaire. Veuillez vérifier les champs.";
+                    document.getElementById("error-message").style.display = "block";
                 });
         }
     </script>
