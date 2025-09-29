@@ -160,7 +160,7 @@ label {
   display: inline-block;
   text-align: right;
   font-size: 1rem;
-    color: #555;
+    color: #363636;
     margin-bottom: 1rem;
 }
 
@@ -251,3 +251,9 @@ label {
 
 /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
 .show {display:block;} 
+
+.icon-align 
+{
+  vertical-align: text-bottom;
+  margin-right: 5px;
+}

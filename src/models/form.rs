@@ -74,10 +74,7 @@ pub struct HgForm {
 impl HgFormDef {
     /// Add new form definition to the database
     /// Each form will be used as a template for actual runs
-    pub async fn new_form_def(
-        new_formdef: HgFormDef,
-        pool: &SqlitePool,
-    ) -> Result<(), super::ModelError> {
+    pub async fn new_form_def(new_formdef: HgFormDef, pool: &SqlitePool) -> Result<(), ModelError> {
         // Insert into Formdef table
 
         if new_formdef.version <= 0 {
@@ -92,12 +89,12 @@ impl HgFormDef {
         }
         if new_formdef.pipeline_name.is_empty() {
             return Err(ModelError::FormError(String::from(
-                "Pas de pipeline défini!",
+                "Pas de pipeline défini",
             )));
         }
         if new_formdef.launcher_name.is_empty() {
             return Err(ModelError::FormError(String::from(
-                "Pas de launcher défini!",
+                "Pas de launcher défini",
             )));
         }
 
@@ -110,7 +107,8 @@ impl HgFormDef {
         .bind(&new_formdef.form_name)
         .bind(new_formdef.version)
         .fetch_one(pool)
-        .await).is_ok()
+        .await)
+            .is_ok()
         {
             return Err(ModelError::FormError(String::from(
                 "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
