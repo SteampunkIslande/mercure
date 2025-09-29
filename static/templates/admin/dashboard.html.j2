@@ -39,13 +39,15 @@
         }
     </script>
     <div class="dropdown">
-        <button onclick="onDropDown(`users_dropdown`)" class="dropbtn">Gestion des utilisateurs</button>
+        <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
+                class="material-icons icon-align">account_circle</span> Gestion des utilisateurs</button>
         <div id="users_dropdown" class="dropdown-content">
             <a href="/mercure/admin/register">Créer un utilisateur</a>
         </div>
     </div>
     <div class="dropdown">
-        <button onclick="onDropDown(`forms_dropdown`)" class="dropbtn">Gestion des formulaires</button>
+        <button onclick="onDropDown(`forms_dropdown`)" class="dropbtn"><span
+                class="material-icons icon-align">format_list_bulleted</span>Gestion des formulaires</button>
         <div id="forms_dropdown" class="dropdown-content">
             <a href="/mercure/admin/newform">Créer un nouveau formulaire</a>
             <a href="/mercure/admin/show/forms">Liste des formulaires</a>
