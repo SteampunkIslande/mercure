@@ -46,7 +46,7 @@ pub struct HgFormDef {
 ///
 /// This form is what is submitted by the user when they are on the '/newrun/groupname' GET endpoint
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgForm {
+pub struct HgRun {
     // These fields are from the FormDef
     pub pipeline_name: String,
     pub launcher_name: String,
@@ -54,9 +54,13 @@ pub struct HgForm {
     pub user_defined_vars: HashMap<String, String>,
 
     // These fields are common to all forms
+    pub run_name: String,
+
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
+
+    pub sample_sheet_path: String,
 }
 
 /// This type helps admin users define a form
