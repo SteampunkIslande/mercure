@@ -256,11 +256,15 @@ impl HgFormDef {
     //     .collect::<Result<Vec<HgFormDef>, ModelError>>()?)
     // }
 
+    /// Get all forms associated with a group, and those not associated with any group
+    /// Returns a tuple of two vectors:
+    /// - first vector: forms associated with the group
+    /// - second vector: forms not associated with any group
     pub async fn get_form_list_items_for_group(
         pool: &SqlitePool,
         group_id: i64,
-    ) -> Result<Vec<HgFormListItem>, super::ModelError> {
-        let rows:Vec<_> = sqlx::query(
+    ) -> Result<(Vec<HgFormListItem>,Vec<HgFormListItem>), super::ModelError> {
+        let rows_with_group:Vec<_> = sqlx::query(
                 r#"
         SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN Groups g ON g.group_id = fg.group_id WHERE fg.group_id = ?
         "#,
@@ -272,7 +276,18 @@ impl HgFormDef {
                 enabled: row.try_get("enabled").ok()?,
                 version: row.try_get("version").ok()?
             })).collect();
-        Ok(rows)
+        let rows_without_group:Vec<_> = sqlx::query(
+                r#"SELECT f.form_id,f.form_name,f.enabled,f.version FROM Formdef f LEFT JOIN FormdefHasGroup fg ON f.form_id = fg.form_id WHERE fg.form_id IS NULL;"#,
+            )
+            .fetch_all(pool)
+            .await?.into_iter().filter_map(|row|Some(HgFormListItem{
+                form_name: row.try_get("form_name").ok()?,
+                formid: row.try_get("form_id").ok()?,
+                enabled: row.try_get("enabled").ok()?,
+                version: row.try_get("version").ok()?
+            })).collect();
+        Ok((rows_with_group,rows_without_group))
+            
     }
 
     async fn formdef_from_row(

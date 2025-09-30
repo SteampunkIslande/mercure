@@ -28,10 +28,15 @@
             onclick="openTab(event,{{ group.id }})">{{ group.name
             }}</button>
         {% endfor %}
+
+        {% if is_admin %}
+        <button id="tab-no-group" class="tablinks" onclick="openTab(event,`no-group`)">Formulaires sans groupe</button>
+        {% endif %}
     </div>
 
     {% for group in user_groups %}
-    <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {% endif %}>
+    <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {% endif
+        %}>
         <tr>
             <th>Nom du formulaire</th>
             <th style="min-width: max-content;padding-inline:30px;">Formulaire actif</th>
@@ -39,6 +44,15 @@
         </tr>
     </table>
     {% endfor %}
+    {% if is_admin %}
+    <table id="forms-container-no-group" class="tabcontent" style="display: none;">
+        <tr>
+            <th>Nom du formulaire</th>
+            <th style="min-width: max-content;padding-inline:30px;">Formulaire actif</th>
+            <th style="min-width: max-content;padding-inline:30px;">Edition du formulaire</th>
+        </tr>
+    </table>
+    {% endif %}
 
     <script>
         function openTab(evt, group_id) {
@@ -65,7 +79,7 @@
 
     <script>
         const userGroups = {{ user_groups | tojson }};
-        userGroups.forEach(group => {
+        userGroups.forEach((group, index, _) => {
             fetch(`/mercure/api/forms/groups/${group.id}`)
                 .then(response => response.json())
                 .then(forms => {
@@ -76,7 +90,7 @@
                         console.log("No tbody found, appending to table directly");
                         container = table;
                     }
-                    forms.data.forEach(form => {
+                    forms.data.with_group.forEach(form => {
                         const formBox = document.createElement('tr');
                         formBox.innerHTML = `
                             <td>${form.form_name} (version ${form.version})</td>
@@ -90,10 +104,34 @@
                         `;
                         container.appendChild(formBox);
                     });
+                    {% if is_admin %}
+                    if (index == 0) {
+                        let table_no_group = document.getElementById(`forms-container-no-group`);
+                        let container_no_group = table_no_group.querySelector('tbody');
+                        if (!container_no_group) {
+                            console.log("No tbody found, appending to table directly");
+                            container_no_group = table_no_group;
+                        }
+                        forms.data.without_group.forEach(form => {
+                            const formBoxNoGroup = document.createElement('tr');
+                            formBoxNoGroup.innerHTML = `
+                                <td>${form.form_name} (version ${form.version})</td>
+                                <td>
+                                    <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
+                                    Actif
+                                </td>
+                                <td>
+                                    <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
+                                </td>
+                            `;
+                            container_no_group.appendChild(formBoxNoGroup);
+                        });
+                    }
+                    {% endif %}
                 })
                 .catch(error => console.error('Error fetching forms:', error));
         });
-        
+
         function toggleFormActive(e, formId) {
             let toggle = e.target.checked ? "enable" : "disable";
             fetch(`/mercure/api/${toggle}/${formId}`)

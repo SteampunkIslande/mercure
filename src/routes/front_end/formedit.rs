@@ -23,7 +23,7 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
             context! {
                 pipelines_struct,
                 groups,
-                formid
+                formid,
             },
         )
     }
@@ -36,6 +36,6 @@ pub async fn show_forms_get(auth: Authenticated, pool: &State<SqlitePool>) -> Te
     if !auth.user.is_admin {
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
     } else {
-        Template::render("admin/showforms", context! {user_groups:user_groups})
+        Template::render("admin/showforms", context! {user_groups:user_groups, is_admin:auth.user.is_admin})
     }
 }
