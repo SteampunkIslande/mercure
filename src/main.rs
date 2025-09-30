@@ -65,6 +65,7 @@ async fn rocket() -> _ {
                 routes::backend::get_all_forms,
             ],
         )
+        .mount("/", routes![routes::frontend::favico])
         .attach(Template::fairing());
 
     // Initialiser la base de données
