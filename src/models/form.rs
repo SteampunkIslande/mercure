@@ -1,4 +1,3 @@
-use rocket::form::validate::Len;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
@@ -74,10 +73,46 @@ pub struct HgForm {
 /// - if type is `Constant`, column `value` will be its value
 /// - if type is `RunDefined`, columns `value` will be `NULL`.
 impl HgFormDef {
+    async fn userdefined_vars_from_form(
+        form_id: i64,
+        pool: &SqlitePool,
+    ) -> Result<HashMap<String, UserDefinedVar>, sqlx::Error> {
+        Ok(sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
+            .bind(form_id)
+            .fetch_all(pool)
+            .await?
+            .iter()
+            .filter_map(|row| {
+                let udv = match row.try_get("type").ok()? {
+                    "FromValuesList" => (
+                        row.try_get("varname").ok()?,
+                        UserDefinedVar::FromValuesList {
+                            allowed: row
+                                .try_get::<String, &str>("default_values")
+                                .ok()?
+                                .split("\n")
+                                .map(String::from)
+                                .collect(),
+                        },
+                    ),
+                    "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
+                    "Constant" => (
+                        row.try_get("varname").ok()?,
+                        UserDefinedVar::Constant(row.try_get("default_values").ok()?),
+                    ),
+                    _ => ("".to_string(), UserDefinedVar::Invalid),
+                };
+                Some(udv)
+            })
+            .collect())
+    }
+
     /// Add new form definition to the database
     /// Each form will be used as a template for actual runs
     pub async fn new_form_def(new_formdef: HgFormDef, pool: &SqlitePool) -> Result<(), ModelError> {
         // Insert into Formdef table
+
+        eprintln!("{:?}", new_formdef);
 
         if new_formdef.version <= 0 {
             return Err(ModelError::FormError(String::from(
@@ -116,42 +151,11 @@ impl HgFormDef {
         .filter_map(|row| row.try_get::<i64, &str>("form_id").ok())
         .next()
         {
-            let user_defined_vars: HashMap<String, UserDefinedVar> =
-                sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
-                    .bind(duplicate_form_id)
-                    .fetch_all(pool)
-                    .await?
-                    .iter()
-                    .filter_map(|row| {
-                        let udv = match row.try_get("type").ok()? {
-                            "FromValuesList" => (
-                                row.try_get("varname").ok()?,
-                                UserDefinedVar::FromValuesList {
-                                    allowed: row
-                                        .try_get::<String, &str>("default_values")
-                                        .ok()?
-                                        .split("\n")
-                                        .map(String::from)
-                                        .collect(),
-                                },
-                            ),
-                            "RunDefined" => {
-                                (row.try_get("varname").ok()?, UserDefinedVar::RunDefined)
-                            }
-                            "Constant" => (
-                                row.try_get("varname").ok()?,
-                                UserDefinedVar::Constant(row.try_get("default_values").ok()?),
-                            ),
-                            _ => ("".to_string(), UserDefinedVar::Invalid),
-                        };
-                        Some(udv)
-                    })
-                    .collect();
-            if new_formdef.user_defined_vars.as_ref() != Some(&user_defined_vars)
-                || (user_defined_vars.len() != new_formdef.user_defined_vars.len())
-            {
+            let user_defined_vars =
+                Self::userdefined_vars_from_form(duplicate_form_id, pool).await?;
+            if Some(&user_defined_vars) != new_formdef.user_defined_vars.as_ref() {
                 return Err(ModelError::FormError(String::from(
-                    "Un formulaire avec le même nom, la même version et les mêmes variables définies par l'utilisateur existe déjà. Veuillez augmenter le numéro de version",
+                    "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
                 )));
             }
             // This is fine, we just want to update the groups
@@ -174,18 +178,17 @@ impl HgFormDef {
             .try_get(0usize)?
         };
 
+        // Prepare groups associations by clearing them
+        sqlx::query(
+            r#"
+            DELETE FROM FormdefHasGroup WHERE form_id = ?
+            "#,
+        )
+        .bind(form_id)
+        .execute(pool)
+        .await?;
         // Insert groups into FormdefHasGroup table
         for group in &new_formdef.groups {
-            sqlx::query(
-                r#"
-                DELETE FROM FormdefHasGroup WHERE form_id = ? AND group_id = ?
-                "#,
-            )
-            .bind(form_id)
-            .bind(group.id)
-            .execute(pool)
-            .await?;
-
             sqlx::query(
                 r#"
                 INSERT INTO FormdefHasGroup (form_id, group_id)

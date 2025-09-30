@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <title>Nouveau formulaire de pipeline</title>
+    <title>{{ title }}</title>
     <script src="/static/scripts/newform_addgroup.js"></script>
     <script src="/static/scripts/userdefvars_edit.js"></script>
     <script src="/static/scripts/utils.js"></script>
@@ -231,7 +231,7 @@
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">Nouveau formulaire de pipeline</span>
+            <span class="banner-text">{{ title }}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -286,7 +286,7 @@
     </form>
 
     <div style="text-align: center; margin-top: 20px;">
-        <button class="btn btn-primary" onclick="submitForm()">Créer</button>
+        <button class="btn btn-primary" onclick="submitForm()">{{ submit_string }}</button>
     </div>
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
