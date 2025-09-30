@@ -24,7 +24,7 @@ pub enum UserDefinedVar {
     Constant(String),
     #[default]
     RunDefined,
-    Invalid
+    Invalid,
 }
 
 /// Struct used to define a form template
@@ -111,50 +111,54 @@ impl HgFormDef {
         .bind(new_formdef.version)
         .fetch_one(pool)
         .await
-            .ok().iter().filter_map(|row|row.try_get::<i64,&str>("form_id").ok()).next()
+        .ok()
+        .iter()
+        .filter_map(|row| row.try_get::<i64, &str>("form_id").ok())
+        .next()
         {
-            let user_defined_vars: HashMap<String, UserDefinedVar> = sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
-                .bind(duplicate_form_id)
-                .fetch_all(pool)
-                .await?
-                .iter()
-                .filter_map(|row| {
-                    let udv = match row.try_get("type").ok()? {
-                        "FromValuesList" => (
-                            row.try_get("varname").ok()?,
-                            UserDefinedVar::FromValuesList {
-                                allowed: row
-                                    .try_get::<String, &str>("default_values")
-                                    .ok()?
-                                    .split("\n")
-                                    .map(String::from)
-                                    .collect(),
-                            },
-                        ),
-                        "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
-                        "Constant" => (
-                            row.try_get("varname").ok()?,
-                            UserDefinedVar::Constant(row.try_get("default_values").ok()?),
-                        ),
-                        _ => {
-                            ("".to_string(),UserDefinedVar::Invalid)
-                        }
-                    };
-                    Some(udv)
-                })
-                .collect();
-            if new_formdef.user_defined_vars.as_ref() != Some(&user_defined_vars) || (user_defined_vars.len() != new_formdef.user_defined_vars.len()) {
+            let user_defined_vars: HashMap<String, UserDefinedVar> =
+                sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
+                    .bind(duplicate_form_id)
+                    .fetch_all(pool)
+                    .await?
+                    .iter()
+                    .filter_map(|row| {
+                        let udv = match row.try_get("type").ok()? {
+                            "FromValuesList" => (
+                                row.try_get("varname").ok()?,
+                                UserDefinedVar::FromValuesList {
+                                    allowed: row
+                                        .try_get::<String, &str>("default_values")
+                                        .ok()?
+                                        .split("\n")
+                                        .map(String::from)
+                                        .collect(),
+                                },
+                            ),
+                            "RunDefined" => {
+                                (row.try_get("varname").ok()?, UserDefinedVar::RunDefined)
+                            }
+                            "Constant" => (
+                                row.try_get("varname").ok()?,
+                                UserDefinedVar::Constant(row.try_get("default_values").ok()?),
+                            ),
+                            _ => ("".to_string(), UserDefinedVar::Invalid),
+                        };
+                        Some(udv)
+                    })
+                    .collect();
+            if new_formdef.user_defined_vars.as_ref() != Some(&user_defined_vars)
+                || (user_defined_vars.len() != new_formdef.user_defined_vars.len())
+            {
                 return Err(ModelError::FormError(String::from(
                     "Un formulaire avec le même nom, la même version et les mêmes variables définies par l'utilisateur existe déjà. Veuillez augmenter le numéro de version",
                 )));
             }
             // This is fine, we just want to update the groups
             duplicate_form_id
-        }
-        else
-        {
+        } else {
             sqlx::query(
-            r#"
+                r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
             VALUES (?, ?, ?, ?, ?)
             RETURNING form_id
@@ -290,17 +294,23 @@ impl HgFormDef {
         Ok(())
     }
 
-    pub async fn get_all_form_defs(pool: &SqlitePool) -> Result<Vec<HgFormListItem>, super::ModelError> {
-        let all_rows:Vec<_> = sqlx::query(
-                r#"SELECT f.form_id,f.form_name,f.enabled,f.version FROM Formdef f;"#,
-            )
-            .fetch_all(pool)
-            .await?.into_iter().filter_map(|row|Some(HgFormListItem{
-                form_name: row.try_get("form_name").ok()?,
-                formid: row.try_get("form_id").ok()?,
-                enabled: row.try_get("enabled").ok()?,
-                version: row.try_get("version").ok()?
-            })).collect();
+    pub async fn get_all_form_defs(
+        pool: &SqlitePool,
+    ) -> Result<Vec<HgFormListItem>, super::ModelError> {
+        let all_rows: Vec<_> =
+            sqlx::query(r#"SELECT f.form_id,f.form_name,f.enabled,f.version FROM Formdef f;"#)
+                .fetch_all(pool)
+                .await?
+                .into_iter()
+                .filter_map(|row| {
+                    Some(HgFormListItem {
+                        form_name: row.try_get("form_name").ok()?,
+                        formid: row.try_get("form_id").ok()?,
+                        enabled: row.try_get("enabled").ok()?,
+                        version: row.try_get("version").ok()?,
+                    })
+                })
+                .collect();
         Ok(all_rows)
     }
 
@@ -311,7 +321,7 @@ impl HgFormDef {
     pub async fn get_form_list_items_for_group(
         pool: &SqlitePool,
         group_id: i64,
-    ) -> Result<(Vec<HgFormListItem>,Vec<HgFormListItem>), super::ModelError> {
+    ) -> Result<(Vec<HgFormListItem>, Vec<HgFormListItem>), super::ModelError> {
         let rows_with_group:Vec<_> = sqlx::query(
                 r#"
         SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN Groups g ON g.group_id = fg.group_id WHERE fg.group_id = ?
@@ -334,8 +344,7 @@ impl HgFormDef {
                 enabled: row.try_get("enabled").ok()?,
                 version: row.try_get("version").ok()?
             })).collect();
-        Ok((rows_with_group,rows_without_group))
-            
+        Ok((rows_with_group, rows_without_group))
     }
 
     async fn formdef_from_row(
