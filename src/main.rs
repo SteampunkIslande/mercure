@@ -27,7 +27,8 @@ async fn rocket() -> _ {
                 routes::frontend::welcome_page_get,
                 routes::frontend::login_get,
                 routes::backend::logout_get,
-                routes::frontend::success_page_get
+                routes::frontend::success_page_get,
+                routes::frontend::home_get,
             ],
         )
         .mount(

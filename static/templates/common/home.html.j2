@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Forms</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <script src="/static/scripts/utils.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Bienvenue, {{user.username }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script>
+        function onDropDown(element) {
+            document.getElementById(element).classList.toggle("show");
+        }
+        function navigateTo(uri) {
+            window.location.href = uri;
+        }
+
+        // Close the dropdown menu if the user clicks outside of it
+        window.onclick = function (event) {
+            if (!event.target.matches('.dropbtn')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                var i;
+                for (i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+    </script>
+    <div class="dropdown">
+        <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
+                class="material-icons icon-align">science</span> Gestion des runs</button>
+        <div id="users_dropdown" class="dropdown-content">
+            <a href="/mercure/runs/running"><span class="material-icons icon-align"
+                    style="color:darkorange;">miscellaneous_services</span>En
+                cours</a>
+            <a href="/mercure/runs/done/"><span class="material-icons icon-align"
+                    style="color:green">check_circle_outline</span>Terminés</a>
+            <a href="/mercure/runs/error/"><span class="material-icons icon-align"
+                    style="color:red">error_outline</span>Erreurs</a>
+        </div>
+    </div>
+    {% if is_admin %}
+    <div class="dropdown" style="float:right;">
+        <button onclick="navigateTo(`/mercure/admin/dashboard`)" class="dropbtn"><span
+                class="material-icons icon-align">settings</span></button>
+    </div>
+    {% endif %}
+
+    <div>
+        <span style="display:block;"><br></span>
+    </div>
+
+    <div>
+        <div class="tab">
+            {% for group in user_groups %}
+
+            <button id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active {% endif %}"
+                onclick="openTab(event,{{ group.id }})">{{ group.name
+                }}</button>
+            {% endfor %}
+        </div>
+
+        {% for group in user_groups %}
+        <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {%
+            endif %}>
+            <tr>
+                <th>Nom du formulaire</th>
+                <th style="min-width: max-content;padding-inline:30px;">Lancement d'un run</th>
+            </tr>
+        </table>
+        {% endfor %}
+
+        <script>
+            function openTab(evt, group_id) {
+                // Declare all variables
+                var i, tabcontent, tablinks;
+
+                // Get all elements with class="tabcontent" and hide them
+                tabcontent = document.getElementsByClassName("tabcontent");
+                for (i = 0; i < tabcontent.length; i++) {
+                    tabcontent[i].style.display = "none";
+                }
+
+                // Get all elements with class="tablinks" and remove the class "active"
+                tablinks = document.getElementsByClassName("tablinks");
+                for (i = 0; i < tablinks.length; i++) {
+                    tablinks[i].className = tablinks[i].className.replace(" active", "");
+                }
+
+                // Show the current tab, and add an "active" class to the button that opened the tab
+                document.getElementById(`forms-container-${group_id}`).style.display = "block";
+                evt.currentTarget.className += " active";
+            } 
+        </script>
+
+        <script>
+            const userGroups = {{ user_groups | tojson }};
+
+            if (userGroups) {
+                userGroups.forEach((group, index, _) => {
+                    fetch(`/mercure/api/forms/groups/${group.id}`)
+                        .then(response => response.json())
+                        .then(forms => {
+                            // Always append to tbody if present, otherwise to table
+                            let table = document.getElementById(`forms-container-${group.id}`);
+                            let container = table.querySelector('tbody');
+                            if (!container) {
+                                console.log("No tbody found, appending to table directly");
+                                container = table;
+                            }
+                            forms.data.with_group.forEach(form => {
+                                const formBox = document.createElement('tr');
+                                formBox.innerHTML = `
+                            <td>${form.form_name} (version ${form.version})</td>
+                            <td>
+                                <a href="/mercure/runs/submit/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Lancer un run</a>
+                            </td>
+                        `;
+                                container.appendChild(formBox);
+                            });
+                        })
+                        .catch(error => console.error('Error fetching forms:', error));
+                });
+
+                function toggleFormActive(e, formId) {
+                    let toggle = e.target.checked ? "enable" : "disable";
+                    fetch(`/mercure/api/${toggle}/${formId}`)
+                        .then(response => response.json())
+                        .then(
+                            data => {
+                                if (data.success) {
+                                    const infodiv = document.getElementById("info-message")
+                                    infodiv.style.display = "block";
+                                    infodiv.textContent = data.data;
+                                    setTimeout(() => {
+                                        infodiv.style.display = 'none';
+                                    }, 2000);
+                                }
+                                else {
+                                    const errordiv = document.getElementById("error-message")
+                                    errordiv.style.display = "block";
+                                    errordiv.textContent = data.message;
+                                    setTimeout(() => {
+                                        errordiv.style.display = 'none';
+                                    }, 2000);
+                                }
+                            }
+                        ).catch(error => {
+                            const errordiv = document.getElementById("error-message")
+                            errordiv.style.display = "block";
+                            errordiv.textContent = error;
+                            setTimeout(() => {
+                                errordiv.style.display = 'none';
+                            }, 2000);
+                        });
+                }
+            }
+        </script>
+        <div class="error" id="error-message" style="display: none;"></div>
+        <div class="info" id="info-message" style="display: none;"></div>
+    </div>
+</body>
+
+</html>

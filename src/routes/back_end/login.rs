@@ -35,10 +35,8 @@ pub async fn login_post(
     cookies.add_private(Cookie::new("user_id", user.id.to_string()));
 
     if user.is_admin {
-        eprintln!("User is admin");
         Ok(Redirect::to(uri!("/mercure/admin/dashboard")))
     } else {
-        eprintln!("User is not admin");
         Ok(Redirect::to(uri!("/mercure/home")))
     }
 }

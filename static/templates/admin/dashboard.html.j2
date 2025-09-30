@@ -23,6 +23,9 @@
         function onDropDown(element) {
             document.getElementById(element).classList.toggle("show");
         }
+        function navigateTo(uri) {
+            window.location.href = uri;
+        }
 
         // Close the dropdown menu if the user clicks outside of it
         window.onclick = function (event) {
@@ -53,6 +56,11 @@
             <a href="/mercure/admin/newform">Créer un nouveau formulaire</a>
             <a href="/mercure/admin/show/forms">Liste des formulaires</a>
         </div>
+    </div>
+    <div class="dropdown" style="float:right;">
+        <button onclick="navigateTo(`/mercure/home`)" class="dropbtn"><span
+                class="material-icons icon-align">home</span></button>
+    </div>
     </div>
 </body>
 
