@@ -7,6 +7,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        table th {
+            background-color: #f1f1f1;
+        }
+
+        table tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        table a {
+            display: inline-block;
+            padding: 5px 10px;
+            text-decoration: none;
+            color: white;
+            background-color: #007bff;
+            border-radius: 4px;
+        }
+
+        table a:hover {
+            background-color: #0056b3;
+        }
+
+        table a:hover {
+            background-color: #0056b3;
+        }
+
+        table td:hover a {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 
 <body>
@@ -35,54 +77,57 @@
 
     <script>
 
-        const userId = "{{ user.id }}";
-        // Sauvegarder l'état initial des cases à cocher
-        const initialState = {};
+        var initialState = {};
+        var userId = "{{ user.id }}";
 
-        const groupsContainer = document.getElementById("groups-container");
-        groupsContainer.innerHTML = ""; // Clear existing groups
+        function init() {
+            const userId = "{{ user.id }}";
+            initialState = {};
+            const groupsContainer = document.getElementById("groups-container");
+            groupsContainer.innerHTML = ""; // Clear existing groups
 
-        fetch("/mercure/api/groups/list")
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Erreur lors du chargement des groupes.");
-                }
-                return response.json();
-            })
-            .then((data) => {
-                if (data.success && Array.isArray(data.data)) {
-                    data.data.forEach((group) => {
-                        const groupDiv = document.createElement("div");
-                        groupDiv.className = "group-checkbox";
-                        groupDiv.innerHTML = `
+            fetch("/mercure/api/groups/list")
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Erreur lors du chargement des groupes.");
+                    }
+                    return response.json();
+                })
+                .then((data) => {
+                    if (data.success && Array.isArray(data.data)) {
+                        data.data.forEach((group) => {
+                            const groupDiv = document.createElement("div");
+                            groupDiv.className = "group-checkbox";
+                            groupDiv.innerHTML = `
             <input type="checkbox" id="group-${group.id}" name="selected_groups" value="${group.id}">
             <label id="label-group-${group.id}" for="group_${group.id}">${group.name}</label>
           `;
-                        groupsContainer.appendChild(groupDiv);
-                    });
-                } else {
-                    throw new Error("Données de groupe invalides.");
-                }
-            })
-            .then(() => {
-                fetch(`/mercure/api/groups/list/${userId}`)
-                    .then(res => res.json())
-                    .then((userGroupsData) => {
-                        userGroupsData.data.forEach(userGroup => {
-                            const checkbox = document.getElementById(`group-${userGroup.id}`);
-                            checkbox.checked = true;
-                        })
-                    }).then(() => {
-                        const checkboxes = document.querySelectorAll("input[name='selected_groups']");
-                        checkboxes.forEach(checkbox => {
-                            initialState[checkbox.id] = checkbox.checked;
+                            groupsContainer.appendChild(groupDiv);
                         });
-                    })
-            })
-            .catch((error) => {
-                console.error(error);
-                alert("Impossible de charger les groupes. Veuillez réessayer plus tard.");
-            });
+                    } else {
+                        throw new Error("Données de groupe invalides.");
+                    }
+                })
+                .then(() => {
+                    fetch(`/mercure/api/groups/list/${userId}`)
+                        .then(res => res.json())
+                        .then((userGroupsData) => {
+                            userGroupsData.data.forEach(userGroup => {
+                                const checkbox = document.getElementById(`group-${userGroup.id}`);
+                                checkbox.checked = true;
+                            })
+                        }).then(() => {
+                            const checkboxes = document.querySelectorAll("input[name='selected_groups']");
+                            checkboxes.forEach(checkbox => {
+                                initialState[checkbox.id] = checkbox.checked;
+                            });
+                        })
+                })
+                .catch((error) => {
+                    console.error(error);
+                    alert("Impossible de charger les groupes. Veuillez réessayer plus tard.");
+                });
+        }
 
         function submitForm() {
             const checkboxes = document.querySelectorAll("input[name='selected_groups']");
@@ -109,10 +154,9 @@
                 },
                 body: payload
             }).then((response) => response.json()).then((data) => {
-                if (data.success) {
-                    window.location.reload();
-                }
-                else {
+                init(); // Re-initialize to reflect changes
+                if (!data.success){
+                    alert("Erreur lors de la mise à jour des groupes : " + data.message);
                     const infoDiv = document.getElementById("info-message");
                     const errorDiv = document.getElementById("error-message");
                     infoDiv.style.display = 'none';
@@ -120,6 +164,16 @@
                     errorDiv.textContent = data.message;
                     setTimeout(() => {
                         errorDiv.style.display = 'none';
+                    }, 2000);
+                }
+                else {
+                    const errorDiv = document.getElementById("error-message");
+                    const infoDiv = document.getElementById("info-message");
+                    errorDiv.style.display = 'none';
+                    infoDiv.style.display = 'block';
+                    infoDiv.textContent = data.data;
+                    setTimeout(() => {
+                        infoDiv.style.display = 'none';
                     }, 2000);
                 }
             })
@@ -134,6 +188,8 @@
                     }, 2000);
                 });
         }
+
+        window.onload = init;
 
 
     </script>
