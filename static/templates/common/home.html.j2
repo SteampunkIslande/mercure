@@ -128,14 +128,16 @@
                                 container = table;
                             }
                             forms.data.with_group.forEach(form => {
-                                const formBox = document.createElement('tr');
-                                formBox.innerHTML = `
+                                if (form.enabled) {
+                                    const formBox = document.createElement('tr');
+                                    formBox.innerHTML = `
                             <td>${form.form_name} (version ${form.version})</td>
                             <td>
                                 <a href="/mercure/runs/submit/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Lancer un run</a>
                             </td>
                         `;
-                                container.appendChild(formBox);
+                                    container.appendChild(formBox);
+                                }
                             });
                         })
                         .catch(error => console.error('Error fetching forms:', error));
