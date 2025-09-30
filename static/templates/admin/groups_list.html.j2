@@ -7,48 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        table th,
-        table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        table th {
-            background-color: #f1f1f1;
-        }
-
-        table tbody tr:hover {
-            background-color: #f1f1f1;
-        }
-
-        table a {
-            display: inline-block;
-            padding: 5px 10px;
-            text-decoration: none;
-            color: white;
-            background-color: #007bff;
-            border-radius: 4px;
-        }
-
-        table a:hover {
-            background-color: #0056b3;
-        }
-
-        table a:hover {
-            background-color: #0056b3;
-        }
-
-        table td:hover a {
-            background-color: #0056b3;
-        }
-    </style>
+    
 </head>
 
 <body>
@@ -61,8 +20,6 @@
             </div>
         </div>
     </div>
-    <div id="error-message" style="display: none;" class="error"></div>
-    <div id="info-message" style="display: none;" class="info"></div>
     <div id="groups-container">
     </div>
     <div style="text-align: center; margin-top: 20px;">
@@ -73,6 +30,8 @@
         <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
         <a class="btn btn-secondary" href="/mercure/admin/dashboard">Retour au tableau de bord</a>
     </div>
+    <div id="error-message" style="display: none;" class="error"></div>
+    <div id="info-message" style="display: none;" class="info"></div>
     </form>
 
     <script>

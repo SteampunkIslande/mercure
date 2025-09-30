@@ -8,8 +8,6 @@
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <script src="/static/scripts/utils.js"></script>
-    <style>
-    </style>
 </head>
 
 <body>
@@ -23,8 +21,6 @@
         </div>
     </div>
 
-    <div class="error" id="error-message" style="display: none;"></div>
-    <div class="info" id="info-message" style="display: none;"></div>
     <div class="tab">
         {% for group in user_groups %}
 
@@ -35,8 +31,13 @@
     </div>
 
     {% for group in user_groups %}
-    <div id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block" {% endif %}>
-    </div>
+    <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {% endif %}>
+        <tr>
+            <th>Nom du formulaire</th>
+            <th style="min-width: max-content;padding-inline:30px;">Formulaire actif</th>
+            <th style="min-width: max-content;padding-inline:30px;">Edition du formulaire</th>
+        </tr>
+    </table>
     {% endfor %}
 
     <script>
@@ -68,32 +69,31 @@
             fetch(`/mercure/api/forms/groups/${group.id}`)
                 .then(response => response.json())
                 .then(forms => {
-                    const container = document.getElementById(`forms-container-${group.id}`);
+                    // Always append to tbody if present, otherwise to table
+                    let table = document.getElementById(`forms-container-${group.id}`);
+                    let container = table.querySelector('tbody');
+                    if (!container) {
+                        console.log("No tbody found, appending to table directly");
+                        container = table;
+                    }
                     forms.data.forEach(form => {
-                        const formBox = document.createElement('div');
-                        formBox.className = 'form-box';
-
+                        const formBox = document.createElement('tr');
                         formBox.innerHTML = `
-                            <h3>${form.form_name} (version ${form.version})</h3>
-                            <div class="actions">
-                                <label>
-                                    <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
-                                    Actif
-                                </label>
-                                <button title='Editer ${form.formid}' onclick="editForm('${form.formid}')">Edit</button>
-                            </div>
+                            <td>${form.form_name} (version ${form.version})</td>
+                            <td>
+                                <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
+                                Actif
+                            </td>
+                            <td>
+                                <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
+                            </td>
                         `;
-
                         container.appendChild(formBox);
                     });
                 })
                 .catch(error => console.error('Error fetching forms:', error));
         });
-
-        function editForm(formId) {
-            // Redirect to the form edit page
-            window.location.href = `/mercure/admin/editform/${formId}`;
-        }
+        
         function toggleFormActive(e, formId) {
             let toggle = e.target.checked ? "enable" : "disable";
             fetch(`/mercure/api/${toggle}/${formId}`)
@@ -129,6 +129,8 @@
         }
     </script>
     <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+    <div class="error" id="error-message" style="display: none;"></div>
+    <div class="info" id="info-message" style="display: none;"></div>
 </body>
 
 </html>

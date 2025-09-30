@@ -7,48 +7,7 @@
     <title>Liste des utilisateurs</title>
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
 
-        table th,
-        table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        table th {
-            background-color: #f1f1f1;
-        }
-
-        table tbody tr:hover {
-            background-color: #f1f1f1;
-        }
-
-        table a {
-            display: inline-block;
-            padding: 5px 10px;
-            text-decoration: none;
-            color: white;
-            background-color: #007bff;
-            border-radius: 4px;
-        }
-
-        table a:hover {
-            background-color: #0056b3;
-        }
-
-        table a:hover {
-            background-color: #0056b3;
-        }
-
-        table td:hover a {
-            background-color: #0056b3;
-        }
-    </style>
 </head>
 
 <body>
@@ -64,9 +23,9 @@
     <table>
         <thead>
             <tr>
-                <th>Nom de l'utilisateur</th>
-                <th>Groupe</th>
-                <th>Mot de passe</th>
+                <th style="min-width: max-content;padding-inline:70px;">Nom de l'utilisateur</th>
+                <th style="min-width: max-content;padding-inline:70px;">Groupe</th>
+                <th style="min-width: max-content;padding-inline:70px;">Mot de passe</th>
             </tr>
         </thead>
         <tbody id="user-list">
@@ -92,6 +51,7 @@
                         const groupEditLink = document.createElement('a');
                         groupEditLink.href = `/mercure/admin/groupedit/${user.id}`;
                         groupEditLink.textContent = 'Editer le groupe';
+                        groupEditLink.style = "display:inline-table;width:100%;text-align:center;";
                         groupEditCell.appendChild(groupEditLink);
                         row.appendChild(groupEditCell);
 
@@ -99,6 +59,7 @@
                         const passEditLink = document.createElement('a');
                         passEditLink.href = `/mercure/passedit/${user.id}`;
                         passEditLink.textContent = 'Modifier le mot de passe';
+                        passEditLink.style = "display:inline-table;width:100%;text-align:center;";
                         passEditCell.appendChild(passEditLink);
                         row.appendChild(passEditCell);
 

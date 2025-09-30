@@ -1,167 +1,166 @@
 body {
-    font-family: Arial, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem;
-    line-height: 1.6;
-    color: #333;
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  line-height: 1.6;
+  color: #333;
 }
 
 h1,
 h2,
 h3 {
-    font-family: 'Arial Black', sans-serif;
-    color: #007bff;
-    margin-bottom: 1rem;
+  font-family: "Arial Black", sans-serif;
+  color: #007bff;
+  margin-bottom: 1rem;
 }
 
 p {
-    font-size: 1rem;
-    color: #555;
-    margin-bottom: 1rem;
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 1rem;
 }
 
 .btn {
-    display: inline-block;
-    cursor: pointer;
-    padding: 10px 20px;
-    background-color: #007bff;
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
-    margin: 10px;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
+  display: inline-block;
+  cursor: pointer;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  margin: 10px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
 }
 
 .btn:hover {
-    background-color: #0056b3;
+  background-color: #0056b3;
 }
 
 .btn-secondary {
-    background-color: #6c757d;
-    color: white;
+  background-color: #6c757d;
+  color: white;
 }
 
 .btn-secondary:hover {
-    background-color: #5a6268;
+  background-color: #5a6268;
 }
 
 .container {
-    text-align: center;
-    margin-top: 2rem;
+  text-align: center;
+  margin-top: 2rem;
 }
 
 @keyframes fadeout {
-    from {
-        opacity: 100%;
-    }
+  from {
+    opacity: 100%;
+  }
 
-    to {
-        opacity: 0%;
-    }
+  to {
+    opacity: 0%;
+  }
 }
 
 .error {
-    border: 1.5px solid #d32f2f;
-    background-color: #fdecea;
-    color: #b71c1c;
-    padding: 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-    font-weight: bold;
-    animation-duration: 10s;
-    animation-iteration-count: 1;
-    animation-name: fadeout;
+  border: 1.5px solid #d32f2f;
+  background-color: #fdecea;
+  color: #b71c1c;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-weight: bold;
+  animation-duration: 10s;
+  animation-iteration-count: 1;
+  animation-name: fadeout;
 }
 
 .info {
-    border: 1.5px solid #2f2fd3;
-    background-color: #eaecfd;
-    color: #1c1cb7;
-    padding: 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-    font-weight: bold;
-    animation-duration: 10s;
-    animation-iteration-count: 1;
-    animation-name: fadeout;
+  border: 1.5px solid #2f2fd3;
+  background-color: #eaecfd;
+  color: #1c1cb7;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-weight: bold;
+  animation-duration: 10s;
+  animation-iteration-count: 1;
+  animation-name: fadeout;
 }
 
 .success {
-    border: 1.5px solid #2fd32f;
-    background-color: #eafdec;
-    color: #1cb71c;
-    padding: 1rem;
-    border-radius: 6px;
-    margin: 1rem 0;
-    font-weight: bold;
-    animation-duration: 10s;
-    animation-iteration-count: 1;
-    animation-name: fadeout;
+  border: 1.5px solid #2fd32f;
+  background-color: #eafdec;
+  color: #1cb71c;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-weight: bold;
+  animation-duration: 10s;
+  animation-iteration-count: 1;
+  animation-name: fadeout;
 }
-
 
 /* Banner styles */
 .banner {
-    background-color: #007bff;
-    color: white;
-    padding: 10px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 5px;
-    margin-bottom: 20px;
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 5px;
+  margin-bottom: 20px;
 }
 
 .banner-content {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .banner-text {
-    font-size: 1.2rem;
-    font-weight: bold;
+  font-size: 1.2rem;
+  font-weight: bold;
 }
 
 .btn-primary {
-    display: inline-block;
-    padding: 10px 20px;
-    text-decoration: none;
-    border-radius: 5px;
-    margin: 10px;
-    font-weight: bold;
+  display: inline-block;
+  padding: 10px 20px;
+  text-decoration: none;
+  border-radius: 5px;
+  margin: 10px;
+  font-weight: bold;
 }
 
 .btn-secondary {
-    background-color: #6c757d;
-    color: white;
+  background-color: #6c757d;
+  color: white;
 }
 
 .btn-secondary:hover {
-    background-color: #5a6268;
+  background-color: #5a6268;
 }
 
 .btn:hover {
-    background-color: #0056b3;
+  background-color: #0056b3;
 }
 
 .user-var-item {
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 10px;
-    margin: 10px 0;
-    background-color: #f9f9f9;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 label {
   display: inline-block;
   text-align: right;
   font-size: 1rem;
-    color: #363636;
-    margin-bottom: 1rem;
+  color: #363636;
+  margin-bottom: 1rem;
 }
 
 .tab {
@@ -197,6 +196,7 @@ label {
   padding: 6px 12px;
   border: 1px solid #ccc;
   border-top: none;
+  width: 100%;
 }
 
 .tablinks {
@@ -206,9 +206,9 @@ label {
   cursor: pointer;
 }
 
- /* Dropdown Button */
+/* Dropdown Button */
 .dropbtn {
-  background-color: #3498DB;
+  background-color: #3498db;
   color: white;
   padding: 16px;
   font-size: 16px;
@@ -217,8 +217,9 @@ label {
 }
 
 /* Dropdown button on hover & focus */
-.dropbtn:hover, .dropbtn:focus {
-  background-color: #2980B9;
+.dropbtn:hover,
+.dropbtn:focus {
+  background-color: #2980b9;
 }
 
 /* The container <div> - needed to position the dropdown content */
@@ -233,7 +234,7 @@ label {
   position: absolute;
   background-color: #f1f1f1;
   min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
   z-index: 1;
   width: 100%;
 }
@@ -247,13 +248,61 @@ label {
 }
 
 /* Change color of dropdown links on hover */
-.dropdown-content a:hover {background-color: #ddd;}
+.dropdown-content a:hover {
+  background-color: #ddd;
+}
 
 /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
-.show {display:block;} 
+.show {
+  display: block;
+}
 
-.icon-align 
-{
+.icon-align {
   vertical-align: text-bottom;
   margin-right: 5px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th,
+table td,
+table tr {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th {
+  background-color: #f1f1f1;
+}
+
+table tbody tr:hover {
+  background-color: #f1f1f1;
+  width: 100%;
+}
+
+table a {
+  display: inline-block;
+  padding: 5px 10px;
+  text-decoration: none;
+  color: white;
+  background-color: #007bff;
+  border-radius: 4px;
+}
+
+table a:hover {
+  background-color: #0056b3;
+}
+
+table a:hover {
+  background-color: #0056b3;
+}
+
+table td:hover a {
+  background-color: #0056b3;
 }
