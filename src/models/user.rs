@@ -62,9 +62,9 @@ impl User {
     }
 
     pub async fn list_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> {
-        Ok(sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
+        sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
             .fetch_all(pool)
-            .await?)
+            .await
     }
 
     pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<Option<User>, AuthError> {

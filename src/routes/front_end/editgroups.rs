@@ -13,6 +13,6 @@ pub async fn edit_groups_for_user(
     if !auth.user.is_admin {
         return Template::render("errors/admin_only", context! {});
     }
-    let user = User::find_by_id(user_id, &pool).await.unwrap_or_default();
+    let user = User::find_by_id(user_id, pool).await.unwrap_or_default();
     Template::render("admin/groups_list", context! {user_id,user})
 }
