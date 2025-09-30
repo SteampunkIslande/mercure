@@ -38,7 +38,9 @@ async fn rocket() -> _ {
                 routes::frontend::admin_dashboard_get,
                 routes::frontend::newform_get,
                 routes::frontend::editform_get,
-                routes::frontend::show_forms_get
+                routes::frontend::show_forms_get,
+                routes::frontend::edit_users,
+                routes::frontend::edit_groups_for_user,
             ],
         )
         .mount(
@@ -55,7 +57,10 @@ async fn rocket() -> _ {
                 // Simple GET pour mettre un formulaire en production
                 routes::backend::enable_form,
                 // Simple GET pour retirer un formulaire du service
-                routes::backend::disable_form
+                routes::backend::disable_form,
+                routes::backend::list_users,
+                routes::backend::list_groups_for_user,
+                routes::backend::update_groups
             ],
         )
         .attach(Template::fairing());

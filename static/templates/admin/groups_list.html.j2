@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Edition des groupes de {{ user.username }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Edition des groupes de {{ user.username }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+        </div>
+    </div>
+    <div id="error-message" style="display: none;" class="error"></div>
+    <div id="info-message" style="display: none;" class="info"></div>
+    <div id="groups-container">
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <button class="btn btn-primary" onclick="submitForm()">Mettre à jour les groupes</button>
+    </div>
+    <!-- Centered submit button at the bottom of the page -->
+    <div style="text-align: center; margin-top: 20px;">
+        <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
+        <a class="btn btn-secondary" href="/mercure/admin/dashboard">Retour au tableau de bord</a>
+    </div>
+    </form>
+
+    <script>
+
+        const userId = "{{ user.id }}";
+        // Sauvegarder l'état initial des cases à cocher
+        const initialState = {};
+
+        const groupsContainer = document.getElementById("groups-container");
+        groupsContainer.innerHTML = ""; // Clear existing groups
+
+        fetch("/mercure/api/groups/list")
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Erreur lors du chargement des groupes.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                if (data.success && Array.isArray(data.data)) {
+                    data.data.forEach((group) => {
+                        const groupDiv = document.createElement("div");
+                        groupDiv.className = "group-checkbox";
+                        groupDiv.innerHTML = `
+            <input type="checkbox" id="group-${group.id}" name="selected_groups" value="${group.id}">
+            <label id="label-group-${group.id}" for="group_${group.id}">${group.name}</label>
+          `;
+                        groupsContainer.appendChild(groupDiv);
+                    });
+                } else {
+                    throw new Error("Données de groupe invalides.");
+                }
+            })
+            .then(() => {
+                fetch(`/mercure/api/groups/list/${userId}`)
+                    .then(res => res.json())
+                    .then((userGroupsData) => {
+                        userGroupsData.data.forEach(userGroup => {
+                            const checkbox = document.getElementById(`group-${userGroup.id}`);
+                            checkbox.checked = true;
+                        })
+                    }).then(() => {
+                        const checkboxes = document.querySelectorAll("input[name='selected_groups']");
+                        checkboxes.forEach(checkbox => {
+                            initialState[checkbox.id] = checkbox.checked;
+                        });
+                    })
+            })
+            .catch((error) => {
+                console.error(error);
+                alert("Impossible de charger les groupes. Veuillez réessayer plus tard.");
+            });
+
+        function submitForm() {
+            const checkboxes = document.querySelectorAll("input[name='selected_groups']");
+            const to_add = [];
+            const to_remove = [];
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked && !initialState[checkbox.id]) {
+                    group_name = document.getElementById(`label-group-${checkbox.value}`).textContent;
+                    to_add.push({ id: parseInt(checkbox.value), name: group_name });
+                } else if (!checkbox.checked && initialState[checkbox.id]) {
+                    group_name = document.getElementById(`label-group-${checkbox.value}`).textContent;
+                    to_remove.push({ id: parseInt(checkbox.value), name: group_name });
+                }
+            });
+
+            const payload = JSON.stringify({ user_id: parseInt(userId), to_add, to_remove });
+            console.log(payload);
+
+            fetch("/mercure/api/groups/update", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: payload
+            }).then((response) => response.json()).then((data) => {
+                if (data.success) {
+                    window.location.reload();
+                }
+                else {
+                    const infoDiv = document.getElementById("info-message");
+                    const errorDiv = document.getElementById("error-message");
+                    infoDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = data.message;
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 2000);
+                }
+            })
+                .catch((e) => {
+                    const infoDiv = document.getElementById("info-message");
+                    const errorDiv = document.getElementById("error-message");
+                    infoDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = e;
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 2000);
+                });
+        }
+
+
+    </script>
+
+
+</body>
+
+</html>

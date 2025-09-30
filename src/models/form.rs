@@ -262,7 +262,7 @@ impl HgFormDef {
     ) -> Result<Vec<HgFormListItem>, super::ModelError> {
         let rows:Vec<_> = sqlx::query(
                 r#"
-        SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN GroupHasUser gu ON gu.group_id = fg.group_id JOIN Groups g ON g.group_id = gu.group_id WHERE fg.group_id = ?
+        SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN Groups g ON g.group_id = fg.group_id WHERE fg.group_id = ?
         "#,
             ).bind(group_id)
             .fetch_all(pool)

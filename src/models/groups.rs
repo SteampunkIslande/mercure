@@ -1,8 +1,9 @@
+use rocket::FromForm;
 use serde::{Deserialize, Serialize};
 use sqlx;
 use sqlx::{Row, SqlitePool};
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, FromForm)]
 pub struct Group {
     pub id: i64,
     pub name: String,
@@ -49,6 +50,29 @@ WHERE gh.user_id = ?; "#,
             })
         })
         .collect())
+    }
+
+    pub async fn set_user_groups(
+        pool: &SqlitePool,
+        user_id: i64,
+        to_remove: Vec<Group>,
+        to_add: Vec<Group>,
+    ) -> Result<(), sqlx::Error> {
+        for g in to_remove {
+            sqlx::query(r#"DELETE FROM GroupHasUser WHERE group_id = ? AND user_id = ? "#)
+                .bind(g.id)
+                .bind(user_id)
+                .execute(pool)
+                .await?;
+        }
+        for g in to_add {
+            sqlx::query(r#"INSERT INTO GroupHasUser (group_id,user_id) VALUES (?,?)"#)
+                .bind(g.id)
+                .bind(user_id)
+                .execute(pool)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Adds a new group to the database and returns its ID
