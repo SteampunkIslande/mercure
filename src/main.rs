@@ -60,7 +60,8 @@ async fn rocket() -> _ {
                 routes::backend::disable_form,
                 routes::backend::list_users,
                 routes::backend::list_groups_for_user,
-                routes::backend::update_groups
+                routes::backend::update_groups,
+                routes::backend::get_all_forms,
             ],
         )
         .attach(Template::fairing());

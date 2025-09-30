@@ -3,17 +3,18 @@ use serde_json::json;
 use sqlx::SqlitePool;
 
 use crate::{
-    models::{HgFormDef},
+    models::{HgFormDef, HgFormListItem},
     routes::ApiResponse,
 };
 
-// #[get("/forms")]
-// pub async fn get_all_forms(pool: &State<SqlitePool>) -> Json<ApiResponse<Vec<HgFormDef>>> {
-//     match HgFormDef::get_all_form_defs(pool).await {
-//         Ok(alldefs) => Json(ApiResponse::success(alldefs)),
-//         Err(e) => Json(ApiResponse::error(format!("{:?}", e))),
-//     }
-// }
+#[get("/forms/all")]
+pub async fn get_all_forms(pool: &State<SqlitePool>) -> Json<ApiResponse<Vec<HgFormListItem>>> {
+    match HgFormDef::get_all_form_defs(pool).await {
+        Ok(alldefs) => Json(ApiResponse::success(alldefs)),
+        Err(e) => Json(ApiResponse::error(format!("{:?}", e))),
+    }
+}
+
 
 #[get("/forms/groups/<group_id>")]
 pub async fn get_all_forms_for_group(

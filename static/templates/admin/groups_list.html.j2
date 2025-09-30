@@ -53,7 +53,7 @@
                     return response.json();
                 })
                 .then((data) => {
-                    if (data.success && Array.isArray(data.data)) {
+                    if (data.success && Array.isArray(data.data) && data.data.length > 0) {
                         data.data.forEach((group) => {
                             const groupDiv = document.createElement("div");
                             groupDiv.className = "group-checkbox";
@@ -63,8 +63,9 @@
           `;
                             groupsContainer.appendChild(groupDiv);
                         });
-                    } else {
-                        throw new Error("Données de groupe invalides.");
+                    }
+                    if (data.success && Array.isArray(data.data) && data.data.length == 0) {
+                        groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
                     }
                 })
                 .then(() => {
@@ -84,7 +85,7 @@
                 })
                 .catch((error) => {
                     console.error(error);
-                    alert("Impossible de charger les groupes. Veuillez réessayer plus tard.");
+                    alert(error.message);
                 });
         }
 

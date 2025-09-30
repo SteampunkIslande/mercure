@@ -1,3 +1,4 @@
+use rocket::form::validate::Len;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
@@ -23,6 +24,7 @@ pub enum UserDefinedVar {
     Constant(String),
     #[default]
     RunDefined,
+    Invalid
 }
 
 /// Struct used to define a form template
@@ -98,42 +100,88 @@ impl HgFormDef {
             )));
         }
 
-        // Make sure the (form_name,version) is unique!
-        if (sqlx::query(
+        // If there is already a form with the same name and version, check if the user-defined variables are the same
+        // If they are, this means the user may have only tried to change the associated groups, so we allow it
+        let form_id = if let Some(duplicate_form_id) = sqlx::query(
             r#"
-            SELECT * FROM Formdef WHERE form_name = ? AND version = ?
+            SELECT form_name,version,form_id FROM Formdef WHERE form_name = ? AND version = ?
             "#,
         )
         .bind(&new_formdef.form_name)
         .bind(new_formdef.version)
         .fetch_one(pool)
-        .await)
-            .is_ok()
+        .await
+            .ok().iter().filter_map(|row|row.try_get::<i64,&str>("form_id").ok()).next()
         {
-            return Err(ModelError::FormError(String::from(
-                "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
-            )));
+            let user_defined_vars: HashMap<String, UserDefinedVar> = sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
+                .bind(duplicate_form_id)
+                .fetch_all(pool)
+                .await?
+                .iter()
+                .filter_map(|row| {
+                    let udv = match row.try_get("type").ok()? {
+                        "FromValuesList" => (
+                            row.try_get("varname").ok()?,
+                            UserDefinedVar::FromValuesList {
+                                allowed: row
+                                    .try_get::<String, &str>("default_values")
+                                    .ok()?
+                                    .split("\n")
+                                    .map(String::from)
+                                    .collect(),
+                            },
+                        ),
+                        "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
+                        "Constant" => (
+                            row.try_get("varname").ok()?,
+                            UserDefinedVar::Constant(row.try_get("default_values").ok()?),
+                        ),
+                        _ => {
+                            ("".to_string(),UserDefinedVar::Invalid)
+                        }
+                    };
+                    Some(udv)
+                })
+                .collect();
+            if new_formdef.user_defined_vars.as_ref() != Some(&user_defined_vars) || (user_defined_vars.len() != new_formdef.user_defined_vars.len()) {
+                return Err(ModelError::FormError(String::from(
+                    "Un formulaire avec le même nom, la même version et les mêmes variables définies par l'utilisateur existe déjà. Veuillez augmenter le numéro de version",
+                )));
+            }
+            // This is fine, we just want to update the groups
+            duplicate_form_id
         }
-
-        let form_id: i64 = sqlx::query(
+        else
+        {
+            sqlx::query(
             r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
             VALUES (?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
-        )
-        .bind(&new_formdef.pipeline_name)
-        .bind(&new_formdef.launcher_name)
-        .bind(&new_formdef.form_name)
-        .bind(new_formdef.enabled)
-        .bind(new_formdef.version)
-        .fetch_one(pool)
-        .await?
-        .try_get(0usize)?;
+            )
+            .bind(&new_formdef.pipeline_name)
+            .bind(&new_formdef.launcher_name)
+            .bind(&new_formdef.form_name)
+            .bind(new_formdef.enabled)
+            .bind(new_formdef.version)
+            .fetch_one(pool)
+            .await?
+            .try_get(0usize)?
+        };
 
         // Insert groups into FormdefHasGroup table
         for group in &new_formdef.groups {
-            eprintln!("{}", group.id);
+            sqlx::query(
+                r#"
+                DELETE FROM FormdefHasGroup WHERE form_id = ? AND group_id = ?
+                "#,
+            )
+            .bind(form_id)
+            .bind(group.id)
+            .execute(pool)
+            .await?;
+
             sqlx::query(
                 r#"
                 INSERT INTO FormdefHasGroup (form_id, group_id)
@@ -189,6 +237,9 @@ impl HgFormDef {
                         .execute(pool)
                         .await?;
                     }
+                    _ => {
+                        eprintln!("Should be unreachable");
+                    }
                 }
             }
         }
@@ -239,22 +290,19 @@ impl HgFormDef {
         Ok(())
     }
 
-    // pub async fn get_all_form_defs(pool: &SqlitePool) -> Result<Vec<HgFormDef>, super::ModelError> {
-    //     Ok(join_all(
-    //         sqlx::query(
-    //             r#"
-    //     SELECT * FROM Formdef
-    //     "#,
-    //         )
-    //         .fetch_all(pool)
-    //         .await?
-    //         .iter()
-    //         .map(async |row| Self::formdef_from_row(row, pool).await),
-    //     )
-    //     .await
-    //     .into_iter()
-    //     .collect::<Result<Vec<HgFormDef>, ModelError>>()?)
-    // }
+    pub async fn get_all_form_defs(pool: &SqlitePool) -> Result<Vec<HgFormListItem>, super::ModelError> {
+        let all_rows:Vec<_> = sqlx::query(
+                r#"SELECT f.form_id,f.form_name,f.enabled,f.version FROM Formdef f;"#,
+            )
+            .fetch_all(pool)
+            .await?.into_iter().filter_map(|row|Some(HgFormListItem{
+                form_name: row.try_get("form_name").ok()?,
+                formid: row.try_get("form_id").ok()?,
+                enabled: row.try_get("enabled").ok()?,
+                version: row.try_get("version").ok()?
+            })).collect();
+        Ok(all_rows)
+    }
 
     /// Get all forms associated with a group, and those not associated with any group
     /// Returns a tuple of two vectors:
