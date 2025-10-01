@@ -37,13 +37,13 @@
         }
         }
 
-        window.onload = async function () {
+        window.onload = function () {
             init();
             addUserVar();
             load_groups();
             updateLauncherField();
             {%if formid %}
-            await fetchFormDefinition();
+            fetchFormDefinition();
             {% endif %}
         };
 
@@ -54,25 +54,22 @@
         // Only fetch form definition in case we are in edit mode
         {%if formid %}
 
-        async function fetchFormDefinition() {
+        function fetchFormDefinition() {
 
             const formId = "{{ formid }}"; // Read formid from template context
 
             const endpoint = `/mercure/api/forms/${formId}`;
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                });
-
+            fetch(endpoint, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then(response => {
                 if (!response.ok) {
                     throw new Error("Erreur lors de la récupération du formulaire.");
                 }
-
-                const res = await response.json();
+                return response.json();
+            }).then((res) => {
                 const formDefinition = res.data;
 
                 // Update form fields based on the fetched definition
@@ -127,15 +124,15 @@
                         }
                     });
                 }
-            } catch (error) {
+            }).catch ((error) => {
                 console.error("Erreur:", error);
                 const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = error.message;
+                errorDiv.textContent = error;
                 errorDiv.style.display = "block";
                 setTimeout(() => {
                     errorDiv.style.display = 'none';
                 }, 8000);
-            }
+            });
         }
 
         {% endif %}
