@@ -40,8 +40,10 @@ function create_group(groupName) {
       } else {
         throw new Error(`Erreur dans la réponse : ${JSON.stringify(data)}`);
       }
+    })
+    .then(() => {
+      load_groups();
     });
-  load_groups();
 }
 
 function load_groups() {
