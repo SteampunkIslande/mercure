@@ -20,6 +20,10 @@ pub enum AuthError {
     DatabaseError(String),
     #[error("Token error: {0}")]
     TokenError(String),
+    #[error(transparent)]
+    SqliteError(#[from] sqlx::Error),
+    #[error(transparent)]
+    BcryptError(#[from] bcrypt::BcryptError),
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {
@@ -41,6 +45,14 @@ impl<'r> Responder<'r, 'static> for AuthError {
             AuthError::UnknownUser => {
                 response.status(Status::Unauthorized);
                 ApiResponse::<u8>::error("Utilisateur inconnu".to_string())
+            }
+            AuthError::SqliteError(e) => {
+                response.status(Status::InternalServerError);
+                ApiResponse::<u8>::error(e.to_string())
+            }
+            AuthError::BcryptError(e) => {
+                response.status(Status::InternalServerError);
+                ApiResponse::<u8>::error(e.to_string())
             }
         };
 

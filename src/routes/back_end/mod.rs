@@ -7,6 +7,7 @@ mod logout;
 mod newform;
 mod newgroup;
 mod newuser;
+mod passedit;
 
 pub use editgroups::*;
 pub use getform::*;
@@ -17,3 +18,4 @@ pub use logout::*;
 pub use newform::*;
 pub use newgroup::*;
 pub use newuser::*;
+pub use passedit::*;

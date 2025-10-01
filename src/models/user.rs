@@ -1,5 +1,6 @@
 use bcrypt::{DEFAULT_COST, hash, verify};
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use sqlx::{FromRow, SqlitePool};
 use time::OffsetDateTime;
 
@@ -24,10 +25,16 @@ pub struct NewUser {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PasswordUpdate<'a> {
+    pub user_id: i64,
+    pub old_password: Option<&'a str>,
+    pub new_password: &'a str,
+}
+
 impl User {
     pub async fn create(new_user: NewUser, pool: &SqlitePool) -> Result<User, AuthError> {
-        let password_hash = hash(new_user.password.as_bytes(), DEFAULT_COST)
-            .map_err(|_| AuthError::DatabaseError("Erreur de hachage du mot de passe".into()))?;
+        let password_hash = hash(new_user.password.as_bytes(), DEFAULT_COST)?;
 
         let now = OffsetDateTime::now_utc();
 
@@ -102,6 +109,59 @@ impl User {
 
     pub async fn verify_password(&self, password: &str) -> bool {
         verify(password.as_bytes(), &self.password_hash).unwrap_or(false)
+    }
+
+    async fn actually_update_password(
+        pool: &SqlitePool,
+        new_password_hash: &str,
+        user_id: i64,
+    ) -> Result<(), AuthError> {
+        sqlx::query(
+            r#"
+            UPDATE Users
+            SET password_hash = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(&new_password_hash)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn update_password<'a>(
+        password_update: PasswordUpdate<'_>,
+        pool: &SqlitePool,
+    ) -> Result<(), AuthError> {
+        // Administrator is updating password
+        if password_update.old_password.is_none() {
+            // No need to check, this comes from an administrator
+            let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
+            return Self::actually_update_password(
+                pool,
+                &new_password_hash,
+                password_update.user_id,
+            )
+            .await;
+        }
+        let correct_old_password_hash: String =
+            sqlx::query("SELECT password_hash FROM Users WHERE id = ?")
+                .bind(password_update.user_id)
+                .fetch_one(pool)
+                .await?
+                .try_get("password_hash")?;
+        let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
+        if !verify(
+            password_update.new_password.as_bytes(),
+            &correct_old_password_hash,
+        )
+        .unwrap_or(false)
+        {
+            return Err(AuthError::InvalidCredentials);
+        }
+        Self::actually_update_password(pool, &new_password_hash, password_update.user_id).await
     }
 
     pub async fn update_last_login(&mut self, pool: &SqlitePool) -> Result<(), AuthError> {

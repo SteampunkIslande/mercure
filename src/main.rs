@@ -29,6 +29,7 @@ async fn rocket() -> _ {
                 routes::backend::logout_get,
                 routes::frontend::success_page_get,
                 routes::frontend::home_get,
+                routes::frontend::password_edit_get,
             ],
         )
         .mount(
@@ -63,6 +64,7 @@ async fn rocket() -> _ {
                 routes::backend::list_groups_for_user,
                 routes::backend::update_groups,
                 routes::backend::get_all_forms,
+                routes::backend::password_edit_post
             ],
         )
         .mount("/", routes![routes::frontend::favico])
