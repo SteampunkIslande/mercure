@@ -155,9 +155,18 @@ impl HgFormDef {
         .filter_map(|row| row.try_get::<i64, &str>("form_id").ok())
         .next()
         {
-            let user_defined_vars =
-                Self::userdefined_vars_from_form(duplicate_form_id, pool).await?;
-            if Some(&user_defined_vars) != new_formdef.user_defined_vars.as_ref() {
+            // Reduce empty map to None, to make it easier to compare
+            let old_user_defined_vars = {
+                let vars = Self::userdefined_vars_from_form(duplicate_form_id, pool).await?;
+                    if vars.is_empty() {
+                        None
+                    } else {
+                        Some(vars)
+                    }
+
+            };
+            if old_user_defined_vars.as_ref() != new_formdef.user_defined_vars.as_ref()
+            {
                 return Err(ModelError::FormError(String::from(
                     "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
                 )));
