@@ -37,7 +37,7 @@
         }
         }
 
-        window.onload = function () {
+        document.addEventListener("DOMContentLoaded", function () {
             init();
             addUserVar();
             load_groups();
@@ -45,7 +45,7 @@
             {%if formid %}
             fetchFormDefinition();
             {% endif %}
-        };
+        });
 
         function init() {
             userVarCounter = 0;
@@ -124,7 +124,7 @@
                         }
                     });
                 }
-            }).catch ((error) => {
+            }).catch((error) => {
                 console.error("Erreur:", error);
                 const errorDiv = document.getElementById("error-message");
                 errorDiv.textContent = error;
