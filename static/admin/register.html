@@ -62,7 +62,7 @@
                 if (data.success) {
                     errorDiv.style.display = 'none';
                     successDiv.style.display = 'block';
-                    successDiv.textContent = 'Utilisateur créé avec succès';
+                    successDiv.innerHTML = `<span class="material-icons icon-align" style="color:green;">check_circle</span>Utilisateur créé avec succès`;
                     setTimeout(() => {
                         successDiv.style.display = 'none';
                     }, 2000);
@@ -70,7 +70,7 @@
                 } else {
                     successDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.textContent = data.message || 'Erreur lors de la création';
+                    errorDiv.innerHTML = `<span class="material-icons icon-align" style="color:red;">error</span>${data.message}`;
                     setTimeout(() => {
                         errorDiv.style.display = 'none';
                     }, 2000);
@@ -78,7 +78,7 @@
             } catch (error) {
                 successDiv.style.display = 'none';
                 errorDiv.style.display = 'block';
-                errorDiv.textContent = 'Erreur de connexion au serveur';
+                errorDiv.innerHTML = '<span class="material-icons icon-align"style="color:red;">error</span>Erreur de connexion au serveur';
                 setTimeout(() => {
                     errorDiv.style.display = 'none';
                 }, 2000);

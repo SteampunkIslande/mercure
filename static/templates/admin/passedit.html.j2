@@ -78,7 +78,8 @@
                 if (res_json.success) {
                     const infoDiv = document.getElementById("info-message");
                     const errorDiv = document.getElementById("error-message");
-                    infoDiv.textContent = res_json.data;
+                    infoDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:blue;">info</span>${res_json.data}`;
                     infoDiv.style = "display:block;";
                     errorDiv.style = "display:none;";
                     setTimeout(() => {
@@ -87,7 +88,8 @@
                 } else {
                     const infoDiv = document.getElementById("info-message");
                     const errorDiv = document.getElementById("error-message");
-                    errorDiv.textContent = res_json.message;
+                    errorDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${res_json.message}`;
                     errorDiv.style = "display:block;";
                     infoDiv.style = "display:none;";
                     setTimeout(() => {
@@ -97,7 +99,8 @@
             }).catch((e) => {
                 const infoDiv = document.getElementById("info-message");
                 const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = e;
+                errorDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${e}`;
                 errorDiv.style = "display:block;";
                 infoDiv.style = "display:none;";
             })

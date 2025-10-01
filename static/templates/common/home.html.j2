@@ -152,7 +152,8 @@
                                 if (data.success) {
                                     const infodiv = document.getElementById("info-message")
                                     infodiv.style.display = "block";
-                                    infodiv.textContent = data.data;
+                                    infodiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:blue;">info</span>${data.data}`;
                                     setTimeout(() => {
                                         infodiv.style.display = 'none';
                                     }, 2000);
@@ -160,7 +161,8 @@
                                 else {
                                     const errordiv = document.getElementById("error-message")
                                     errordiv.style.display = "block";
-                                    errordiv.textContent = data.message;
+                                    errordiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${data.message}`;
                                     setTimeout(() => {
                                         errordiv.style.display = 'none';
                                     }, 2000);
@@ -169,7 +171,8 @@
                         ).catch(error => {
                             const errordiv = document.getElementById("error-message")
                             errordiv.style.display = "block";
-                            errordiv.textContent = error;
+                            errordiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${error}`;
                             setTimeout(() => {
                                 errordiv.style.display = 'none';
                             }, 2000);

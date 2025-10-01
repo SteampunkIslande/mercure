@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    
+
 </head>
 
 <body>
@@ -115,13 +115,14 @@
                 body: payload
             }).then((response) => response.json()).then((data) => {
                 init(); // Re-initialize to reflect changes
-                if (!data.success){
+                if (!data.success) {
                     alert("Erreur lors de la mise à jour des groupes : " + data.message);
                     const infoDiv = document.getElementById("info-message");
                     const errorDiv = document.getElementById("error-message");
                     infoDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.textContent = data.message;
+                    errorDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${data.message}`;
                     setTimeout(() => {
                         errorDiv.style.display = 'none';
                     }, 2000);
@@ -131,7 +132,8 @@
                     const infoDiv = document.getElementById("info-message");
                     errorDiv.style.display = 'none';
                     infoDiv.style.display = 'block';
-                    infoDiv.textContent = data.data;
+                    infoDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:blue;">info</span>${data.data}`;
                     setTimeout(() => {
                         infoDiv.style.display = 'none';
                     }, 2000);
@@ -142,7 +144,8 @@
                     const errorDiv = document.getElementById("error-message");
                     infoDiv.style.display = 'none';
                     errorDiv.style.display = 'block';
-                    errorDiv.textContent = e;
+                    errorDiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${e}`;
                     setTimeout(() => {
                         errorDiv.style.display = 'none';
                     }, 2000);

@@ -133,7 +133,7 @@
         });
 
         {% if is_admin %}
-        if(userGroups.length == 0) {
+        if (userGroups.length == 0) {
             // If no groups, show the no-group tab by default
             document.getElementById('tab-no-group').click();
             // Will have to load all the forms, since we cannot count on the /mercure/api/forms/groups/${group.id} endpoint
@@ -147,12 +147,12 @@
                         container_no_group = table_no_group;
                     }
                     if (!container_no_group) {
-                            console.log("No tbody found, appending to table directly");
-                            container_no_group = table_no_group;
-                        }
-                        forms.data.forEach(form => {
-                            const formBoxNoGroup = document.createElement('tr');
-                            formBoxNoGroup.innerHTML = `
+                        console.log("No tbody found, appending to table directly");
+                        container_no_group = table_no_group;
+                    }
+                    forms.data.forEach(form => {
+                        const formBoxNoGroup = document.createElement('tr');
+                        formBoxNoGroup.innerHTML = `
                                 <td>${form.form_name} (version ${form.version})</td>
                                 <td>
                                     <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
@@ -162,9 +162,9 @@
                                     <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
                                 </td>
                             `;
-                            container_no_group.appendChild(formBoxNoGroup);
-                        });
-                    })
+                        container_no_group.appendChild(formBoxNoGroup);
+                    });
+                })
                 .catch(error => console.error('Error fetching forms:', error));
 
         }
@@ -179,7 +179,8 @@
                         if (data.success) {
                             const infodiv = document.getElementById("info-message")
                             infodiv.style.display = "block";
-                            infodiv.textContent = data.data;
+                            infodiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:blue;">info</span>${data.data}`;
                             setTimeout(() => {
                                 infodiv.style.display = 'none';
                             }, 2000);
@@ -187,7 +188,8 @@
                         else {
                             const errordiv = document.getElementById("error-message")
                             errordiv.style.display = "block";
-                            errordiv.textContent = data.message;
+                            errordiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${data.message}`;
                             setTimeout(() => {
                                 errordiv.style.display = 'none';
                             }, 2000);
@@ -196,7 +198,8 @@
                 ).catch(error => {
                     const errordiv = document.getElementById("error-message")
                     errordiv.style.display = "block";
-                    errordiv.textContent = error;
+                    errordiv.innerHTML = `<span class="material-icons icon-align"
+            style="color:red;">error</span>${error}`;
                     setTimeout(() => {
                         errordiv.style.display = 'none';
                     }, 2000);
