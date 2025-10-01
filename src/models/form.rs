@@ -26,6 +26,21 @@ pub enum UserDefinedVar {
     Invalid,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+pub enum RunStatus {
+    /// Le formulaire a été validé mais l'analyse n'a pas encore commencé
+    Pending,
+    /// Le formulaire a été validé et l'analyse est en cours
+    Running,
+    /// Le formulaire a été validé mais l'analyse a échoué avec une erreur
+    Failed(String),
+    /// Le formulaire a été validé et l'analyse s'est terminée avec succès
+    Success,
+    /// Le formulaire a été créé mais pas encore validé
+    #[default]
+    Idle,
+}
+
 /// Struct used to define a form template
 /// Only read from JSON, defined within the browser
 /// See newform.html.jinja2 for more info
@@ -47,13 +62,12 @@ pub struct HgFormDef {
 /// This form is what is submitted by the user when they are on the '/newrun/groupname' GET endpoint
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRun {
-    // These fields are from the FormDef
-    pub pipeline_name: String,
-    pub launcher_name: String,
-    pub form_name: String,
+    /// The form definition used to create this run
+    pub form: HgFormDef,
+
+    /// The key,value pairs for user-defined variables
     pub user_defined_vars: HashMap<String, String>,
 
-    // These fields are common to all forms
     pub run_name: String,
 
     pub run_date: String,
@@ -332,13 +346,13 @@ impl HgFormDef {
 
     /// Get all forms associated with a group, and those not associated with any group
     /// Returns a tuple of two vectors:
-    /// - first vector: forms associated with the group
-    /// - second vector: forms not associated with any group
+    /// - first vector: forms associated with the group, sorted by version
+    /// - second vector: forms not associated with any group, sorted by version
     pub async fn get_form_list_items_for_group(
         pool: &SqlitePool,
         group_id: i64,
     ) -> Result<(Vec<HgFormListItem>, Vec<HgFormListItem>), super::ModelError> {
-        let rows_with_group:Vec<_> = sqlx::query(
+        let mut rows_with_group:Vec<_> = sqlx::query(
                 r#"
         SELECT f.form_id,f.form_name,f.enabled,f.version,fg.group_id,g.group_name FROM Formdef f JOIN FormdefHasGroup fg ON f.form_id = fg.form_id JOIN Groups g ON g.group_id = fg.group_id WHERE fg.group_id = ?
         "#,
@@ -350,7 +364,7 @@ impl HgFormDef {
                 enabled: row.try_get("enabled").ok()?,
                 version: row.try_get("version").ok()?
             })).collect();
-        let rows_without_group:Vec<_> = sqlx::query(
+        let mut rows_without_group:Vec<_> = sqlx::query(
                 r#"SELECT f.form_id,f.form_name,f.enabled,f.version FROM Formdef f LEFT JOIN FormdefHasGroup fg ON f.form_id = fg.form_id WHERE fg.form_id IS NULL;"#,
             )
             .fetch_all(pool)
@@ -360,6 +374,8 @@ impl HgFormDef {
                 enabled: row.try_get("enabled").ok()?,
                 version: row.try_get("version").ok()?
             })).collect();
+        rows_with_group.sort_by(|a,b| a.version.cmp(&b.version));
+        rows_without_group.sort_by(|a,b| a.version.cmp(&b.version));
         Ok((rows_with_group, rows_without_group))
     }
 

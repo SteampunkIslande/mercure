@@ -1,4 +1,4 @@
-use rocket::{get, serde::{ json::Json}, State};
+use rocket::{State, get, serde::json::Json};
 use serde_json::json;
 use sqlx::SqlitePool;
 
@@ -14,7 +14,6 @@ pub async fn get_all_forms(pool: &State<SqlitePool>) -> Json<ApiResponse<Vec<HgF
         Err(e) => Json(ApiResponse::error(format!("{:?}", e))),
     }
 }
-
 
 #[get("/forms/groups/<group_id>")]
 pub async fn get_all_forms_for_group(
