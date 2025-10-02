@@ -6,7 +6,7 @@ use rocket_dyn_templates::{Template, context};
 #[get("/editusers")]
 pub async fn edit_users(auth: Authenticated) -> Template {
     if !auth.user.is_admin {
-        return Template::render("errors/admin_only", context! {});
+        return Template::render("errors/admin_only", context! {user_name:auth.user.username});
     }
     Template::render("admin/users_list", context! {})
 }

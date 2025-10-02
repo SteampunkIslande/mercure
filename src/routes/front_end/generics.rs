@@ -1,17 +1,16 @@
-use rocket::fs::NamedFile;
 use rocket::get;
 use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 
 #[get("/")]
-pub async fn welcome_page_get() -> Option<NamedFile> {
-    NamedFile::open("static/common/welcome.html").await.ok()
+pub async fn welcome_page_get() -> Option<Template> {
+    Some(Template::render("common/welcome", context! {}))
 }
 
 #[get("/login")]
-pub async fn login_get() -> Option<NamedFile> {
-    NamedFile::open("static/common/login.html").await.ok()
+pub async fn login_get() -> Option<Template> {
+    Some(Template::render("common/login", context! {}))
 }
 
 #[get("/success?<origin>&<message>")]

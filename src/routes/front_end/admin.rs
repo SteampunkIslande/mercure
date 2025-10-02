@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 #[get("/dashboard")]
 pub async fn admin_dashboard_get(auth: Authenticated) -> Option<Template> {
     if !auth.user.is_admin {
-        return None;
+        return Some(Template::render("errors/unauthorized", context! {}));
     }
     Some(Template::render(
         "admin/dashboard",
@@ -22,7 +22,7 @@ pub async fn password_edit_get(
     user_id: i64,
 ) -> Option<Template> {
     if user_id != auth.user.id && !auth.user.is_admin {
-        return None;
+        return Some(Template::render("errors/unauthorized", context! {}));
     }
     let edited_user = User::find_by_id(user_id, pool).await.ok()?;
     Some(Template::render(
@@ -33,11 +33,9 @@ pub async fn password_edit_get(
 
 /// Route to show the admin a page to register new user.
 #[get("/register")]
-pub async fn register_get(auth: Authenticated) -> Option<rocket::fs::NamedFile> {
+pub async fn register_get(auth: Authenticated) -> Option<Template> {
     if !auth.user.is_admin {
-        return None;
+        return Some(Template::render("errors/unauthorized", context! {}));
     }
-    rocket::fs::NamedFile::open("static/admin/register.html")
-        .await
-        .ok()
+    Some(Template::render("admin/register", context! {}))
 }

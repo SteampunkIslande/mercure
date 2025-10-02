@@ -28,6 +28,9 @@ pub enum UserDefinedVar {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RunStatus {
+    /// Le formulaire a été créé mais pas encore validé
+    #[default]
+    Idle,
     /// Le formulaire a été validé mais l'analyse n'a pas encore commencé
     Pending,
     /// Le formulaire a été validé et l'analyse est en cours
@@ -36,9 +39,6 @@ pub enum RunStatus {
     Failed(String),
     /// Le formulaire a été validé et l'analyse s'est terminée avec succès
     Success,
-    /// Le formulaire a été créé mais pas encore validé
-    #[default]
-    Idle,
 }
 
 /// Struct used to define a form template
@@ -74,7 +74,13 @@ pub struct HgRun {
     pub run_sequencer: String,
     pub run_flowcellid: String,
 
-    pub sample_sheet_path: String,
+    pub sample_sheet_adn_path: String,
+    pub sample_sheet_arn_path: String,
+    pub metadata_path: String,
+
+    /// Md5Hash of the full zipped pipeline folder stored in the database as a BLOB
+    /// Only determined at the time of launching the pipeline
+    pub archived_folder_md5: Option<String>,
 }
 
 /// This type helps admin users define a form
@@ -172,15 +178,9 @@ impl HgFormDef {
             // Reduce empty map to None, to make it easier to compare
             let old_user_defined_vars = {
                 let vars = Self::userdefined_vars_from_form(duplicate_form_id, pool).await?;
-                    if vars.is_empty() {
-                        None
-                    } else {
-                        Some(vars)
-                    }
-
+                if vars.is_empty() { None } else { Some(vars) }
             };
-            if old_user_defined_vars.as_ref() != new_formdef.user_defined_vars.as_ref()
-            {
+            if old_user_defined_vars.as_ref() != new_formdef.user_defined_vars.as_ref() {
                 return Err(ModelError::FormError(String::from(
                     "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
                 )));
@@ -374,8 +374,8 @@ impl HgFormDef {
                 enabled: row.try_get("enabled").ok()?,
                 version: row.try_get("version").ok()?
             })).collect();
-        rows_with_group.sort_by(|a,b| a.version.cmp(&b.version));
-        rows_without_group.sort_by(|a,b| a.version.cmp(&b.version));
+        rows_with_group.sort_by(|a, b| a.version.cmp(&b.version));
+        rows_without_group.sort_by(|a, b| a.version.cmp(&b.version));
         Ok((rows_with_group, rows_without_group))
     }
 
