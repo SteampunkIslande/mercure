@@ -67,7 +67,6 @@ async fn rocket() -> _ {
                 routes::backend::password_edit_post
             ],
         )
-        .mount("/", routes![routes::frontend::favico])
         .attach(Template::fairing());
 
     // Initialiser la base de données
