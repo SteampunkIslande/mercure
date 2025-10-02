@@ -36,6 +36,14 @@
         </div>
         <button class="btn btn-primary" onclick="submitForm()">Modifier le mot de passe</button>
 
+        <div style="text-align: center; margin-top: 20px;">
+            {% if auth_user.is_admin %}
+            <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
+            {% else %}
+            <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+            {% endif %}
+        </div>
+
         <div id="error-message" class="error" style="display:none;"></div>
         <div id="info-message" class="info" style="display:none;"></div>
     </div>
@@ -62,6 +70,42 @@
                 return;
             }
 
+            if (old_password == "") {
+                const errorDiv = document.getElementById("error-message");
+                const infoDiv = document.getElementById("info-message");
+                errorDiv.style = "display:block;";
+                errorDiv.textContent = "Veuillez entrer votre mot de passe actuel";
+                infoDiv.style = "display:none;";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
+                return;
+            }
+
+            if (new_password == "") {
+                const errorDiv = document.getElementById("error-message");
+                const infoDiv = document.getElementById("info-message");
+                errorDiv.style = "display:block;";
+                errorDiv.textContent = "Veuillez entrer un nouveau mot de passe";
+                infoDiv.style = "display:none;";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
+                return;
+            }
+
+            if (new_password_confirm == "") {
+                const errorDiv = document.getElementById("error-message");
+                const infoDiv = document.getElementById("info-message");
+                errorDiv.style = "display:block;";
+                errorDiv.textContent = "Veuillez confirmer votre nouveau mot de passe";
+                infoDiv.style = "display:none;";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
+                return;
+            }
+
             const user_id = document.getElementById('user_id').value;
 
             fetch('/mercure/api/passedit', {
@@ -76,15 +120,12 @@
                 })
             }).then((response) => { return response.json() }).then((res_json) => {
                 if (res_json.success) {
-                    const infoDiv = document.getElementById("info-message");
-                    const errorDiv = document.getElementById("error-message");
-                    infoDiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:blue;">info</span>${res_json.data}`;
-                    infoDiv.style = "display:block;";
-                    errorDiv.style = "display:none;";
-                    setTimeout(() => {
-                        infoDiv.style.display = 'none';
-                    }, 2000);
+                    alert(res_json.data);
+                    {% if auth_user.is_admin %}
+                    window.location.href = "/mercure/admin/editusers/"
+                    {% else %}
+                    window.location.href = "/mercure/home"
+                    {% endif %}
                 } else {
                     const infoDiv = document.getElementById("info-message");
                     const errorDiv = document.getElementById("error-message");
@@ -107,12 +148,6 @@
 
         }
     </script>
-    {% if auth_user.is_admin %}
-    <div style="text-align: center; margin-top: 20px;">
-        <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
-        <a href="/mercure/admin/editusers/" class="btn btn-secondary">Retour à l'édition des utilisateurs</a>
-    </div>
-    {% endif %}
 </body>
 
 </html>

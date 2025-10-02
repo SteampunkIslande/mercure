@@ -24,6 +24,8 @@ pub enum AuthError {
     SqliteError(#[from] sqlx::Error),
     #[error(transparent)]
     BcryptError(#[from] bcrypt::BcryptError),
+    #[error("No password given")]
+    NoPassword,
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {
@@ -53,6 +55,10 @@ impl<'r> Responder<'r, 'static> for AuthError {
             AuthError::BcryptError(e) => {
                 response.status(Status::InternalServerError);
                 ApiResponse::<u8>::error(e.to_string())
+            }
+            AuthError::NoPassword => {
+                response.status(Status::BadRequest);
+                ApiResponse::<u8>::error(self.to_string())
             }
         };
 

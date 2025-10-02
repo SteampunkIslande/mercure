@@ -63,6 +63,11 @@
         <button onclick="navigateTo(`/mercure/admin/dashboard`)" class="dropbtn"><span
                 class="material-icons icon-align">settings</span></button>
     </div>
+    {% else %}
+    <div class="dropdown" style="float:right;">
+        <button onclick="navigateTo(`/mercure/passedit/{{ user.id }}`)" class="dropbtn"><span
+                class="material-icons icon-align">key</span>Modifier le mot de passe</button>
+    </div>
     {% endif %}
 
     <div>

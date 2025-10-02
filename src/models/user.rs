@@ -154,11 +154,12 @@ impl User {
                 .try_get("password_hash")?;
         let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
         if !verify(
-            password_update.new_password.as_bytes(),
+            password_update
+                .old_password
+                .ok_or(AuthError::NoPassword)?
+                .as_bytes(),
             &correct_old_password_hash,
-        )
-        .unwrap_or(false)
-        {
+        )? {
             return Err(AuthError::InvalidCredentials);
         }
         Self::actually_update_password(pool, &new_password_hash, password_update.user_id).await
