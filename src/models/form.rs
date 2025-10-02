@@ -26,21 +26,6 @@ pub enum UserDefinedVar {
     Invalid,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
-pub enum RunStatus {
-    /// Le formulaire a été créé mais pas encore validé
-    #[default]
-    Idle,
-    /// Le formulaire a été validé mais l'analyse n'a pas encore commencé
-    Pending,
-    /// Le formulaire a été validé et l'analyse est en cours
-    Running,
-    /// Le formulaire a été validé mais l'analyse a échoué avec une erreur
-    Failed(String),
-    /// Le formulaire a été validé et l'analyse s'est terminée avec succès
-    Success,
-}
-
 /// Struct used to define a form template
 /// Only read from JSON, defined within the browser
 /// See newform.html.jinja2 for more info
@@ -53,34 +38,6 @@ pub struct HgFormDef {
     pub version: i32,
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
-}
-
-/// Created by users.
-/// On any user's home page, there is a list of runs submitted by the user
-/// There is also a button that the user can press to get to route '/newrun/groupname'
-///
-/// This form is what is submitted by the user when they are on the '/newrun/groupname' GET endpoint
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgRun {
-    /// The form definition used to create this run
-    pub form: HgFormDef,
-
-    /// The key,value pairs for user-defined variables
-    pub user_defined_vars: HashMap<String, String>,
-
-    pub run_name: String,
-
-    pub run_date: String,
-    pub run_sequencer: String,
-    pub run_flowcellid: String,
-
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
-    /// Md5Hash of the full zipped pipeline folder stored in the database as a BLOB
-    /// Only determined at the time of launching the pipeline
-    pub archived_folder_md5: Option<String>,
 }
 
 /// This type helps admin users define a form

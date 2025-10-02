@@ -1,0 +1,48 @@
+use rocket::Config;
+use rocket::form::{Form, FromForm};
+use rocket::fs::TempFile;
+use rocket::serde::json::Json;
+use std::path::PathBuf;
+
+use crate::config::MercureConfig;
+use crate::routes::ApiResponse;
+
+#[derive(FromForm)]
+pub struct UploadForm<'r> {
+    pub file: TempFile<'r>,
+    pub file_name_base: &'r str,
+}
+
+#[rocket::post("/upload", data = "<form>")]
+pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<String>> {
+    let config = Config::figment()
+        .extract::<MercureConfig>()
+        .unwrap_or_default();
+
+    // Define upload directory
+    let upload_dir = PathBuf::from(config.upload_folder);
+
+    // Ensure directory exists
+    if !upload_dir.exists() {
+        if let Err(_) = std::fs::create_dir_all(&upload_dir) {
+            return Json(ApiResponse::error("Failed to create upload directory"));
+        }
+    }
+
+    // Generate a unique filename. Alphabetical order is also creation time order.
+    let filename = format!(
+        "{}-{}",
+        time::OffsetDateTime::now_utc().unix_timestamp(),
+        form.file_name_base
+    );
+    let filepath = upload_dir.join(filename);
+
+    // Persist the file
+    if let Err(_) = form.file.persist_to(&filepath).await {
+        return Json(ApiResponse::error("Failed to save file"));
+    }
+
+    // Return the path
+    let path_str = filepath.to_string_lossy().to_string();
+    Json(ApiResponse::success(path_str))
+}

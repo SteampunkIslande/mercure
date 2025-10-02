@@ -18,6 +18,20 @@ pub struct User {
     pub is_admin: bool,
 }
 
+impl Default for User {
+    fn default() -> Self {
+        Self {
+            id: Default::default(),
+            usermail: Default::default(),
+            username: Default::default(),
+            password_hash: Default::default(),
+            created_at: OffsetDateTime::now_utc(),
+            last_login: Default::default(),
+            is_admin: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct NewUser {
     pub usermail: String,

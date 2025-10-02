@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nouveau Run</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <script src="/static/scripts/utils.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Nouveau Run - {{ user.username }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+    <h2>Créer un nouveau run</h2>
+
+    <form id="newrun-form">
+        <input type="hidden" id="form_id" value="{{ form_id }}">
+        <input type="hidden" id="user_id" value="{{ user.id }}">
+
+        <label for="run_name">Nom du run:</label>
+        <input type="text" id="run_name" required><br><br>
+
+        <label for="run_date">Date du run:</label>
+        <input type="date" id="run_date" required><br><br>
+
+        <label for="run_sequencer">Séquenceur:</label>
+        <select id="run_sequencer" required>
+            {% for seq in sequenceurs_list %}
+            <option value="{{ seq }}">{{ seq }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <label for="run_flowcellid">Flowcell ID:</label>
+        <input type="text" id="run_flowcellid" required><br><br>
+
+        <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
+        <input type="file" id="sample_sheet_adn_file"><br><br>
+        <input type="hidden" id="sample_sheet_adn_path">
+
+        <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
+        <input type="file" id="sample_sheet_arn_file"><br><br>
+        <input type="hidden" id="sample_sheet_arn_path">
+
+        <label for="metadata_file">Fichier metadata:</label>
+        <input type="file" id="metadata_file"><br><br>
+        <input type="hidden" id="metadata_path">
+
+        <h3>Variables définies par l'utilisateur</h3>
+        <div id="user-defined-vars"></div>
+
+        <button type="submit">Soumettre</button>
+    </form>
+
+    <div id="message"></div>
+
+    <script>
+        const userDefinedVars = {{ user_defined_vars_json| tojson }};
+        console.log(JSON.stringify(userDefinedVars));
+
+        // Function to upload file
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('file_name_base', file.name);
+
+            const response = await fetch('/mercure/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            } else {
+                throw new Error(result.message);
+            }
+        }
+
+        // Event listeners for file inputs
+        document.getElementById('sample_sheet_adn_file').addEventListener('change', async function () {
+            if (this.files.length > 0) {
+                try {
+                    const path = await uploadFile(this.files[0]);
+                    document.getElementById('sample_sheet_adn_path').value = path;
+                } catch (error) {
+                    alert('Erreur upload ADN: ' + error.message);
+                }
+            }
+        });
+
+        document.getElementById('sample_sheet_arn_file').addEventListener('change', async function () {
+            if (this.files.length > 0) {
+                try {
+                    const path = await uploadFile(this.files[0]);
+                    document.getElementById('sample_sheet_arn_path').value = path;
+                } catch (error) {
+                    alert('Erreur upload ARN: ' + error.message);
+                }
+            }
+        });
+
+        document.getElementById('metadata_file').addEventListener('change', async function () {
+            if (this.files.length > 0) {
+                try {
+                    const path = await uploadFile(this.files[0]);
+                    document.getElementById('metadata_path').value = path;
+                } catch (error) {
+                    alert('Erreur upload metadata: ' + error.message);
+                }
+            }
+        });
+
+        document.getElementById('newrun-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            // Collect user_defined_vars
+            const userDefinedVars = {};
+            const udvElements = document.querySelectorAll('[id^="udv_"]');
+            udvElements.forEach(el => {
+                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+                    const key = el.id.replace('udv_', '');
+                    userDefinedVars[key] = el.value;
+                }
+            });
+
+            const formData = {
+                form_id: parseInt(document.getElementById('form_id').value),
+                user_id: parseInt(document.getElementById('user_id').value),
+                run_name: document.getElementById('run_name').value,
+                run_date: document.getElementById('run_date').value,
+                run_sequencer: document.getElementById('run_sequencer').value,
+                run_flowcellid: document.getElementById('run_flowcellid').value,
+                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
+                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
+                metadata_path: document.getElementById('metadata_path').value,
+                user_defined_vars: userDefinedVars
+            };
+
+            fetch('/mercure/api/newrun', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const messageDiv = document.getElementById('message');
+                    if (data.success) {
+                        messageDiv.innerHTML = '<span style="color: green;">' + data.data + '</span>';
+                    } else {
+                        messageDiv.innerHTML = '<span style="color: red;">' + data.message + '</span>';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('message').innerHTML = '<span style="color: red;">Erreur: ' + error + '</span>';
+                });
+        });
+    </script>
+</body>
+
+</html>

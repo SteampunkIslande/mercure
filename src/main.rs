@@ -5,6 +5,7 @@ use rocket_dyn_templates::Template;
 extern crate rocket;
 
 mod auth;
+mod config;
 mod db;
 mod models;
 mod routes;
@@ -30,6 +31,7 @@ async fn rocket() -> _ {
                 routes::frontend::success_page_get,
                 routes::frontend::home_get,
                 routes::frontend::password_edit_get,
+                routes::frontend::new_run_get,
             ],
         )
         .mount(
@@ -64,7 +66,9 @@ async fn rocket() -> _ {
                 routes::backend::list_groups_for_user,
                 routes::backend::update_groups,
                 routes::backend::get_all_forms,
-                routes::backend::password_edit_post
+                routes::backend::password_edit_post,
+                routes::backend::newrun_post,
+                routes::backend::upload_post
             ],
         )
         .attach(Template::fairing());

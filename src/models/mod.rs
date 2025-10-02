@@ -1,9 +1,11 @@
 pub mod form;
 pub mod groups;
+pub mod hgrun;
 pub mod user;
 
 pub use form::*;
 pub use groups::*;
+pub use hgrun::*;
 pub use user::*;
 
 #[derive(Debug, thiserror::Error)]

@@ -96,6 +96,31 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS Runs (
+            run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            form_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            run_name TEXT NOT NULL,
+            run_date TEXT NOT NULL,
+            creation_date TEXT NOT NULL,
+            run_sequencer TEXT NOT NULL,
+            run_flowcellid TEXT NOT NULL,
+            sample_sheet_adn_path TEXT NOT NULL,
+            sample_sheet_arn_path TEXT NOT NULL,
+            metadata_path TEXT NOT NULL,
+            status TEXT NOT NULL,
+            user_defined_vars TEXT NOT NULL,
+            archived_folder_md5 TEXT,
+            FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 

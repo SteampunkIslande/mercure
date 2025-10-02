@@ -8,6 +8,8 @@ mod newform;
 mod newgroup;
 mod newuser;
 mod passedit;
+mod submitrun;
+mod upload;
 
 pub use editgroups::*;
 pub use getform::*;
@@ -19,3 +21,5 @@ pub use newform::*;
 pub use newgroup::*;
 pub use newuser::*;
 pub use passedit::*;
+pub use submitrun::*;
+pub use upload::*;
