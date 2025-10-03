@@ -58,9 +58,10 @@ pub struct HgRun {
     pub run_name: String,
 
     pub run_date: String,
-    pub creation_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
+
+    pub creation_date: String,
 
     pub sample_sheet_adn_path: String,
     pub sample_sheet_arn_path: String,

@@ -21,51 +21,125 @@
         </div>
     </div>
 
-    <h2>Créer un nouveau run</h2>
+
+
+    <h2>Déclarer un nouveau run</h2>
 
     <form id="newrun-form">
+        <style>
+            #newrun-form div {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                margin-bottom: 10px;
+            }
+
+            #newrun-form label {
+                margin-bottom: 5px;
+                text-align: left;
+            }
+
+            #newrun-form input,
+            {
+            width: 33.3%;
+            }
+        </style>
+
         <input type="hidden" id="form_id" value="{{ form_id }}">
         <input type="hidden" id="user_id" value="{{ user.id }}">
 
-        <label for="run_name">Nom du run:</label>
-        <input type="text" id="run_name" required><br><br>
+        <div>
+            <label for="run_name">Nom du run:</label>
+            <input type="text" id="run_name" required>
+        </div>
 
-        <label for="run_date">Date du run:</label>
-        <input type="date" id="run_date" required><br><br>
+        <div>
+            <label for="run_date">Date du run:</label>
+            <input type="date" id="run_date" required>
+        </div>
 
-        <label for="run_sequencer">Séquenceur:</label>
-        <select id="run_sequencer" required>
-            {% for seq in sequenceurs_list %}
-            <option value="{{ seq }}">{{ seq }}</option>
-            {% endfor %}
-        </select><br><br>
+        <div>
+            <label for="run_sequencer">Séquenceur:</label>
+            <select id="run_sequencer" required>
+                {% for seq in sequenceurs_list %}
+                <option value="{{ seq }}">{{ seq }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
-        <label for="run_flowcellid">Flowcell ID:</label>
-        <input type="text" id="run_flowcellid" required><br><br>
+        <div>
+            <label for="run_flowcellid">Flowcell ID:</label>
+            <input type="text" id="run_flowcellid" required>
+        </div>
 
-        <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
-        <input type="file" id="sample_sheet_adn_file"><br><br>
-        <input type="hidden" id="sample_sheet_adn_path">
+        <div>
+            <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
+            <input type="file" id="sample_sheet_adn_file">
+            <input type="hidden" id="sample_sheet_adn_path">
+        </div>
 
-        <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
-        <input type="file" id="sample_sheet_arn_file"><br><br>
-        <input type="hidden" id="sample_sheet_arn_path">
+        <div>
+            <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
+            <input type="file" id="sample_sheet_arn_file">
+            <input type="hidden" id="sample_sheet_arn_path">
+        </div>
 
-        <label for="metadata_file">Fichier metadata:</label>
-        <input type="file" id="metadata_file"><br><br>
-        <input type="hidden" id="metadata_path">
+        <div>
+            <label for="metadata_file">Fichier metadata:</label>
+            <input type="file" id="metadata_file">
+            <input type="hidden" id="metadata_path">
+        </div>
 
         <h3>Variables définies par l'utilisateur</h3>
         <div id="user-defined-vars"></div>
 
-        <button type="submit">Soumettre</button>
+        <button type="submit" class="btn primary">Soumettre</button>
     </form>
 
     <div id="message"></div>
 
     <script>
-        const userDefinedVars = {{ user_defined_vars_json| tojson }};
-        console.log(JSON.stringify(userDefinedVars));
+        // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
+        const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+
+        // Generate user-defined fields
+        const container = document.getElementById('user-defined-vars');
+        for (const [key, value] of Object.entries(userDefinedVars)) {
+            if (typeof value === 'object' && value.Constant) {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.id = 'udv_' + key;
+                hidden.value = value.Constant;
+                container.appendChild(hidden);
+            } else if (typeof value === 'object' && value.FromValuesList) {
+                const div = document.createElement('div');
+                const label = document.createElement('label');
+                label.for = 'udv_' + key;
+                label.textContent = key + ':';
+                div.appendChild(label);
+                const select = document.createElement('select');
+                select.id = 'udv_' + key;
+                value.FromValuesList.allowed.forEach(val => {
+                    const option = document.createElement('option');
+                    option.value = val;
+                    option.textContent = val;
+                    select.appendChild(option);
+                });
+                div.appendChild(select);
+                container.appendChild(div);
+            } else if (value === 'RunDefined') {
+                const div = document.createElement('div');
+                const label = document.createElement('label');
+                label.for = 'udv_' + key;
+                label.textContent = key + ':';
+                div.appendChild(label);
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = 'udv_' + key;
+                div.appendChild(input);
+                container.appendChild(div);
+            }
+        }
 
         // Function to upload file
         async function uploadFile(file) {
