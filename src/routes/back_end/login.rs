@@ -36,7 +36,8 @@ pub async fn login_post(
     // Créer un cookie privé (chiffré)
     // TODO: Make cookie duration configurable
     let mut cookie = Cookie::new("user_id", user.id.to_string());
-    cookie.set_max_age(Some(Duration::minutes(30)));
+    // cookie.set_max_age(Some(Duration::minutes(30)));
+    cookie.set_expires(None);
     cookies.add_private(cookie);
 
     if user.is_admin {
