@@ -1,5 +1,5 @@
-use rocket::fs::{FileServer, NamedFile};
-use rocket_dyn_templates::Template;
+use rocket::fs::FileServer;
+use rocket_dyn_templates::{Template, context};
 
 #[macro_use]
 extern crate rocket;
@@ -11,10 +11,15 @@ mod models;
 mod routes;
 
 #[catch(401)]
-pub async fn unauthorized() -> Option<NamedFile> {
-    NamedFile::open("static/errors/unauthorized.html")
-        .await
-        .ok()
+pub async fn unauthorized() -> Template {
+    Template::render(
+        "errors/unauthorized",
+        context! {
+            title: "Session expirée",
+            h2: "Session expirée",
+            message: "Votre session a expirée, veuillez vous reconnecter"
+        },
+    )
 }
 
 #[launch]
