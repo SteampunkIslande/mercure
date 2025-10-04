@@ -24,7 +24,12 @@ pub async fn unauthorized() -> Template {
 
 #[launch]
 async fn rocket() -> _ {
-    let rocket_app = rocket::build()
+    // Initialiser la base de données
+    let pool = db::init_db()
+        .await
+        .expect("Impossible d'initialiser la base de données");
+
+    rocket::build()
         .register("/", catchers![unauthorized])
         .mount("/static", FileServer::from("./static"))
         .mount(
@@ -76,12 +81,6 @@ async fn rocket() -> _ {
                 routes::backend::upload_post
             ],
         )
-        .attach(Template::fairing());
-
-    // Initialiser la base de données
-    let pool = db::init_db(&rocket_app)
-        .await
-        .expect("Impossible d'initialiser la base de données");
-
-    rocket_app.manage(pool)
+        .manage(pool)
+        .attach(Template::fairing())
 }

@@ -1,12 +1,12 @@
+use rocket::config;
 use serde::Deserialize;
-use std::path::PathBuf;
 
 /// Additional configuration for Mercure
 #[derive(Deserialize)]
 pub struct MercureConfig {
-    pub mercure_db: PathBuf,
-    pub sequencers_folder: PathBuf,
-    pub upload_folder: PathBuf,
+    pub mercure_db: String,
+    pub sequencers_folder: String,
+    pub upload_folder: String,
 }
 
 impl Default for MercureConfig {
@@ -17,4 +17,10 @@ impl Default for MercureConfig {
             upload_folder: "/home/charles/mercure/uploads".into(),
         }
     }
+}
+
+pub fn get_mercure_config() -> MercureConfig {
+    config::Config::figment()
+        .extract::<MercureConfig>()
+        .unwrap_or_default()
 }

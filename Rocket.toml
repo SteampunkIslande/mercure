@@ -1,0 +1,18 @@
+[debug]
+address = "127.0.0.1"
+secret_key = "hLtkhUgxdZJffXn6+YjJL7E3z0OwPAnx92NUZy8mpCQ="
+log_level = "normal"
+max_blocking = 512
+port = 8000
+workers = 12
+ident = "Mercure"
+ip_header = "X-Real-IP"
+keep_alive = 5
+cli_colors = true
+ctrlc = true
+
+template_dir = "/home/charles/mercure/static/templates"
+
+mercure_db = "sqlite://mercure.db"
+sequencers_folder = "/data/raw/sequenceurs"
+upload_folder = "/home/charles/mercure/uploads"

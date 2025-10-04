@@ -1,6 +1,7 @@
-use rocket::Build;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::time::Duration;
+
+use crate::config::get_mercure_config;
 
 pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     SqlitePoolOptions::new()
@@ -124,11 +125,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn init_db(app: &rocket::Rocket<Build>) -> Result<SqlitePool, sqlx::Error> {
-    let figment = app.figment();
-    let database_url: String = figment.extract_inner("mercure_db").expect(
-        "No database URL configured. Please set field `mercure_db` (should start with sqlite://",
-    );
+pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
+    let database_url: String = get_mercure_config().mercure_db;
     init_db_from_url(&database_url).await
 }
 

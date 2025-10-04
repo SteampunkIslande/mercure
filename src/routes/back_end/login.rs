@@ -1,5 +1,3 @@
-use time::Duration;
-
 use rocket::State;
 use rocket::http::{Cookie, CookieJar};
 use rocket::post;
@@ -33,10 +31,9 @@ pub async fn login_post(
 
     user.update_last_login(pool).await?;
 
-    // Créer un cookie privé (chiffré)
-    // TODO: Make cookie duration configurable
     let mut cookie = Cookie::new("user_id", user.id.to_string());
-    // cookie.set_max_age(Some(Duration::minutes(30)));
+
+    // Crée un cookie pour la durée de la session (dépend du navigateur)
     cookie.set_expires(None);
     cookies.add_private(cookie);
 

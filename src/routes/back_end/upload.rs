@@ -1,10 +1,9 @@
-use rocket::Config;
 use rocket::form::{Form, FromForm};
 use rocket::fs::TempFile;
 use rocket::serde::json::Json;
 use std::path::PathBuf;
 
-use crate::config::MercureConfig;
+use crate::config::get_mercure_config;
 use crate::routes::ApiResponse;
 
 #[derive(FromForm)]
@@ -15,9 +14,7 @@ pub struct UploadForm<'r> {
 
 #[rocket::post("/upload", data = "<form>")]
 pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<String>> {
-    let config = Config::figment()
-        .extract::<MercureConfig>()
-        .unwrap_or_default();
+    let config = get_mercure_config();
 
     // Define upload directory
     let upload_dir = PathBuf::from(config.upload_folder);

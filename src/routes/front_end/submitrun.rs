@@ -1,19 +1,16 @@
-use std::fs::read_dir;
-
-use rocket::{Config, State, get};
+use rocket::{State, get};
 use rocket_dyn_templates::{Template, context};
 use serde_json::{self, json};
 use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
-use crate::config::MercureConfig;
+use crate::config::get_mercure_config;
 use crate::models::HgFormDef;
+use std::fs::read_dir;
 
 #[get("/runs/submit/<form_id>")]
 pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqlitePool>) -> Template {
-    let config = Config::figment()
-        .extract::<MercureConfig>()
-        .unwrap_or_default();
+    let config = get_mercure_config();
     let sequenceurs_folder = config.sequencers_folder;
 
     // List directories at the top level of sequencers_folder
