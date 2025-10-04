@@ -29,9 +29,11 @@ async fn rocket() -> _ {
         .await
         .expect("Impossible d'initialiser la base de données");
 
+    let config = config::get_mercure_config();
+
     rocket::build()
         .register("/", catchers![unauthorized])
-        .mount("/static", FileServer::from("./static"))
+        .mount("/static", FileServer::from(config.static_dir))
         .mount(
             "/mercure",
             routes![
