@@ -113,7 +113,6 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             metadata_path TEXT NOT NULL,
             status TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
-            archived_folder_md5 TEXT,
             FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
         )

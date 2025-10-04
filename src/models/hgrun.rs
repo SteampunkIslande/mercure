@@ -68,10 +68,6 @@ pub struct HgRun {
     pub metadata_path: String,
 
     pub status: RunStatus,
-
-    /// Md5Hash of the full zipped pipeline folder stored in the database as a BLOB
-    /// Only determined at the time of launching the pipeline
-    pub archived_folder_md5: Option<String>,
 }
 
 impl HgRun {
@@ -86,8 +82,8 @@ impl HgRun {
 
         sqlx::query(
             r#"
-            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, archived_folder_md5)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(run_form.form_id)
@@ -174,7 +170,6 @@ impl HgRun {
             sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
             metadata_path: row.try_get("metadata_path")?,
             status,
-            archived_folder_md5: row.try_get("archived_folder_md5").ok(),
         };
 
         Ok(hgrun)
