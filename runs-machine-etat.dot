@@ -1,0 +1,109 @@
+digraph Machines {
+    rankdir=TB;
+    fontsize=12;
+    labelloc="t";
+    splines=ortho;
+    label="Deux machines-états : Run (cyclique) et Attempt (1..n instances)";
+
+    // ---------------------
+    // Machine Run (cyclique)
+    // ---------------------
+    subgraph cluster_run {
+        label="Machine Run (cycle). Un run correspond à une manip déclarée, avec des propriétés éditables";
+        color=blue;
+
+        Idle [shape=circle, style=filled, fillcolor=lightgrey];
+        Pending [shape=circle];
+        Running [shape=circle];
+        Success [shape=doublecircle, color=green];
+        Failure [shape=doublecircle, color=red];
+
+        // Transitions avec cartouches
+        Idle -> t_formval [arrowhead=none];
+        t_formval [shape=box, label="formulaire validé", style=rounded, fillcolor=white];
+        t_formval -> Pending;
+
+        Pending -> t_runterm [arrowhead=none];
+        t_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        t_runterm -> Running;
+
+        Running -> t_success [arrowhead=none];
+        t_success [shape=box, label="succès", style=rounded, fillcolor=white];
+        t_success -> Success;
+
+        Running -> t_failure [arrowhead=none];
+        t_failure [shape=box, label="échec", style=rounded, fillcolor=white];
+        t_failure -> Failure;
+
+        Success -> t_relancer1 [arrowhead=none];
+        t_relancer1 [shape=box, label="relancer", style=rounded, fillcolor=white];
+        t_relancer1 -> Idle;
+
+        Failure -> t_relancer2 [arrowhead=none];
+        t_relancer2 [shape=box, label="relancer", style=rounded, fillcolor=white];
+        t_relancer2 -> Idle;
+    }
+
+    // ---------------------
+    // Machine Attempt #1
+    // ---------------------
+    subgraph cluster_attempt1 {
+        label="Attempt #1";
+        color=orange;
+
+        a1_Pending [label="Pending", shape=circle];
+        a1_Running [label="Running", shape=circle];
+        a1_Success [label="Success", shape=doublecircle, color=green];
+        a1_Failure [label="Failure", shape=doublecircle, color=red];
+
+        a1_Pending -> ta1_runterm [arrowhead=none];
+        ta1_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        ta1_runterm -> a1_Running;
+
+        a1_Running -> ta1_success [arrowhead=none];
+        ta1_success [shape=box, label="succès", style=rounded, fillcolor=white];
+        ta1_success -> a1_Success;
+
+        a1_Running -> ta1_failure [arrowhead=none];
+        ta1_failure [shape=box, label="échec", style=rounded, fillcolor=white];
+        ta1_failure -> a1_Failure;
+    }
+
+    // ---------------------
+    // Machine Attempt #2
+    // ---------------------
+    subgraph cluster_attempt2 {
+        label="Attempt #2";
+        color=orange;
+
+        a2_Pending [label="Pending", shape=circle];
+        a2_Running [label="Running", shape=circle];
+        a2_Success [label="Success", shape=doublecircle, color=green];
+        a2_Failure [label="Failure", shape=doublecircle, color=red];
+
+        a2_Pending -> ta2_runterm [arrowhead=none];
+        ta2_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        ta2_runterm -> a2_Running;
+
+        a2_Running -> ta2_success [arrowhead=none];
+        ta2_success [shape=box, label="succès", style=rounded, fillcolor=white];
+        ta2_success -> a2_Success;
+
+        a2_Running -> ta2_failure [arrowhead=none];
+        ta2_failure [shape=box, label="échec", style=rounded, fillcolor=white];
+        ta2_failure -> a2_Failure;
+    }
+
+    // ---------------------
+    // Liens entre Run et Attempts
+    // ---------------------
+    Idle -> ta1_start [arrowhead=none, style=dashed];
+    ta1_start [shape=box, label="formulaire validé → Attempt #1", style=rounded, fillcolor=white];
+    ta1_start -> a1_Pending;
+
+    Idle -> ta2_start [arrowhead=none, style=dashed];
+    ta2_start [shape=box, label="formulaire validé → Attempt #2", style=rounded, fillcolor=white];
+    ta2_start -> a2_Pending;
+
+    
+}

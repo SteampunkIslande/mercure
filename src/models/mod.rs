@@ -1,8 +1,10 @@
+pub mod attempt;
 pub mod form;
 pub mod groups;
 pub mod hgrun;
 pub mod user;
 
+pub use attempt::*;
 pub use form::*;
 pub use groups::*;
 pub use hgrun::*;

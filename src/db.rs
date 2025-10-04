@@ -113,8 +113,30 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             metadata_path TEXT NOT NULL,
             status TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS Attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL,
+            attempt_date TEXT NOT NULL,
+            user_defined_vars TEXT NOT NULL,
+            run_date TEXT NOT NULL,
+            run_sequencer TEXT NOT NULL,
+            run_flowcellid TEXT NOT NULL,
+            sample_sheet_adn_path TEXT NOT NULL,
+            sample_sheet_arn_path TEXT NOT NULL,
+            metadata_path TEXT NOT NULL,
+            status TEXT NOT NULL,
+            FOREIGN KEY (run_id) REFERENCES Runs(run_id) ON DELETE CASCADE
         )
         "#,
     )
