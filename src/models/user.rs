@@ -137,7 +137,7 @@ impl User {
             WHERE id = ?
             "#,
         )
-        .bind(&new_password_hash)
+        .bind(new_password_hash)
         .bind(user_id)
         .execute(pool)
         .await

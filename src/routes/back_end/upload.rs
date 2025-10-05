@@ -20,10 +20,8 @@ pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<Str
     let upload_dir = PathBuf::from(config.upload_folder);
 
     // Ensure directory exists
-    if !upload_dir.exists() {
-        if let Err(_) = std::fs::create_dir_all(&upload_dir) {
-            return Json(ApiResponse::error("Failed to create upload directory"));
-        }
+    if !upload_dir.exists() && std::fs::create_dir_all(&upload_dir).is_err() {
+        return Json(ApiResponse::error("Failed to create upload directory"));
     }
 
     // Generate a unique filename. Alphabetical order is also creation time order.
