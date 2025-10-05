@@ -100,7 +100,7 @@ impl HgAttempt {
             sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
             metadata_path: row.try_get("metadata_path")?,
             status,
-            comment: "".to_string(),
+            comment: row.try_get("comment")?,
         };
 
         Ok(attempt)
@@ -207,6 +207,24 @@ impl HgAttempt {
         .bind(format!("Failure:{}", reason))
         .bind(run_id)
         .bind("Running")
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Met à jour le commentaire d'une tentative
+    pub async fn update_comment(
+        attempt_id: i64,
+        new_comment: String,
+        pool: &SqlitePool,
+    ) -> Result<(), ModelError> {
+        sqlx::query(
+            r#"
+            UPDATE Attempts SET comment = ? WHERE attempt_id = ?
+            "#,
+        )
+        .bind(&new_comment)
+        .bind(attempt_id)
         .execute(pool)
         .await?;
         Ok(())

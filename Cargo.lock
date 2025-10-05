@@ -515,6 +515,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diacritics"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "720807774f004a558d2b6d88e17b27a9c7cedccd541f4851446976631da2a151"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1334,6 +1340,7 @@ dependencies = [
  "async-trait",
  "bcrypt",
  "clap",
+ "diacritics",
  "futures",
  "rocket",
  "rocket_dyn_templates",

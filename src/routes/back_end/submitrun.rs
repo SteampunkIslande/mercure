@@ -1,6 +1,6 @@
-use rocket::State;
-use rocket::post;
 use rocket::serde::json::Json;
+use rocket::{State, post};
+use serde_json::{Value, json};
 use sqlx::SqlitePool;
 
 use super::super::ApiResponse;
@@ -14,9 +14,11 @@ pub async fn newrun_post(
     _auth: Authenticated,
     pool: &State<SqlitePool>,
     form: Json<HgRunSubmission>,
-) -> Json<ApiResponse<String>> {
+) -> Json<ApiResponse<Value>> {
     match HgRun::new_run(form.0, pool).await {
-        Ok(()) => Json(ApiResponse::success("Run créé avec succès!".to_string())),
+        Ok(run_id) => Json(ApiResponse::success(
+            json!({"message":"Run créé avec succès!","run_id":run_id}),
+        )),
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }
 }

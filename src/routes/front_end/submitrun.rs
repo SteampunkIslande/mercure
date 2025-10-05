@@ -1,6 +1,6 @@
 use rocket::{State, get};
 use rocket_dyn_templates::{Template, context};
-use serde_json::{self, json};
+use serde_json::{self};
 use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
@@ -32,14 +32,32 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
         .unwrap_or_default();
 
     // Fetch form definition to get user_defined_vars
-    let form_def = HgFormDef::get_formdef_from_id(pool, form_id)
-        .await
-        .unwrap_or_default();
-    eprintln!("{:?}", form_def);
+    let form_def = match HgFormDef::get_formdef_from_id(pool, form_id).await {
+        Ok(form_def) => form_def,
+        Err(e) => {
+            return Template::render(
+                "common/error",
+                context! {
+                    title:"Formulaire invalide",
+                    h2:"Formulaire invalide",
+                    message:format!("Erreur lors du chargement de la définition du formulaire: {}", e)
+                },
+            );
+        }
+    };
     let user_defined_vars = form_def.user_defined_vars.unwrap_or_default();
     let user_defined_vars_json = match serde_json::to_string(&user_defined_vars) {
         Ok(udv_string) => udv_string,
-        Err(e) => format!("{}", json! ({"error":e.to_string()})),
+        Err(e) => {
+            return Template::render(
+                "common/error",
+                context! {
+                    title:"Formulaire invalide",
+                    h2:"Formulaire invalide",
+                    message:format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
+                },
+            );
+        }
     };
 
     Template::render(

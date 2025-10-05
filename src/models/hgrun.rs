@@ -76,7 +76,7 @@ pub struct HgRun {
 
 impl HgRun {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub async fn new_run(run_form: HgRunSubmission, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub async fn new_run(run_form: HgRunSubmission, pool: &SqlitePool) -> Result<i64, ModelError> {
         // Date de création
         let creation_date = OffsetDateTime::now_utc().to_string();
 
@@ -84,10 +84,17 @@ impl HgRun {
         let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        sqlx::query(
+        if run_form.sample_sheet_adn_path.is_empty() && run_form.sample_sheet_arn_path.is_empty() {
+            return Err(ModelError::FormError(
+                "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
+            ));
+        }
+
+        let run_id=sqlx::query(
             r#"
             INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, attempt_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING run_id
             "#,
         )
         .bind(run_form.form_id)
@@ -103,10 +110,10 @@ impl HgRun {
         .bind("Idle")
         .bind(&user_defined_vars_json)
         .bind(0)
-        .execute(pool)
-        .await?;
+        .fetch_one(pool)
+        .await?.try_get("run_id")?;
 
-        Ok(())
+        Ok(run_id)
     }
 
     pub async fn remove_run(form_id: i64) -> Result<(), ModelError> {
