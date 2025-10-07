@@ -4,6 +4,7 @@ use futures::StreamExt;
 use sqlx;
 use sqlx::Row;
 use thiserror::Error;
+use tokio::sync::watch;
 
 use mercure::models::HgAttempt;
 use mercure::models::InvalidRunStatusError;
@@ -45,16 +46,20 @@ async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<Result<HgAttempt, Rou
         .await
 }
 
-#[tokio::main]
-async fn main() -> Result<(), RoutineError> {
-    use sqlx::sqlite::SqlitePool;
+/// Fonction qui exécute la boucle de routine avec des points de contrôle pour l'annulation
+async fn run_routine_loop(
+    pool: sqlx::SqlitePool,
+    mut shutdown_rx: watch::Receiver<bool>,
+) -> Result<(), RoutineError> {
     use std::time::Duration;
-    use tokio::signal;
-
-    println!("Connecting to database...");
-    let pool = SqlitePool::connect("sqlite://mercure.db").await?;
 
     loop {
+        // Point de contrôle 1: Vérifier le signal d'arrêt au début de chaque itération
+        if *shutdown_rx.borrow() {
+            println!("Signal d'arrêt reçu, arrêt de la routine...");
+            break;
+        }
+
         println!("Routine: recherche de runs à traiter...");
 
         let pending_runs = find_pending_runs(&pool).await;
@@ -68,6 +73,8 @@ async fn main() -> Result<(), RoutineError> {
                             "Traitement de la tentative {} pour le run {}...",
                             attempt.attempt_number, attempt.run_id
                         );
+                        // Ici, le traitement réel ne peut pas être interrompu
+                        // sauf aux points de contrôle explicites
                     }
                     Err(e) => {
                         eprintln!("Erreur lors de la récupération d'une tentative: {}", e);
@@ -76,17 +83,62 @@ async fn main() -> Result<(), RoutineError> {
             }
         }
 
+        // Point de contrôle 2: Attendre avec possibilité d'interruption
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(300)) => {
-                // Continue to next iteration
+                // Continue vers la prochaine itération
             }
-            _ = signal::ctrl_c() => {
-                println!("Shutdown signal received, closing pool...");
-                pool.close().await;
-                println!("Pool closed. Exiting.");
-                break;
+            _ = shutdown_rx.changed() => {
+                if *shutdown_rx.borrow() {
+                    break;
+                }
             }
         }
     }
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), RoutineError> {
+    use sqlx::sqlite::SqlitePool;
+    use tokio::signal;
+
+    println!("Connecting to database...");
+    let pool = SqlitePool::connect("sqlite://mercure.db").await?;
+
+    // Canal pour communiquer le signal d'arrêt
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    // Clone le pool pour la routine
+    let routine_pool = pool.clone();
+
+    // Lancer la routine dans une tâche séparée
+    let routine_handle =
+        tokio::spawn(async move { run_routine_loop(routine_pool, shutdown_rx).await });
+
+    // Attendre le signal Ctrl+C
+    match signal::ctrl_c().await {
+        Ok(()) => {
+            println!("Shutdown signal received, envoi du signal d'arrêt...");
+            // Envoyer le signal d'arrêt à la routine
+            let _ = shutdown_tx.send(true);
+
+            // Attendre que la routine se termine proprement
+            if let Err(e) = routine_handle.await {
+                eprintln!("Erreur lors de l'arrêt de la routine: {}", e);
+            }
+
+            println!("Fermeture de la connexion à la base de données...");
+            pool.close().await;
+            println!("Connexion à la base de données fermée. Sortie.");
+        }
+        Err(err) => {
+            eprintln!("Erreur lors de l'écoute du signal Ctrl+C: {}", err);
+            return Err(RoutineError::SqlxError(sqlx::Error::Io(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("Signal error: {}", err)),
+            )));
+        }
+    }
+
     Ok(())
 }
