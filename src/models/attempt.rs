@@ -27,7 +27,7 @@ pub struct HgAttempt {
 
 impl HgAttempt {
     /// Crée une nouvelle tentative à partir d'une HgRun
-    pub async fn new_attempt(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn new_attempt(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
         let run: HgRun = HgRun::get_run_from_id(run_id, pool).await?;
 
         let attempt_date = OffsetDateTime::now_utc().to_string();
@@ -148,42 +148,10 @@ impl HgAttempt {
             .collect())
     }
 
-    /// Démarre toutes les tentatives pour un run : Pending -> Running
-    pub async fn start_attempts_for_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        sqlx::query(
-            r#"
-            UPDATE Attempts SET status = ? WHERE run_id = ? AND status = ?
-            "#,
-        )
-        .bind("Running")
-        .bind(run_id)
-        .bind("Pending")
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-
-    /// Termine toutes les tentatives avec succès : Running -> Success
-    pub async fn complete_attempts_success_for_run(
-        run_id: i64,
-        pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
-        sqlx::query(
-            r#"
-            UPDATE Attempts SET status = ? WHERE run_id = ? AND status = ?
-            "#,
-        )
-        .bind("Success")
-        .bind(run_id)
-        .bind("Running")
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-
     /// Termine toutes les tentatives avec échec : Running -> Failure
-    pub async fn complete_attempts_failure_for_run(
+    pub async fn set_attempt_failure_for_run(
         run_id: i64,
+        attempt_id: i64,
         reason: String,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {

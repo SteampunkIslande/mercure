@@ -122,7 +122,10 @@ pub struct HgRun {
 
 impl HgRun {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub async fn new_run(run_form: HgRunSubmission, pool: &SqlitePool) -> Result<i64, ModelError> {
+    pub(super) async fn new_run(
+        run_form: HgRunSubmission,
+        pool: &SqlitePool,
+    ) -> Result<i64, ModelError> {
         // Date de création
         let creation_date = OffsetDateTime::now_utc().to_string();
 
@@ -160,11 +163,6 @@ impl HgRun {
         .await?.try_get("run_id")?;
 
         Ok(run_id)
-    }
-
-    pub async fn remove_run(form_id: i64) -> Result<(), ModelError> {
-        // TODO: Implement
-        Ok(())
     }
 
     /// Instancie un HgRun à partir de son run_id en récupérant depuis la base de données
@@ -235,21 +233,8 @@ impl HgRun {
         Ok(hgrun)
     }
 
-    /// Incrémente attempt_count pour cette run (privée car une nouvelle tentative d'analyse doit d'abord être créée)
-    async fn increment_attempt_count(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        sqlx::query(
-            r#"
-            UPDATE Runs SET attempt_count = attempt_count + 1 WHERE run_id = ?
-            "#,
-        )
-        .bind(run_id)
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
-
-    /// Valide le formulaire pour cette run : Idle -> Pending, crée une nouvelle tentative
-    pub async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    /// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative
+    pub(super) async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
         // Vérifier le statut actuel
         let run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
@@ -258,11 +243,15 @@ impl HgRun {
             ));
         }
 
-        // Incrémenter attempt_count
-        Self::increment_attempt_count(run_id, pool).await?;
-
-        // Créer HgAttempt
-        HgAttempt::new_attempt(run_id, pool).await?;
+        // Incrémenter le nombre de tentatives
+        sqlx::query(
+            r#"
+            UPDATE Runs SET attempt_count = attempt_count + 1 WHERE run_id = ?
+            "#,
+        )
+        .bind(run_id)
+        .execute(pool)
+        .await?;
 
         // Mettre à jour le statut à Pending
         sqlx::query(
@@ -279,7 +268,7 @@ impl HgRun {
     }
 
     /// Démarre le run : Pending -> Running (appelé par surveillance)
-    pub async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
         // Vérifier le statut actuel
         let run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Pending) {
@@ -298,9 +287,6 @@ impl HgRun {
         .bind(run_id)
         .execute(pool)
         .await?;
-
-        // Démarrer toutes les tentatives associées
-        HgAttempt::start_attempts_for_run(run_id, pool).await?;
 
         Ok(())
     }
@@ -326,9 +312,6 @@ impl HgRun {
         .execute(pool)
         .await?;
 
-        // Terminer toutes les tentatives avec succès
-        HgAttempt::complete_attempts_success_for_run(run_id, pool).await?;
-
         Ok(())
     }
 
@@ -340,11 +323,6 @@ impl HgRun {
     ) -> Result<(), ModelError> {
         // Vérifier le statut actuel
         let run = Self::get_run_from_id(run_id, pool).await?;
-        if !matches!(run.status, RunStatus::Running) {
-            return Err(ModelError::FormError(
-                "Le run n'est pas en état Running".to_string(),
-            ));
-        }
 
         // Mettre à jour le statut à Failure
         sqlx::query(
@@ -358,7 +336,7 @@ impl HgRun {
         .await?;
 
         // Terminer toutes les tentatives avec échec
-        HgAttempt::complete_attempts_failure_for_run(run_id, reason, pool).await?;
+        HgAttempt::set_attempt_failure_for_run(run_id, reason, pool).await?;
 
         Ok(())
     }

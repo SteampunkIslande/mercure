@@ -6,7 +6,8 @@ use sqlx::SqlitePool;
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
-use crate::models::{HgRun, HgRunSubmission};
+use crate::models::HgRunSubmission;
+use crate::models::analysis::AnalysisStateMachine;
 
 /// Route: /mercure/api/newrun
 #[post("/newrun", data = "<form>")]
@@ -15,7 +16,7 @@ pub async fn newrun_post(
     pool: &State<SqlitePool>,
     form: Json<HgRunSubmission>,
 ) -> Json<ApiResponse<Value>> {
-    match HgRun::new_run(form.0, pool).await {
+    match AnalysisStateMachine::new_run(form.0, pool).await {
         Ok(run_id) => Json(ApiResponse::success(
             json!({"message":"Run créé avec succès!","run_id":run_id}),
         )),
