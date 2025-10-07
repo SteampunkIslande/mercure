@@ -4,13 +4,14 @@ use serde_json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::str::FromStr;
 use time::OffsetDateTime;
 
 /// Created every time we attempt to analyze an HgRun.
 /// Copies the editable data from HgRun at the time of attempt.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HgAttempt {
-    pub attempt_id: i64,
+    pub attempt_number: i64,
     pub run_id: i64,
     pub attempt_date: String,
     pub user_defined_vars: HashMap<String, String>,
@@ -48,24 +49,26 @@ impl HgAttempt {
         .bind(&run.sample_sheet_adn_path)
         .bind(&run.sample_sheet_arn_path)
         .bind(&run.metadata_path)
-        .bind(serde_json::to_string(&run.status).unwrap_or_else(|_| "Idle".to_string()))
+        .bind(&run.status.to_string())
         .execute(pool)
         .await?;
 
         Ok(())
     }
 
-    /// Instancie un HgAttempt à partir de son attempt_id
-    pub async fn get_attempt_from_id(
-        attempt_id: i64,
+    /// Instancie un HgAttempt à partir de son attempt_number et run_id
+    pub async fn get_attempt_from_number(
+        attempt_number: i64,
+        run_id: i64,
         pool: &SqlitePool,
     ) -> Result<Self, ModelError> {
         let row = sqlx::query(
             r#"
-            SELECT * FROM Attempts WHERE attempt_id = ?
+            SELECT * FROM Attempts WHERE attempt_number = ? AND run_id = ?
             "#,
         )
-        .bind(attempt_id)
+        .bind(attempt_number)
+        .bind(run_id)
         .fetch_one(pool)
         .await?;
 
@@ -76,20 +79,12 @@ impl HgAttempt {
                 ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
             })?;
 
-        // Parser le statut
-        let status_str: String = row.try_get("status")?;
-        let status = match status_str.as_str() {
-            "Idle" => RunStatus::Idle,
-            "Pending" => RunStatus::Pending,
-            "Running" => RunStatus::Running,
-            "Success" => RunStatus::Success,
-            s if s.starts_with("Failure:") => RunStatus::Failure(s[8..].to_string()),
-            _ => RunStatus::Idle, // Défaut en cas d'inconnu
-        };
+        let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())
+            .unwrap_or(RunStatus::Idle);
 
         // Construire l'instance HgAttempt
         let attempt = HgAttempt {
-            attempt_id,
+            attempt_number,
             run_id: row.try_get("run_id")?,
             attempt_date: row.try_get("attempt_date")?,
             user_defined_vars,
@@ -120,44 +115,37 @@ impl HgAttempt {
         .fetch_all(pool)
         .await?;
 
-        let mut attempts = Vec::new();
-        for row in rows {
-            // Désérialiser les variables définies par l'utilisateur
-            let user_defined_vars_json: String = row.try_get("user_defined_vars")?;
-            let user_defined_vars: HashMap<String, String> =
-                serde_json::from_str(&user_defined_vars_json).map_err(|e| {
-                    ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
-                })?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                // Désérialiser les variables définies par l'utilisateur
+                let user_defined_vars_json: String = row.try_get("user_defined_vars").ok()?;
+                let user_defined_vars: HashMap<String, String> =
+                    serde_json::from_str(&user_defined_vars_json)
+                        .map_err(|e| {
+                            ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
+                        })
+                        .ok()?;
 
-            // Parser le statut
-            let status_str: String = row.try_get("status")?;
-            let status = match status_str.as_str() {
-                "Idle" => RunStatus::Idle,
-                "Pending" => RunStatus::Pending,
-                "Running" => RunStatus::Running,
-                "Success" => RunStatus::Success,
-                s if s.starts_with("Failure:") => RunStatus::Failure(s[8..].to_string()),
-                _ => RunStatus::Idle, // Défaut en cas d'inconnu
-            };
-
-            let attempt = HgAttempt {
-                attempt_id: row.try_get("attempt_id")?,
-                run_id: row.try_get("run_id")?,
-                attempt_date: row.try_get("attempt_date")?,
-                user_defined_vars,
-                run_date: row.try_get("run_date")?,
-                run_sequencer: row.try_get("run_sequencer")?,
-                run_flowcellid: row.try_get("run_flowcellid")?,
-                sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
-                sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
-                metadata_path: row.try_get("metadata_path")?,
-                status,
-                comment: row.try_get("comment")?,
-            };
-            attempts.push(attempt);
-        }
-
-        Ok(attempts)
+                // Parser le statut
+                let status_str: String = row.try_get("status").ok()?;
+                let status = RunStatus::from_str(status_str.as_str()).ok()?;
+                Some(HgAttempt {
+                    attempt_number: row.try_get("attempt_number").ok()?,
+                    run_id: row.try_get("run_id").ok()?,
+                    attempt_date: row.try_get("attempt_date").ok()?,
+                    user_defined_vars,
+                    run_date: row.try_get("run_date").ok()?,
+                    run_sequencer: row.try_get("run_sequencer").ok()?,
+                    run_flowcellid: row.try_get("run_flowcellid").ok()?,
+                    sample_sheet_adn_path: row.try_get("sample_sheet_adn_path").ok()?,
+                    sample_sheet_arn_path: row.try_get("sample_sheet_arn_path").ok()?,
+                    metadata_path: row.try_get("metadata_path").ok()?,
+                    status,
+                    comment: row.try_get("comment").ok()?,
+                })
+            })
+            .collect())
     }
 
     /// Démarre toutes les tentatives pour un run : Pending -> Running

@@ -7,7 +7,18 @@ use serde_json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::str::FromStr;
 use time::OffsetDateTime;
+
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub struct InvalidRunStatusError;
+
+impl Display for InvalidRunStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Invalid run status")
+    }
+}
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RunStatus {
@@ -24,7 +35,32 @@ pub enum RunStatus {
     Failure(String),
 }
 
-//TODO: Add a HgRunSubmission struct for the backend
+impl Display for RunStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunStatus::Idle => write!(f, "Idle"),
+            RunStatus::Pending => write!(f, "Pending"),
+            RunStatus::Running => write!(f, "Running"),
+            RunStatus::Success => write!(f, "Success"),
+            RunStatus::Failure(reason) => write!(f, "Failure:{}", reason),
+        }
+    }
+}
+
+impl FromStr for RunStatus {
+    type Err = InvalidRunStatusError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Idle" => Ok(RunStatus::Idle),
+            "Pending" => Ok(RunStatus::Pending),
+            "Running" => Ok(RunStatus::Running),
+            "Success" => Ok(RunStatus::Success),
+            s if s.starts_with("Failure:") => Ok(RunStatus::Failure(s[8..].to_string())),
+            _ => Err(InvalidRunStatusError),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRunSubmission {
@@ -43,34 +79,44 @@ pub struct HgRunSubmission {
 /// Created by users.
 /// On any user's home page, there is a list of runs submitted by the user
 /// There is also a button that the user can press to get to route '/newrun/groupname'
-///
-/// This form is what is submitted by the user when they are on the '/newrun/groupname' GET endpoint
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRun {
     pub run_id: i64,
 
     /// The form definition used to create this run
+    /// Not modifiable with new attempts, defines the pipeline used.
     pub form: HgFormDef,
 
+    /// The user who created this run. Not modifiable with new attempts.
     pub user: User,
 
-    /// The key,value pairs for user-defined variables
+    /// The key,value pairs for user-defined variables. Editable from attempt to attempt
+    /// Comes from the form definition, once the user has defined values for them.
     pub user_defined_vars: HashMap<String, String>,
 
+    /// A user-defined name for this run
+    /// Not modifiable with new attempts.
     pub run_name: String,
 
+    /// Date of the run, as defined by the user. Can be modified with new attempts.
     pub run_date: String,
+    /// The sequencer used for this run, as defined by the user. Can be modified with new attempts.
     pub run_sequencer: String,
+    /// The flowcell ID used for this run, as defined by the user. Can be modified with new attempts.
     pub run_flowcellid: String,
 
+    /// Date of creation of this run in the database. Not modifiable with new attempts.
     pub creation_date: String,
 
+    /// Paths to the SampleSheets and metadata file, as defined by the user. Can be modified with new attempts.
     pub sample_sheet_adn_path: String,
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
 
+    /// Current status of the run. Reflects the status of the latest attempt.
     pub status: RunStatus,
 
+    /// Number of attempts made for this run. Incremented each time a new attempt is created.
     pub attempt_count: u32,
 }
 

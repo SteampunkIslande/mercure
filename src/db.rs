@@ -125,7 +125,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS Attempts (
-            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            attempt_number INTEGER NOT NULL,
             run_id INTEGER NOT NULL,
             attempt_date TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
