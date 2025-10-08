@@ -325,7 +325,7 @@ impl HgRun {
     /// Termine le run avec échec : Running -> Failure
     pub(super) async fn complete_failure(
         run_id: i64,
-        reason: String,
+        reason: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
         // Mettre à jour le statut à Failure

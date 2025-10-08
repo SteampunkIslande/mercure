@@ -167,11 +167,8 @@ impl HgAttempt {
     }
 
     /// La tentative `attempt_number` s'est terminée avec succès.
-    pub(super) async fn complete_success(
-        run_id: i64,
-        attempt_number: i64,
-        pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
+    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+        let run = HgRun::get_run_from_id(run_id, pool).await?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -179,7 +176,7 @@ impl HgAttempt {
         )
         .bind("Success")
         .bind(run_id)
-        .bind(attempt_number)
+        .bind(run.attempt_count)
         .execute(pool)
         .await?;
         Ok(())
@@ -188,10 +185,10 @@ impl HgAttempt {
     /// La tentative `attempt_number` a échoué.
     pub(super) async fn complete_failure(
         run_id: i64,
-        attempt_number: i64,
-        reason: String,
+        reason: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
+        let run = HgRun::get_run_from_id(run_id, pool).await?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -199,7 +196,7 @@ impl HgAttempt {
         )
         .bind(format!("Failure:{}", reason))
         .bind(run_id)
-        .bind(attempt_number)
+        .bind(run.attempt_count)
         .execute(pool)
         .await?;
         Ok(())
@@ -207,8 +204,9 @@ impl HgAttempt {
 
     /// Met à jour le commentaire d'une tentative
     pub(super) async fn update_comment(
-        attempt_id: i64,
-        new_comment: String,
+        run_id: i64,
+        attempt_number: i64,
+        new_comment: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
         sqlx::query(
@@ -216,8 +214,8 @@ impl HgAttempt {
             UPDATE Attempts SET comment = ? WHERE attempt_id = ?
             "#,
         )
-        .bind(&new_comment)
-        .bind(attempt_id)
+        .bind(new_comment)
+        .bind(attempt_number)
         .execute(pool)
         .await?;
         Ok(())

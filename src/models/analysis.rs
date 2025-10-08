@@ -1,4 +1,4 @@
-use crate::models::{HgRun, RunStatus};
+use crate::models::{HgAttempt, HgRun, RunStatus};
 
 use super::ModelError;
 use sqlx::SqlitePool;
@@ -10,6 +10,8 @@ pub enum AnalysisStateMachineError {
     InvalidTransition { from: String, to: String },
     #[error(transparent)]
     ModelError(#[from] ModelError),
+    #[error("{0}")]
+    InvalidOperation(String),
 }
 
 /// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative
@@ -64,6 +66,9 @@ pub async fn complete_success(
     }
     super::hgrun::HgRun::complete_success(run_id, pool)
         .await
+        .map_err(AnalysisStateMachineError::from)?;
+    super::attempt::HgAttempt::complete_success(run_id, pool)
+        .await
         .map_err(AnalysisStateMachineError::from)
 }
 
@@ -80,9 +85,30 @@ pub async fn complete_failure(
             to: RunStatus::Failure(reason).to_string(),
         });
     }
-    super::hgrun::HgRun::complete_failure(run_id, reason, pool)
+    super::hgrun::HgRun::complete_failure(run_id, &reason, pool)
+        .await
+        .map_err(AnalysisStateMachineError::from)?;
+    super::attempt::HgAttempt::complete_failure(run_id, &reason, pool)
         .await
         .map_err(AnalysisStateMachineError::from)
+}
+
+/// Commenter une tentative
+pub async fn comment_attempt(
+    run_id: i64,
+    attempt_number: i64,
+    comment: &str,
+    pool: &SqlitePool,
+) -> Result<(), AnalysisStateMachineError> {
+    let attempt: HgAttempt =
+        HgAttempt::get_attempt_from_number(attempt_number, run_id, pool).await?;
+    if !matches!(attempt.status, RunStatus::Success | RunStatus::Failure(_)) {
+        return Err(AnalysisStateMachineError::InvalidOperation(
+            "You can only comment on finished attempts".to_string(),
+        ));
+    }
+    HgAttempt::update_comment(run_id, attempt_number, comment, pool).await?;
+    Ok(())
 }
 
 /// Relance le run : Success/Failure -> Idle
