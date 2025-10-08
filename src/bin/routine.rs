@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use futures::StreamExt;
+use mercure::models::AnalysisStateMachineError;
 use sqlx;
 use sqlx::Row;
 use thiserror::Error;
@@ -10,12 +11,16 @@ use mercure::models::HgAttempt;
 use mercure::models::InvalidRunStatusError;
 use mercure::models::RunStatus;
 
+use mercure::models::analysis;
+
 #[derive(Error, Debug)]
 enum RoutineError {
     #[error(transparent)]
     SqlxError(#[from] sqlx::Error),
     #[error(transparent)]
     InvalidRunStatusError(#[from] InvalidRunStatusError),
+    #[error(transparent)]
+    AnalysisStateMachineError(#[from] AnalysisStateMachineError),
 }
 
 async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<Result<HgAttempt, RoutineError>> {
@@ -46,6 +51,25 @@ async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<Result<HgAttempt, Rou
         .await
 }
 
+async fn treat_attempt(
+    run_result: Result<HgAttempt, RoutineError>,
+    pool: &sqlx::SqlitePool,
+) -> Result<(), RoutineError> {
+    match run_result {
+        Ok(attempt) => {
+            println!(
+                "Traitement de la tentative {} pour le run {}...",
+                attempt.attempt_number, attempt.run_id
+            );
+            analysis::start_run_analysis(attempt.run_id, &pool).await?;
+        }
+        Err(e) => {
+            eprintln!("Erreur lors de la récupération d'une tentative: {}", e);
+        }
+    }
+    Ok(())
+}
+
 /// Fonction qui exécute la boucle de routine avec des points de contrôle pour l'annulation
 async fn run_routine_loop(
     pool: sqlx::SqlitePool,
@@ -61,23 +85,15 @@ async fn run_routine_loop(
         }
 
         println!("Routine: recherche de runs à traiter...");
-
         let pending_runs = find_pending_runs(&pool).await;
         if pending_runs.is_empty() {
             println!("Aucun run en attente.");
         } else {
             for run_result in pending_runs {
-                match run_result {
-                    Ok(attempt) => {
-                        println!(
-                            "Traitement de la tentative {} pour le run {}...",
-                            attempt.attempt_number, attempt.run_id
-                        );
-                        // Ici, le traitement réel ne peut pas être interrompu
-                        // sauf aux points de contrôle explicites
-                    }
+                match treat_attempt(run_result, &pool).await {
+                    Ok(()) => {}
                     Err(e) => {
-                        eprintln!("Erreur lors de la récupération d'une tentative: {}", e);
+                        eprintln!("Erreur lors de l'exécution de la routine: {e}");
                     }
                 }
             }
