@@ -1,4 +1,4 @@
-use crate::models::{HgAttempt, User};
+use crate::models::User;
 
 use super::form::HgFormDef;
 use crate::models::ModelError;
@@ -76,6 +76,17 @@ pub struct HgRunSubmission {
     pub user_defined_vars: HashMap<String, String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct HgRunEdit {
+    pub run_date: String,
+    pub run_sequencer: String,
+    pub run_flowcellid: String,
+    pub sample_sheet_adn_path: String,
+    pub sample_sheet_arn_path: String,
+    pub metadata_path: String,
+    pub user_defined_vars: HashMap<String, String>,
+}
+
 /// Created by users.
 /// On any user's home page, there is a list of runs submitted by the user
 /// There is also a button that the user can press to get to route '/newrun/groupname'
@@ -122,10 +133,7 @@ pub struct HgRun {
 
 impl HgRun {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub(super) async fn new_run(
-        run_form: HgRunSubmission,
-        pool: &SqlitePool,
-    ) -> Result<i64, ModelError> {
+    pub async fn new_run(run_form: HgRunSubmission, pool: &SqlitePool) -> Result<i64, ModelError> {
         // Date de création
         let creation_date = OffsetDateTime::now_utc().to_string();
 
@@ -165,7 +173,44 @@ impl HgRun {
         Ok(run_id)
     }
 
-    /// Instancie un HgRun à partir de son run_id en récupérant depuis la base de données
+    /// Edite un HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
+    pub async fn edit_run(
+        run_form: HgRunEdit,
+        run_id: i64,
+        pool: &SqlitePool,
+    ) -> Result<i64, ModelError> {
+        let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
+            .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
+
+        if run_form.sample_sheet_adn_path.is_empty() && run_form.sample_sheet_arn_path.is_empty() {
+            return Err(ModelError::FormError(
+                "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
+            ));
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE Runs SET
+            (user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path)
+            =
+            (?, ?, ?, ?, ?, ?, ?)
+            WHERE run_id = ?
+            "#,
+        )
+        .bind(&user_defined_vars_json)
+        .bind(&run_form.run_date)
+        .bind(&run_form.run_sequencer)
+        .bind(&run_form.run_flowcellid)
+        .bind(&run_form.sample_sheet_adn_path)
+        .bind(&run_form.sample_sheet_arn_path)
+        .bind(&run_form.metadata_path)
+        .bind(run_id)
+        .execute(pool).await?;
+
+        Ok(run_id)
+    }
+
+    /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
     pub async fn get_run_from_id(run_id: i64, pool: &SqlitePool) -> Result<Self, ModelError> {
         let row = sqlx::query(
             r#"
@@ -202,15 +247,7 @@ impl HgRun {
             })?;
 
         // Parser le statut
-        let status_str: String = row.try_get("status")?;
-        let status = match status_str.as_str() {
-            "Idle" => RunStatus::Idle,
-            "Pending" => RunStatus::Pending,
-            "Running" => RunStatus::Running,
-            "Success" => RunStatus::Success,
-            s if s.starts_with("Failure:") => RunStatus::Failure(s[8..].to_string()),
-            _ => RunStatus::Idle, // Défaut en cas d'inconnu
-        };
+        let status: RunStatus = RunStatus::from_str(row.try_get("status")?)?;
 
         // Construire l'instance HgRun
         let hgrun = HgRun {
@@ -233,30 +270,16 @@ impl HgRun {
         Ok(hgrun)
     }
 
-    /// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative
+    /// Valide le formulaire pour ce run : Idle -> Pending
+    ///
+    /// Cette fonction ne modifie que la table HgRun.
+    ///
+    /// Il est de la responsabilité de l'appelant de mettre à jour la table Attempts **après** cette fonction.
     pub(super) async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        // Vérifier le statut actuel
-        let run = Self::get_run_from_id(run_id, pool).await?;
-        if !matches!(run.status, RunStatus::Idle) {
-            return Err(ModelError::FormError(
-                "Le run n'est pas en état Idle".to_string(),
-            ));
-        }
-
         // Incrémenter le nombre de tentatives
         sqlx::query(
             r#"
-            UPDATE Runs SET attempt_count = attempt_count + 1 WHERE run_id = ?
-            "#,
-        )
-        .bind(run_id)
-        .execute(pool)
-        .await?;
-
-        // Mettre à jour le statut à Pending
-        sqlx::query(
-            r#"
-            UPDATE Runs SET status = ? WHERE run_id = ?
+            UPDATE Runs SET (attempt_count, status) = (attempt_count + 1, ?) WHERE run_id = ?
             "#,
         )
         .bind("Pending")
@@ -267,16 +290,8 @@ impl HgRun {
         Ok(())
     }
 
-    /// Démarre le run : Pending -> Running (appelé par surveillance)
+    /// Démarre le run : Pending -> Running (appelé par la routine de surveillance)
     pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        // Vérifier le statut actuel
-        let run = Self::get_run_from_id(run_id, pool).await?;
-        if !matches!(run.status, RunStatus::Pending) {
-            return Err(ModelError::FormError(
-                "Le run n'est pas en état Pending".to_string(),
-            ));
-        }
-
         // Mettre à jour le statut à Running
         sqlx::query(
             r#"
@@ -292,15 +307,7 @@ impl HgRun {
     }
 
     /// Termine le run avec succès : Running -> Success
-    pub async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        // Vérifier le statut actuel
-        let run = Self::get_run_from_id(run_id, pool).await?;
-        if !matches!(run.status, RunStatus::Running) {
-            return Err(ModelError::FormError(
-                "Le run n'est pas en état Running".to_string(),
-            ));
-        }
-
+    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
         // Mettre à jour le statut à Success
         sqlx::query(
             r#"
@@ -316,14 +323,11 @@ impl HgRun {
     }
 
     /// Termine le run avec échec : Running -> Failure
-    pub async fn complete_failure(
+    pub(super) async fn complete_failure(
         run_id: i64,
         reason: String,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        // Vérifier le statut actuel
-        let run = Self::get_run_from_id(run_id, pool).await?;
-
         // Mettre à jour le statut à Failure
         sqlx::query(
             r#"
@@ -335,22 +339,11 @@ impl HgRun {
         .execute(pool)
         .await?;
 
-        // Terminer toutes les tentatives avec échec
-        HgAttempt::set_attempt_failure_for_run(run_id, reason, pool).await?;
-
         Ok(())
     }
 
     /// Relance le run : Success/Failure -> Idle
-    pub async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        // Vérifier le statut actuel
-        let run = Self::get_run_from_id(run_id, pool).await?;
-        if !matches!(run.status, RunStatus::Success | RunStatus::Failure(_)) {
-            return Err(ModelError::FormError(
-                "Le run n'est pas terminé".to_string(),
-            ));
-        }
-
+    pub(super) async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
         // Mettre à jour le statut à Idle
         sqlx::query(
             r#"

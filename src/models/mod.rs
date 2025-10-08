@@ -18,4 +18,6 @@ pub enum ModelError {
     FormError(String),
     #[error("Database error: {0}")]
     DatabaseError(#[from] sqlx::Error),
+    #[error(transparent)]
+    InvalidRunStatusError(#[from] hgrun::InvalidRunStatusError),
 }

@@ -8,7 +8,10 @@ use std::str::FromStr;
 use time::OffsetDateTime;
 
 /// Created every time we attempt to analyze an HgRun.
+///
 /// Copies the editable data from HgRun at the time of attempt.
+///
+/// All of its fields are read-only except for comment and status.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HgAttempt {
     pub attempt_number: i64,
@@ -21,7 +24,10 @@ pub struct HgAttempt {
     pub sample_sheet_adn_path: String,
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
+
+    /// One of the only two editable fields
     pub status: RunStatus,
+    /// One of the only two editable fields
     pub comment: String,
 }
 
@@ -36,10 +42,11 @@ impl HgAttempt {
 
         sqlx::query(
             r#"
-            INSERT INTO Attempts (run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, comment)
+            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, comment)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
             "#,
         )
+        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
         .bind(run.run_id)
         .bind(&attempt_date)
         .bind(&user_defined_vars_json)
@@ -56,7 +63,7 @@ impl HgAttempt {
         Ok(())
     }
 
-    /// Instancie un HgAttempt à partir de son attempt_number et run_id
+    /// Récupère un HgAttempt à partir de son attempt_number et run_id
     pub async fn get_attempt_from_number(
         attempt_number: i64,
         run_id: i64,
@@ -102,7 +109,7 @@ impl HgAttempt {
     }
 
     /// Récupère toutes les tentatives pour un run_id
-    pub async fn get_attempts_for_run(
+    pub async fn list_attempts_for_run(
         run_id: i64,
         pool: &SqlitePool,
     ) -> Result<Vec<Self>, ModelError> {
@@ -148,28 +155,58 @@ impl HgAttempt {
             .collect())
     }
 
-    /// Termine toutes les tentatives avec échec : Running -> Failure
-    pub async fn set_attempt_failure_for_run(
+    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+        let run = HgRun::get_run_from_id(run_id, pool).await?;
+        sqlx::query(r#"UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?"#)
+            .bind("Running")
+            .bind(run_id)
+            .bind(run.attempt_count)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    /// La tentative `attempt_number` s'est terminée avec succès.
+    pub(super) async fn complete_success(
         run_id: i64,
-        attempt_id: i64,
+        attempt_number: i64,
+        pool: &SqlitePool,
+    ) -> Result<(), ModelError> {
+        sqlx::query(
+            r#"
+            UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
+            "#,
+        )
+        .bind("Success")
+        .bind(run_id)
+        .bind(attempt_number)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// La tentative `attempt_number` a échoué.
+    pub(super) async fn complete_failure(
+        run_id: i64,
+        attempt_number: i64,
         reason: String,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
         sqlx::query(
             r#"
-            UPDATE Attempts SET status = ? WHERE run_id = ? AND status = ?
+            UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
             "#,
         )
         .bind(format!("Failure:{}", reason))
         .bind(run_id)
-        .bind("Running")
+        .bind(attempt_number)
         .execute(pool)
         .await?;
         Ok(())
     }
 
     /// Met à jour le commentaire d'une tentative
-    pub async fn update_comment(
+    pub(super) async fn update_comment(
         attempt_id: i64,
         new_comment: String,
         pool: &SqlitePool,
