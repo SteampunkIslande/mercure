@@ -47,17 +47,8 @@
         }
     </script>
     <div class="dropdown">
-        <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
-                class="material-icons icon-align">science</span> Gestion des runs</button>
-        <div id="users_dropdown" class="dropdown-content">
-            <a href="/mercure/runs/running"><span class="material-icons icon-align"
-                    style="color:darkorange;">miscellaneous_services</span>En
-                cours</a>
-            <a href="/mercure/runs/done/"><span class="material-icons icon-align"
-                    style="color:green">check_circle_outline</span>Terminés</a>
-            <a href="/mercure/runs/error/"><span class="material-icons icon-align"
-                    style="color:red">error_outline</span>Erreurs</a>
-        </div>
+        <button onclick="navigateTo(`/mercure/runs/show`)" class="dropbtn"><span
+                class="material-icons icon-align">science</span> Voir mes runs</button>
     </div>
     {% if is_admin %}
     <div class="dropdown" style="float:right;">
