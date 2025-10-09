@@ -2,8 +2,6 @@ use crate::models::User;
 
 use super::form::HgFormDef;
 use crate::models::ModelError;
-use futures::StreamExt;
-use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
@@ -210,78 +208,6 @@ impl HgRun {
         .execute(pool).await?;
 
         Ok(run_id)
-    }
-
-    pub async fn list_runs(
-        pool: &SqlitePool,
-        page: Option<i64>,
-        runs_per_page: Option<i64>,
-    ) -> Result<Vec<Option<Self>>, ModelError> {
-        let runs = sqlx::query(
-            r#"
-            SELECT * FROM Runs ORDER BY creation_date DESC LIMIT ? OFFSET ?
-            "#,
-        )
-        .bind(runs_per_page.unwrap_or(20))
-        .bind(page.unwrap_or(0) * runs_per_page.unwrap_or(20))
-        .fetch(pool)
-        .map_ok(|row| {
-            let run_id: i64 = row.try_get("run_id").ok()?;
-            let form_id: i64 = row.try_get("form_id").ok()?;
-            let user_id: i64 = row.try_get("user_id").ok()?;
-
-            // Récupérer la définition du formulaire
-            let form =
-                futures::executor::block_on(HgFormDef::get_formdef_from_id(pool, form_id)).ok()?;
-
-            // Récupérer l'utilisateur
-            let user = futures::executor::block_on(
-                sqlx::query_as::<_, User>(
-                    r#"
-                SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
-                FROM Users WHERE id = ?
-                "#,
-                )
-                .bind(user_id)
-                .fetch_optional(pool),
-            )
-            .ok()?
-            .ok_or(ModelError::FormError("Utilisateur non trouvé".to_string()))
-            .ok()?;
-
-            // Désérialiser les variables définies par l'utilisateur
-            let user_defined_vars_json: String = row.try_get("user_defined_vars").ok()?;
-            let user_defined_vars: HashMap<String, String> =
-                serde_json::from_str(&user_defined_vars_json)
-                    .map_err(|e| {
-                        ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
-                    })
-                    .ok()?;
-
-            // Parser le statut
-            let status: RunStatus = RunStatus::from_str(row.try_get("status").ok()?).ok()?;
-
-            // Construire l'instance HgRun
-            Some(HgRun {
-                run_id,
-                form,
-                user,
-                user_defined_vars,
-                run_name: row.try_get("run_name").ok()?,
-                run_date: row.try_get("run_date").ok()?,
-                creation_date: row.try_get("creation_date").ok()?,
-                run_sequencer: row.try_get("run_sequencer").ok()?,
-                run_flowcellid: row.try_get("run_flowcellid").ok()?,
-                sample_sheet_adn_path: row.try_get("sample_sheet_adn_path").ok()?,
-                sample_sheet_arn_path: row.try_get("sample_sheet_arn_path").ok()?,
-                metadata_path: row.try_get("metadata_path").ok()?,
-                status,
-                attempt_count: row.try_get("attempt_count").ok()?,
-            })
-        })
-        .try_collect::<Vec<Option<HgRun>>>()
-        .await?;
-        Ok(runs)
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données

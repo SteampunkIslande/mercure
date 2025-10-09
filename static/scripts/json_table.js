@@ -1,64 +1,56 @@
-// Génère une table HTML à partir d'un objet JSON selon le schéma donné
-// parentName : nom de l'élément parent (clé principale dans l'objet)
-// jsonObj : l'objet JSON à afficher
 /**
- * Génère et insère une table HTML à partir d'un objet JSON selon le schéma donné.
- * @param {Object} jsonObj - L'objet JSON à afficher (clé = nom de colonne, valeur = tableau de cellules).
- * @param {string} parentName - id ou nom de l'élément HTML parent où insérer la table.
+ * Génère un tableau HTML à partir d'un objet JSON avec le format:
+ * {
+ *   "header": ["colA", "colB", "colC"],
+ *   "data": [
+ *     [{"content": "line1", "href": null}, {"content": "somelink", "href": "/link/to/whatever"}],
+ *     [{"content": "line2", "href": null}, {"content": "some otherlink", "href": "/link/to/whatever"}]
+ *   ]
+ * }
  */
-function generateJsonTable(jsonObj, parentName) {
-  const parent =
-    document.getElementById(parentName) ||
-    document.querySelector(`[name="${parentName}"]`);
-  if (!parent) {
-    throw new Error("Élément parent introuvable dans le DOM.");
+function generateJsonTable(data, elementId) {
+  const tableDiv = document.getElementById(elementId);
+  if (!tableDiv) {
+    console.error(`Élément avec l'ID '${elementId}' non trouvé`);
+    return;
   }
-  const columns = Object.keys(jsonObj);
-  if (columns.length === 0) return;
 
-  const rowCount = jsonObj[columns[0]].length;
-  const table = document.createElement("table");
-
-  // En-tête
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  columns.forEach((col) => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  // Corps
-  const tbody = document.createElement("tbody");
-  for (let i = 0; i < rowCount; i++) {
-    const tr = document.createElement("tr");
-    columns.forEach((col) => {
-      const cellData = jsonObj[col][i];
-      const td = document.createElement("td");
-      if (cellData.type === "link" && cellData.href) {
-        const a = document.createElement("a");
-        a.href = cellData.href;
-        a.textContent = cellData.text;
-        td.appendChild(a);
-      } else {
-        td.textContent = cellData.text;
-      }
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
+  if (!data || !data.header || !data.table) {
+    console.error(
+      "Format de données invalide. Attendu: {header: [...], data: [...]}"
+    );
+    return;
   }
-  table.appendChild(tbody);
 
-  parent.appendChild(table);
+  tableDiv.innerHTML = createTableFromJson(data);
 }
 
-// Exemple d'utilisation :
-// const json = {
-//   "table": {
-//     "Nom": [{type:"plain",text:"Alice"}, {type:"plain",text:"Bob"}],
-//     "Profil": [{type:"link",href:"/alice",text:"Voir"}, {type:"link",href:"/bob",text:"Voir"}]
-//   }
-// };
-// document.body.appendChild(generateJsonTable(json, "table"));
+/**
+ * Crée le HTML d'un tableau à partir des données JSON
+ */
+function createTableFromJson(jsonData) {
+  const { header, table } = jsonData;
+
+  // Créer l'en-tête
+  const headerRow = `<tr>${header
+    .map((col) => `<th>${col}</th>`)
+    .join("")}</tr>`;
+
+  // Créer les lignes de données
+  const dataRows = table
+    .map((row) => {
+      const cells = row
+        .map((cell) => {
+          if (cell.href && cell.href !== null) {
+            return `<td><a href="${cell.href}">${cell.content}</a></td>`;
+          } else {
+            return `<td>${cell.content}</td>`;
+          }
+        })
+        .join("");
+      return `<tr>${cells}</tr>`;
+    })
+    .join("");
+
+  return `<table class="table">${headerRow}${dataRows}</table>`;
+}

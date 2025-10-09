@@ -91,7 +91,7 @@ async fn rocket() -> _ {
                 routes::backend::password_edit_post,
                 routes::backend::newrun_post,
                 routes::backend::upload_post,
-                routes::backend::list_runs,
+                routes::backend::list_runs_get,
             ],
         )
         .manage(pool)

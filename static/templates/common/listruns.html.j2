@@ -10,13 +10,13 @@
     <script src="/static/scripts/json_table.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            fetch("/mercure/api/listruns")
+            fetch("/mercure/api/listruns?page=1&page_size=6")
                 .then(response => response.json())
                 .then(json => {
                     if (json.success) {
                         document.getElementById("banner-title").textContent = json.data.title || "Liste des runs";
                         if (json.data.table) {
-                            generateJsonTable(json.data.table, "runs-table");
+                            generateJsonTable(json.data, "runs-table");
                         } else {
                             document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";
                         }
@@ -47,6 +47,8 @@
     <section>
         <div id="runs-table"></div>
     </section>
+    <a class="btn btn-secondary" href="/mercure/home"><span class="material-icons icon-align">home</span>Retour</a>
+
     <div id="error-message" style="display: none;" class="error"></div>
 </body>
 
