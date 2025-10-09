@@ -7,6 +7,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <style>
+        .pagination-btn {
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: background-color 0.2s ease;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+
+        .pagination-btn:disabled {
+            background-color: #d6d8db;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .pagination-input {
+            width: 45px;
+            padding: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .pagination-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+    </style>
     <script src="/static/scripts/json_table.js"></script>
     <script>
         let currentPage = 1;
@@ -44,14 +83,18 @@
         }
 
         function updatePaginationControls() {
+            const firstBtn = document.getElementById("first-page-btn");
             const prevBtn = document.getElementById("prev-page-btn");
             const nextBtn = document.getElementById("next-page-btn");
+            const lastBtn = document.getElementById("last-page-btn");
             const pageInput = document.getElementById("page-input");
             const pageSizeInput = document.getElementById("page-size-input");
             const pageInfo = document.getElementById("page-info");
 
+            firstBtn.disabled = currentPage <= 1;
             prevBtn.disabled = currentPage <= 1;
             nextBtn.disabled = currentPage >= totalPages;
+            lastBtn.disabled = currentPage >= totalPages;
             pageInput.value = currentPage;
             pageSizeInput.value = pageSize;
             pageInfo.textContent = `/ ${totalPages}`;
@@ -73,6 +116,14 @@
             if (currentPage < totalPages) {
                 goToPage(currentPage + 1);
             }
+        }
+
+        function firstPage() {
+            goToPage(1);
+        }
+
+        function lastPage() {
+            goToPage(totalPages);
         }
 
         function onPageInputChange() {
@@ -117,30 +168,40 @@
         <div id="runs-table"></div>
     </section>
 
-    <div id="pagination-controls" style="margin: 20px 0; text-align: center;">
-        <button id="prev-page-btn" class="btn btn-secondary" onclick="previousPage()" disabled>
-            <span class="material-icons icon-align">chevron_left</span>Page précédente
+    <div id="pagination-controls"
+        style="margin: 10px 0; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem;">
+        <button id="first-page-btn" class="pagination-btn" onclick="firstPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">first_page</span>
         </button>
 
-        <span style="margin: 0 20px;">
-            Page
-            <input id="page-input" type="number" min="1" style="width: 60px; text-align: center; margin: 0 5px;"
-                onchange="onPageInputChange()" onkeypress="if(event.key==='Enter') onPageInputChange()">
+        <button id="prev-page-btn" class="pagination-btn" onclick="previousPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+        </button>
+
+        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem;">
+            <span>Page</span>
+            <input id="page-input" type="number" min="1" class="pagination-input" onchange="onPageInputChange()"
+                onkeypress="if(event.key==='Enter') onPageInputChange()">
             <span id="page-info">/ 1</span>
-        </span>
+        </div>
 
-        <button id="next-page-btn" class="btn btn-secondary" onclick="nextPage()" disabled>
-            Page suivante<span class="material-icons icon-align">chevron_right</span>
+        <button id="next-page-btn" class="pagination-btn" onclick="nextPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_right</span>
         </button>
 
-        <span style="margin: 0 0 0 30px;">
-            Taille :
-            <input id="page-size-input" type="number" min="1" max="100"
-                style="width: 60px; text-align: center; margin: 0 5px;" onchange="onPageSizeChange()"
-                onkeypress="if(event.key==='Enter') onPageSizeChange()">
-            éléments/page
-        </span>
+        <button id="last-page-btn" class="pagination-btn" onclick="lastPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">last_page</span>
+        </button>
+
+        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; margin-left: 15px;">
+            <span>Nombre :</span>
+            <input id="page-size-input" type="number" min="1" max="100" class="pagination-input"
+                onchange="onPageSizeChange()" onkeypress="if(event.key==='Enter') onPageSizeChange()">
+            <span>runs/page</span>
+        </div>
     </div>
+
+    <br>
 
     <a class="btn btn-secondary" href="/mercure/home"><span class="material-icons icon-align">home</span>Retour</a>
 
