@@ -9,8 +9,12 @@
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <script src="/static/scripts/json_table.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            fetch("/mercure/api/listruns?page=1&page_size=6")
+        let currentPage = 1;
+        let totalPages = 1;
+        let pageSize = 5;
+
+        function loadRuns(page, size = pageSize) {
+            fetch(`/mercure/api/listruns?page=${page}&page_size=${size}`)
                 .then(response => response.json())
                 .then(json => {
                     if (json.success) {
@@ -19,6 +23,13 @@
                             generateJsonTable(json.data, "runs-table");
                         } else {
                             document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";
+                        }
+
+                        // Update pagination info
+                        if (json.data.pagination) {
+                            currentPage = json.data.pagination.current_page;
+                            totalPages = json.data.pagination.total_pages;
+                            updatePaginationControls();
                         }
                     } else {
                         document.getElementById("error-message").textContent = json.message || "Erreur inconnue";
@@ -30,6 +41,64 @@
                     errorDiv.textContent = "Erreur de chargement des données.";
                     setTimeout(() => { errorDiv.style.display = "none"; }, 5000);
                 });
+        }
+
+        function updatePaginationControls() {
+            const prevBtn = document.getElementById("prev-page-btn");
+            const nextBtn = document.getElementById("next-page-btn");
+            const pageInput = document.getElementById("page-input");
+            const pageSizeInput = document.getElementById("page-size-input");
+            const pageInfo = document.getElementById("page-info");
+
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+            pageInput.value = currentPage;
+            pageSizeInput.value = pageSize;
+            pageInfo.textContent = `/ ${totalPages}`;
+        }
+
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                loadRuns(page);
+            }
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                goToPage(currentPage - 1);
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages) {
+                goToPage(currentPage + 1);
+            }
+        }
+
+        function onPageInputChange() {
+            const pageInput = document.getElementById("page-input");
+            const page = parseInt(pageInput.value);
+            if (page >= 1 && page <= totalPages) {
+                goToPage(page);
+            } else {
+                pageInput.value = currentPage;
+            }
+        }
+
+        function onPageSizeChange() {
+            const pageSizeInput = document.getElementById("page-size-input");
+            const newSize = parseInt(pageSizeInput.value);
+            if (newSize >= 1 && newSize <= 100) {
+                pageSize = newSize;
+                // Reset to page 1 when changing page size
+                loadRuns(1, pageSize);
+            } else {
+                pageSizeInput.value = pageSize;
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            loadRuns(1);
         });
     </script>
 </head>
@@ -47,6 +116,32 @@
     <section>
         <div id="runs-table"></div>
     </section>
+
+    <div id="pagination-controls" style="margin: 20px 0; text-align: center;">
+        <button id="prev-page-btn" class="btn btn-secondary" onclick="previousPage()" disabled>
+            <span class="material-icons icon-align">chevron_left</span>Page précédente
+        </button>
+
+        <span style="margin: 0 20px;">
+            Page
+            <input id="page-input" type="number" min="1" style="width: 60px; text-align: center; margin: 0 5px;"
+                onchange="onPageInputChange()" onkeypress="if(event.key==='Enter') onPageInputChange()">
+            <span id="page-info">/ 1</span>
+        </span>
+
+        <button id="next-page-btn" class="btn btn-secondary" onclick="nextPage()" disabled>
+            Page suivante<span class="material-icons icon-align">chevron_right</span>
+        </button>
+
+        <span style="margin: 0 0 0 30px;">
+            Taille :
+            <input id="page-size-input" type="number" min="1" max="100"
+                style="width: 60px; text-align: center; margin: 0 5px;" onchange="onPageSizeChange()"
+                onkeypress="if(event.key==='Enter') onPageSizeChange()">
+            éléments/page
+        </span>
+    </div>
+
     <a class="btn btn-secondary" href="/mercure/home"><span class="material-icons icon-align">home</span>Retour</a>
 
     <div id="error-message" style="display: none;" class="error"></div>

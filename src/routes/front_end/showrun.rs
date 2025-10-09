@@ -11,11 +11,7 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
     Template::render("common/run", context! {})
 }
 
-#[get("/show/runs?<page>")]
-pub async fn list_runs(
-    auth: Authenticated,
-    pool: &State<SqlitePool>,
-    page: Option<i64>,
-) -> Template {
+#[get("/show/runs")]
+pub async fn list_runs() -> Template {
     Template::render("common/listruns", context! {})
 }

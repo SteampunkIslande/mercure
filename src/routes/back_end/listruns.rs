@@ -10,7 +10,34 @@ async fn list_runs(
     user: Option<&User>,
     page_size: Option<i64>,
     page: Option<i64>,
-) -> Result<Vec<serde_json::Value>, sqlx::Error> {
+) -> Result<(Vec<serde_json::Value>, i64), sqlx::Error> {
+    let count_query = match user {
+        Some(u) => {
+            format!(
+                r#"
+                SELECT COUNT(DISTINCT r.run_id) as total
+                FROM Runs r
+                INNER JOIN Formdef f ON r.form_id = f.form_id
+                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
+                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
+                WHERE gu.user_id = {}
+            "#,
+                u.id
+            )
+        }
+        None => {
+            format!(
+                r#"
+                SELECT COUNT(DISTINCT r.run_id) as total
+                FROM Runs r
+                INNER JOIN Formdef f ON r.form_id = f.form_id
+                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
+                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
+                "#
+            )
+        }
+    };
+
     let base_query = match user {
         Some(u) => {
             format!(
@@ -41,9 +68,14 @@ async fn list_runs(
             )
         }
     };
-    eprintln!("{:?}", page_size);
-    eprintln!("{:?}", page);
-    Ok(sqlx::query(&base_query)
+
+    // Get total count
+    let total_count: i64 = sqlx::query(&count_query)
+        .fetch_one(pool)
+        .await?
+        .try_get("total")?;
+
+    let runs_data = sqlx::query(&base_query)
         .bind(page_size.unwrap_or(20))
         .bind((page.unwrap_or(1) - 1) * page_size.unwrap_or(20))
         .fetch_all(pool)
@@ -64,7 +96,9 @@ async fn list_runs(
                 json!({"content":attempt_count.to_string()})
             ]))
         })
-        .collect())
+        .collect();
+
+    Ok((runs_data, total_count))
 }
 
 #[get("/listruns?<page>&<page_size>")]
@@ -86,14 +120,25 @@ pub async fn list_runs_get(
     )
     .await
     {
-        Ok(runs_list) => {
+        Ok((runs_list, total_count)) => {
             if runs_list.is_empty() {
                 return Json(ApiResponse::error("Aucun run trouvé.".to_string()));
             } else {
+                let page_size_val = page_size.unwrap_or(5);
+                let current_page = page.unwrap_or(1);
+                let total_pages = (total_count + page_size_val - 1) / page_size_val;
+
                 return Json(ApiResponse::success(json!({
                         "title": "Liste des runs de vos groupes",
                         "header": vec!["Nom du run","Statut","Tentative"] ,
-                        "table": runs_list })));
+                        "table": runs_list,
+                        "pagination": {
+                            "current_page": current_page,
+                            "total_pages": total_pages,
+                            "page_size": page_size_val,
+                            "total_count": total_count
+                        }
+                })));
             }
         }
         Err(_e) => {
