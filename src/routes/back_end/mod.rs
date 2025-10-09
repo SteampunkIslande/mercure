@@ -1,6 +1,7 @@
 mod editgroups;
 mod getform;
 mod listgroups;
+mod listruns;
 mod listusers;
 mod login;
 mod logout;
@@ -14,6 +15,7 @@ mod upload;
 pub use editgroups::*;
 pub use getform::*;
 pub use listgroups::*;
+pub use listruns::*;
 pub use listusers::*;
 pub use login::*;
 pub use logout::*;

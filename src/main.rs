@@ -37,13 +37,21 @@ async fn rocket() -> _ {
         .mount(
             "/mercure",
             routes![
+                // Page d'accueil
                 routes::frontend::welcome_page_get,
+                // Page de login
                 routes::frontend::login_get,
+                // Simple GET pour se déconnecter, la seule route GET qui appartient au backend
                 routes::backend::logout_get,
+                // Routes pour le frontend: renvoie toujours du HTML
                 routes::frontend::success_page_get,
                 routes::frontend::home_get,
                 routes::frontend::password_edit_get,
                 routes::frontend::new_run_get,
+                // Affichage d'un run spécifique
+                routes::frontend::show_run_get,
+                // Affichage de la liste des runs
+                routes::frontend::list_runs,
             ],
         )
         .mount(
@@ -74,13 +82,16 @@ async fn rocket() -> _ {
                 routes::backend::enable_form,
                 // Simple GET pour retirer un formulaire du service
                 routes::backend::disable_form,
+                // Simple GET pour lister les utilisateurs
                 routes::backend::list_users,
+                // Simple GET pour lister les groupes d'un utilisateur
                 routes::backend::list_groups_for_user,
                 routes::backend::update_groups,
                 routes::backend::get_all_forms,
                 routes::backend::password_edit_post,
                 routes::backend::newrun_post,
-                routes::backend::upload_post
+                routes::backend::upload_post,
+                routes::backend::list_runs,
             ],
         )
         .manage(pool)
