@@ -377,6 +377,7 @@ table td:hover a {
   overflow: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
+  text-align: center;
 }
 
 .run-status.idle {
