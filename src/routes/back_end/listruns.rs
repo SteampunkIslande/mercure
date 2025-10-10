@@ -8,6 +8,45 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use sqlx::SqlitePool;
 
+fn create_header() -> Vec<Value> {
+    vec![
+        json!({"content": "Nom du run", "class": "content-column"}),
+        json!({"content": "Statut", "class": "badge-column"}),
+        json!({"content": "Tentative", "class": "numeric-column"}),
+    ]
+}
+
+fn create_run_row(run_id: i64, run_name: String, status: RunStatus, attempt_count: i64) -> Value {
+    json!(vec![
+        json!({
+            "content": run_name,
+            "href": Some(format!("/mercure/show/run/{}", run_id)),
+            "td_class": "content-column"
+        }),
+        json!({
+            "content": match status {
+                RunStatus::Idle => "A valider",
+                RunStatus::Failure(_) => "Echec",
+                RunStatus::Pending => "En attente",
+                RunStatus::Running => "Analyses en cours",
+                RunStatus::Success => "Succès"
+            },
+            "class": format!("run-status {}", match status {
+                RunStatus::Idle => "idle",
+                RunStatus::Failure(_) => "failure",
+                RunStatus::Pending => "pending",
+                RunStatus::Running => "running",
+                RunStatus::Success => "success"
+            }),
+            "td_class": "badge-column"
+        }),
+        json!({
+            "content": attempt_count.to_string(),
+            "td_class": "numeric-column"
+        })
+    ])
+}
+
 async fn list_runs(
     pool: &SqlitePool,
     user: Option<&User>,
@@ -91,23 +130,7 @@ async fn list_runs(
             let status_str: String = row.try_get("status").ok()?;
             let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
 
-            Some(json!(vec![
-                json!({
-                    "content":run_name,
-                    "href":Some(format!("/mercure/show/run/{run_id}"))
-                }),
-                json!({
-                    "content":status_str,
-                    "class":format!("run-status {}",match status
-                {
-                    RunStatus::Idle=>"idle",
-                    RunStatus::Failure(_)=>"failure",
-                    RunStatus::Pending=>"pending",
-                    RunStatus::Running=>"running",
-                    RunStatus::Success=>"success"
-                })}),
-                json!({"content":attempt_count.to_string()})
-            ]))
+            Some(create_run_row(run_id, run_name, status, attempt_count))
         })
         .collect();
 
@@ -143,7 +166,7 @@ pub async fn list_runs_get(
 
                 return Json(ApiResponse::success(json!({
                         "title": "Liste des runs de vos groupes",
-                        "header": vec!["Nom du run","Statut","Tentative"] ,
+                        "header": create_header(),
                         "table": runs_list,
                         "pagination": {
                             "current_page": current_page,

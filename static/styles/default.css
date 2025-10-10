@@ -265,16 +265,46 @@ label {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 table th,
-table td,
-table tr {
+table td {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;
-  width: 100%;
+  vertical-align: middle;
+}
+
+table tr {
+  border: 1px solid #ddd;
   border-collapse: collapse;
+}
+
+/* Classe pour les colonnes contenant des badges */
+table th.badge-column,
+table td.badge-column {
+  width: 150px;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Classe pour les colonnes numériques courtes */
+table th.numeric-column,
+table td.numeric-column {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  min-width: fit-content;
+}
+
+/* Classe pour les colonnes de contenu principal */
+table th.content-column,
+table td.content-column {
+  width: auto;
+  min-width: 150px;
 }
 
 table th {
@@ -309,14 +339,20 @@ table td:hover a {
 
 /* Run status styles */
 .run-status {
-  padding: 2px 2px;
+  padding: 4px 6px;
   text-decoration: none;
   color: white;
   border-radius: 6px;
-  display: inline-block;
+  display: block;
   border: 1px solid;
-  border-radius: 6px;
   font-weight: bold;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 
 .run-status.idle {
@@ -394,12 +430,4 @@ table td:hover a {
   font-size: 1rem;
   color: #555;
   margin-bottom: 1rem;
-}
-
-.highlight {
-  background: #ffe0e0;
-  border: 1px solid #d32f2f;
-  border-radius: 8px;
-  padding: 4px 8px;
-  display: inline-block;
 }

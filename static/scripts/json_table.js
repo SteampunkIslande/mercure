@@ -1,10 +1,16 @@
 /**
  * Génère un tableau HTML à partir d'un objet JSON avec le format:
  * {
- *   "header": ["colA", "colB", "colC"],
- *   "data": [
- *     [{"content": "line1", "href": null, "class": "custom-class"}, {"content": "somelink", "href": "/link/to/whatever"}],
- *     [{"content": "line2", "href": null}, {"content": "some otherlink", "href": "/link/to/whatever", "class": "highlight"}]
+ *   "header": [
+ *     {"content": "colA", "class": "content-column"},
+ *     {"content": "colB", "class": "badge-column"},
+ *     {"content": "colC", "class": "numeric-column"}
+ *   ],
+ *   "table": [
+ *     [
+ *       {"content": "line1", "href": null, "class": "custom-class", "td_class": "content-column"},
+ *       {"content": "somelink", "href": "/link/to/whatever", "td_class": "badge-column"}
+ *     ]
  *   ]
  * }
  */
@@ -17,7 +23,7 @@ function generateJsonTable(data, elementId) {
 
   if (!data || !data.header || !data.table) {
     console.error(
-      "Format de données invalide. Attendu: {header: [...], data: [...]}"
+      "Format de données invalide. Attendu: {header: [...], table: [...]}"
     );
     return;
   }
@@ -33,7 +39,10 @@ function createTableFromJson(jsonData) {
 
   // Créer l'en-tête
   const headerRow = `<tr>${header
-    .map((col) => `<th>${col}</th>`)
+    .map((col) => {
+      const headerClass = col.class ? ` class="${col.class}"` : "";
+      return `<th${headerClass}>${col.content}</th>`;
+    })
     .join("")}</tr>`;
 
   // Créer les lignes de données
@@ -41,11 +50,13 @@ function createTableFromJson(jsonData) {
     .map((row) => {
       const cells = row
         .map((cell) => {
-          const cssClass = cell.class ? ` class="${cell.class}"` : "";
+          const tdClass = cell.td_class ? ` class="${cell.td_class}"` : "";
+          const spanClass = cell.class ? ` class="${cell.class}"` : "";
+
           if (cell.href && cell.href !== null) {
-            return `<td${cssClass}><a href="${cell.href}">${cell.content}</a></td>`;
+            return `<td${tdClass}><a href="${cell.href}">${cell.content}</a></td>`;
           } else {
-            return `<td><span${cssClass}>${cell.content}</span></td>`;
+            return `<td${tdClass}><span${spanClass}>${cell.content}</span></td>`;
           }
         })
         .join("");
