@@ -45,7 +45,7 @@
                         const row = document.createElement('tr');
 
                         const nameCell = document.createElement('td');
-                        nameCell.textContent = user.username;
+                        nameCell.innerHTML = user.username + (user.is_admin ? ' (Admin <span class="material-icons icon-align" style="font-size: 1rem; color: #ff0000;">shield</span>)' : '');
                         row.appendChild(nameCell);
 
                         const groupEditCell = document.createElement('td');

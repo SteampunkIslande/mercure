@@ -309,42 +309,43 @@ table td:hover a {
 
 /* Run status styles */
 .run-status {
-  padding: 5px 35px;
+  padding: 2px 2px;
   text-decoration: none;
   color: white;
   border-radius: 6px;
   display: inline-block;
   border: 1px solid;
   border-radius: 6px;
+  font-weight: bold;
 }
 
 .run-status.idle {
-  background-color: #e3f2fd;
-  color: #1976d2;
+  color: white;
+  background-color: #1976d2;
   border-color: #1976d2;
 }
 
 .run-status.pending {
-  background-color: #fff3e0;
-  color: #f57c00;
+  color: white;
+  background-color: #f57c00;
   border-color: #f57c00;
 }
 
 .run-status.running {
-  background-color: #f3e5f5;
-  color: #7b1fa2;
+  color: white;
+  background-color: #7b1fa2;
   border-color: #7b1fa2;
 }
 
 .run-status.success {
-  background-color: #e8f5e8;
-  color: #388e3c;
+  color: white;
+  background-color: #388e3c;
   border-color: #388e3c;
 }
 
 .run-status.failure {
-  background-color: #ffebee;
-  color: #d32f2f;
+  color: white;
+  background-color: #d32f2f;
   border-color: #d32f2f;
 }
 
