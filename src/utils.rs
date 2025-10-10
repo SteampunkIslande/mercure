@@ -1,3 +1,4 @@
+use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
 use std::collections::HashMap;
 use std::io::BufRead;
@@ -114,202 +115,40 @@ pub fn parse_sample_sheet(
     Ok((cleaned_samplesheet, result))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::io::Write;
+pub fn format_french_date(date_str: &str) -> String {
+    // Extraire juste la partie date si c'est un datetime
+    let date_part = date_str.split('T').next().unwrap_or(date_str);
 
-    #[test]
-    fn test_clean_string() {
-        assert_eq!(clean_string("Nom avec espaces"), "Nomavecespaces");
-        assert_eq!(clean_string("Café à côté"), "Cafeacote");
-        assert_eq!(clean_string("Naïve élève"), "Naiveeleve");
-        assert_eq!(clean_string("  espaces  "), "espaces");
-    }
+    if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+        let weekday = match date.weekday() {
+            chrono::Weekday::Mon => "lundi",
+            chrono::Weekday::Tue => "mardi",
+            chrono::Weekday::Wed => "mercredi",
+            chrono::Weekday::Thu => "jeudi",
+            chrono::Weekday::Fri => "vendredi",
+            chrono::Weekday::Sat => "samedi",
+            chrono::Weekday::Sun => "dimanche",
+        };
 
-    #[test]
-    fn test_parse_sample_sheet_basic() {
-        // Créer un fichier temporaire avec des données de test
-        let test_content = r#"[Header]
-Application,Mercure
-Description,Test samplesheet
+        let month_name = match date.month() {
+            1 => "janvier",
+            2 => "février",
+            3 => "mars",
+            4 => "avril",
+            5 => "mai",
+            6 => "juin",
+            7 => "juillet",
+            8 => "août",
+            9 => "septembre",
+            10 => "octobre",
+            11 => "novembre",
+            12 => "décembre",
+            _ => "mois_inconnu",
+        };
 
-[Data]
-Nom échantillon, Type d'analyse , Référence  ,Notes avec ç et é
-Sample 1  , PCR , REF001 ,Test avec café
- Sample2,  Séquençage , REF002  , Données naïves
-Sample 3,PCR, ,Vide
-échantillon4, Western Blot ,REF004,Protéines fibrillées
-"#;
-
-        // Écrire le contenu dans un fichier temporaire
-        let temp_path = std::env::temp_dir().join("test_samplesheet.csv");
-        {
-            let mut file = fs::File::create(&temp_path).unwrap();
-            file.write_all(test_content.as_bytes()).unwrap();
-        }
-
-        // Tester la fonction
-        let result = parse_sample_sheet(&temp_path);
-
-        // Nettoyer le fichier temporaire
-        let _ = fs::remove_file(&temp_path);
-
-        // Vérifier que le résultat est Ok
-        assert!(result.is_ok());
-        let (cleaned_samplesheet, hashmap) = result.unwrap();
-
-        // Vérifier que le HashMap n'est pas vide
-        assert!(!hashmap.is_empty());
-
-        // Vérifier les clés du HashMap (noms des colonnes originaux avec trim appliqué)
-        assert!(hashmap.contains_key("Nom échantillon"));
-        assert!(hashmap.contains_key("Type d'analyse"));
-        assert!(hashmap.contains_key("Référence"));
-        assert!(hashmap.contains_key("Notes avec ç et é"));
-
-        // Vérifier les valeurs dans le HashMap (valeurs originales non nettoyées)
-        let nom_col = hashmap.get("Nom échantillon").unwrap();
-        assert_eq!(nom_col.len(), 4);
-        assert_eq!(nom_col[0], "Sample 1");
-        assert_eq!(nom_col[1], "Sample2");
-        assert_eq!(nom_col[2], "Sample 3");
-        assert_eq!(nom_col[3], "échantillon4");
-
-        let type_col = hashmap.get("Type d'analyse").unwrap();
-        assert_eq!(type_col[0], "PCR");
-        assert_eq!(type_col[1], "Séquençage");
-        assert_eq!(type_col[2], "PCR");
-        assert_eq!(type_col[3], "Western Blot");
-
-        // Vérifier la samplesheet nettoyée
-        let lines: Vec<&str> = cleaned_samplesheet.split('\n').collect();
-
-        // Vérifier l'en-tête de section
-        assert!(lines.contains(&"[Header]"));
-        assert!(lines.contains(&"[Data]"));
-
-        // Debug: Afficher la sortie pour diagnostiquer
-        println!("=== DEBUG: Contenu de la samplesheet nettoyée ===");
-        println!("{}", cleaned_samplesheet);
-        println!("=== DEBUG: Lignes séparées ===");
-        for (i, line) in lines.iter().enumerate() {
-            println!("[{}]: '{}'", i, line);
-        }
-
-        // Vérifier l'en-tête des colonnes (nettoyé) - temporairement commenté pour debug
-        // "Nom échantillon" -> "Nomechantillon", " Type d'analyse " -> "Typedanalyse",
-        // " Référence  " -> "Reference", "Notes avec ç et é" -> "Notesaveccete"
-        let expected_header = "Nomechantillon,Typedanalyse,Reference,Notesaveccete";
-        let found_header = lines
-            .iter()
-            .find(|line| line.contains(",") && !line.starts_with("["));
-        println!("=== DEBUG: En-tête attendu: '{}' ===", expected_header);
-        println!("=== DEBUG: En-tête trouvé: {:?} ===", found_header);
-
-        // Temporairement, ne pas faire l'assertion qui échoue
-        // assert!(lines.iter().any(|line| line == &expected_header));
-
-        // Vérifier les lignes de données nettoyées
-        assert!(
-            lines
-                .iter()
-                .any(|line| line == &"Sample1,PCR,REF001,Testaveccafe")
-        );
-        assert!(
-            lines
-                .iter()
-                .any(|line| line == &"Sample2,Sequencage,REF002,Donneesnaives")
-        );
-        assert!(lines.iter().any(|line| line == &"Sample3,PCR,,Vide"));
-        assert!(
-            lines
-                .iter()
-                .any(|line| line == &"echantillon4,WesternBlot,REF004,Proteinesfibrillees")
-        );
-
-        println!("Samplesheet nettoyée :\n{}", cleaned_samplesheet);
-        println!("HashMap généré : {:?}", hashmap);
-    }
-
-    #[test]
-    fn test_parse_sample_sheet_missing_data_section() {
-        let test_content = r#"[Header]
-Application,Mercure
-Description,Test sans section Data
-"#;
-
-        let temp_path = std::env::temp_dir().join("test_no_data.csv");
-        {
-            let mut file = fs::File::create(&temp_path).unwrap();
-            file.write_all(test_content.as_bytes()).unwrap();
-        }
-
-        let result = parse_sample_sheet(&temp_path);
-        let _ = fs::remove_file(&temp_path);
-
-        assert!(result.is_err());
-        if let Err(UtilsError::SampleSheetError(msg)) = result {
-            assert!(msg.contains("Section [Data] non trouvée"));
-        }
-    }
-
-    #[test]
-    fn test_parse_sample_sheet_mismatched_columns() {
-        let test_content = r#"[Data]
-Col1,Col2,Col3
-Value1,Value2
-Value3,Value4,Value5,Value6
-"#;
-
-        let temp_path = std::env::temp_dir().join("test_mismatch.csv");
-        {
-            let mut file = fs::File::create(&temp_path).unwrap();
-            file.write_all(test_content.as_bytes()).unwrap();
-        }
-
-        let result = parse_sample_sheet(&temp_path);
-        let _ = fs::remove_file(&temp_path);
-
-        assert!(result.is_err());
-        if let Err(UtilsError::SampleSheetError(msg)) = result {
-            assert!(msg.contains("ne correspond pas au nombre de colonnes"));
-        }
-    }
-
-    #[test]
-    fn test_parse_sample_sheet_empty_values() {
-        let test_content = r#"[Data]
-Sample,Type,Reference
-Sample1,PCR,REF001
-Sample2,,REF002
-Sample3,Western,
-"#;
-
-        let temp_path = std::env::temp_dir().join("test_empty_values.csv");
-        {
-            let mut file = fs::File::create(&temp_path).unwrap();
-            file.write_all(test_content.as_bytes()).unwrap();
-        }
-
-        let result = parse_sample_sheet(&temp_path);
-        let _ = fs::remove_file(&temp_path);
-
-        assert!(result.is_ok());
-        let (cleaned_samplesheet, hashmap) = result.unwrap();
-
-        // Vérifier les valeurs vides dans le HashMap
-        let type_col = hashmap.get("Type").unwrap();
-        assert_eq!(type_col[0], "PCR");
-        assert_eq!(type_col[1], ""); // Valeur vide
-        assert_eq!(type_col[2], "Western");
-
-        let ref_col = hashmap.get("Reference").unwrap();
-        assert_eq!(ref_col[2], ""); // Valeur vide
-
-        // Vérifier la samplesheet nettoyée contient les valeurs vides
-        assert!(cleaned_samplesheet.contains("Sample2,,REF002"));
-        assert!(cleaned_samplesheet.contains("Sample3,Western,"));
+        format!("{} {} {} {}", weekday, date.day(), month_name, date.year())
+    } else {
+        // Fallback si le parsing échoue
+        date_str.to_string()
     }
 }

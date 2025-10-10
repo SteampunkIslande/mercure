@@ -22,6 +22,7 @@ async-trait = "0.1"
 clap = { version = "4.4", features = ["derive"] }
 futures = "0.3.31"
 diacritics = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dependencies.rocket_dyn_templates]
 version = "0.2.0"

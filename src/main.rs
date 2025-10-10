@@ -9,6 +9,7 @@ mod config;
 mod db;
 mod models;
 mod routes;
+mod utils;
 
 #[catch(401)]
 pub async fn unauthorized() -> Template {

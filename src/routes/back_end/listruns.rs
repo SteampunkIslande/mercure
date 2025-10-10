@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::models::RunStatus;
+use crate::utils::format_french_date;
 use crate::{auth::Authenticated, models::User, routes::ApiResponse};
 use rocket::serde::json::Json;
 use rocket::{State, get};
@@ -11,18 +12,39 @@ use sqlx::SqlitePool;
 fn create_header() -> Vec<Value> {
     vec![
         json!({"content": "Nom du run", "class": "content-column"}),
+        json!({"content": "Utilisateur", "class": "content-column"}),
+        json!({"content": "Date du run", "class": "content-column"}),
         json!({"content": "Statut", "class": "badge-column"}),
         json!({"content": "Tentative", "class": "numeric-column"}),
     ]
 }
 
-fn create_run_row(run_id: i64, run_name: String, status: RunStatus, attempt_count: i64) -> Value {
+fn create_run_row(
+    run_id: i64,
+    run_name: &str,
+    user_name: &str,
+    run_date: &str,
+    status: RunStatus,
+    attempt_count: i64,
+) -> Value {
     json!(vec![
+        // Colonne 1 - Nom du run
         json!({
             "content": run_name,
             "href": Some(format!("/mercure/show/run/{}", run_id)),
             "td_class": "content-column"
         }),
+        // Colonne 2 - Utilisateur
+        json!({
+            "content": user_name,
+            "td_class": "content-column"
+        }),
+        // Colonne 3 - Date du run
+        json!({
+            "content": format_french_date(run_date),
+            "td_class": "content-column"
+        }),
+        // Colonne 4 - Statut
         json!({
             "content": match status {
                 RunStatus::Idle => "A valider",
@@ -40,6 +62,7 @@ fn create_run_row(run_id: i64, run_name: String, status: RunStatus, attempt_coun
             }),
             "td_class": "badge-column"
         }),
+        // Colonne 5 - Tentatives
         json!({
             "content": attempt_count.to_string(),
             "td_class": "numeric-column"
@@ -53,61 +76,56 @@ async fn list_runs(
     page_size: Option<i64>,
     page: Option<i64>,
 ) -> Result<(Vec<serde_json::Value>, i64), sqlx::Error> {
-    let count_query = match user {
+    let (count_query, base_query) = match user {
         Some(u) => {
-            format!(
+            let count_query = format!(
                 r#"
-                SELECT COUNT(DISTINCT r.run_id) as total
+                SELECT COUNT(r.run_id) as total
                 FROM Runs r
-                INNER JOIN Formdef f ON r.form_id = f.form_id
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                WHERE gu.user_id = {}
-            "#,
+                WHERE r.form_id IN (
+                    SELECT f.form_id
+                    FROM Formdef f
+                    INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
+                    INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
+                    WHERE gu.user_id = {}
+                )
+                "#,
                 u.id
-            )
-        }
-        None => {
-            format!(
-                r#"
-                SELECT COUNT(DISTINCT r.run_id) as total
-                FROM Runs r
-                INNER JOIN Formdef f ON r.form_id = f.form_id
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                "#
-            )
-        }
-    };
+            );
 
-    let base_query = match user {
-        Some(u) => {
-            format!(
+            let base_query = format!(
                 r#"
-                SELECT DISTINCT r.run_id, r.run_name, r.attempt_count, r.status
+                SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
                 FROM Runs r
-                INNER JOIN Formdef f ON r.form_id = f.form_id
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                WHERE gu.user_id = {}
-                ORDER BY r.creation_date DESC
+                INNER JOIN Users u ON r.user_id = u.id
+                WHERE r.form_id IN (
+                    SELECT f.form_id
+                    FROM Formdef f
+                    INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
+                    INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
+                    WHERE gu.user_id = {}
+                )
+                ORDER BY r.run_date DESC
                 LIMIT ? OFFSET ?
-            "#,
+                "#,
                 u.id
-            )
+            );
+
+            (count_query, base_query)
         }
         None => {
-            format!(
-                r#"
-                SELECT DISTINCT r.run_id, r.run_name, r.attempt_count, r.status
+            let count_query = "SELECT COUNT(r.run_id) as total FROM Runs r".to_string();
+
+            let base_query = r#"
+                SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
                 FROM Runs r
-                INNER JOIN Formdef f ON r.form_id = f.form_id
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                ORDER BY r.creation_date DESC
+                INNER JOIN Users u ON r.user_id = u.id
+                ORDER BY r.run_date DESC
                 LIMIT ? OFFSET ?
-                "#
-            )
+            "#
+            .to_string();
+
+            (count_query, base_query)
         }
     };
 
@@ -126,11 +144,20 @@ async fn list_runs(
         .filter_map(|row| {
             let run_id: i64 = row.try_get("run_id").ok()?;
             let run_name: String = row.try_get("run_name").ok()?;
+            let username: String = row.try_get("username").ok()?;
+            let run_date: String = row.try_get("run_date").ok()?;
             let attempt_count: i64 = row.try_get("attempt_count").ok()?;
             let status_str: String = row.try_get("status").ok()?;
             let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
 
-            Some(create_run_row(run_id, run_name, status, attempt_count))
+            Some(create_run_row(
+                run_id,
+                &run_name,
+                &username,
+                &run_date,
+                status,
+                attempt_count,
+            ))
         })
         .collect();
 
