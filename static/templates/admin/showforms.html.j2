@@ -40,18 +40,18 @@
     <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {% endif
         %}>
         <tr>
-            <th>Nom du formulaire</th>
-            <th class="padding-x centered">Formulaire actif</th>
-            <th class="padding-x centered">Edition du formulaire</th>
+            <th class="content-column">Nom du formulaire</th>
+            <th class="content-column padding-x centered">Formulaire actif</th>
+            <th class="content-column padding-x centered">Edition du formulaire</th>
         </tr>
     </table>
     {% endfor %}
     {% if is_admin %}
     <table id="forms-container-no-group" class="tabcontent" style="display: none;">
         <tr>
-            <th>Nom du formulaire</th>
-            <th class="padding-x centered">Formulaire actif</th>
-            <th class="padding-x centered">Edition du formulaire</th>
+            <th class="content-column">Nom du formulaire</th>
+            <th class="numeric-column padding-x centered">Formulaire actif</th>
+            <th class="numeric-column padding-x centered">Edition du formulaire</th>
         </tr>
     </table>
     {% endif %}
@@ -95,12 +95,12 @@
                     forms.data.with_group.forEach(form => {
                         const formBox = document.createElement('tr');
                         formBox.innerHTML = `
-                            <td>${form.form_name} (version ${form.version})</td>
-                            <td>
+                            <td class="content-column">${form.form_name} (version ${form.version})</td>
+                            <td class="numeric-column">
                                 <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
                                 Actif
                             </td>
-                            <td>
+                            <td class="numeric-column">
                                 <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                             </td>
                         `;
@@ -117,12 +117,12 @@
                         forms.data.without_group.forEach(form => {
                             const formBoxNoGroup = document.createElement('tr');
                             formBoxNoGroup.innerHTML = `
-                                <td>${form.form_name} (version ${form.version})</td>
-                                <td>
+                                <td class="content-column">${form.form_name} (version ${form.version})</td>
+                                <td class="numeric-column">
                                     <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
                                     Actif
                                 </td>
-                                <td>
+                                <td class="numeric-column">
                                     <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                                 </td>
                             `;
@@ -155,12 +155,12 @@
                     forms.data.forEach(form => {
                         const formBoxNoGroup = document.createElement('tr');
                         formBoxNoGroup.innerHTML = `
-                                <td>${form.form_name} (version ${form.version})</td>
-                                <td>
+                                <td class="content-column">${form.form_name} (version ${form.version})</td>
+                                <td class="numeric-column">
                                     <input type="checkbox" onclick="toggleFormActive(event,'${form.formid}')" ${form.enabled ? 'checked' : ''}>
                                     Actif
                                 </td>
-                                <td>
+                                <td class="numeric-column">
                                     <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                                 </td>
                             `;

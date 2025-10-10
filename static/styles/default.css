@@ -303,8 +303,8 @@ table td.numeric-column {
 /* Classe pour les colonnes de contenu principal */
 table th.content-column,
 table td.content-column {
-  width: auto;
-  min-width: 150px;
+  width: 100%;
+  min-width: 170px;
 }
 
 /* Style des liens dans les colonnes de contenu */
