@@ -309,11 +309,13 @@ table td:hover a {
 
 /* Run status styles */
 .run-status {
-  padding: 5px 10px;
+  padding: 5px 35px;
   text-decoration: none;
   color: white;
   border-radius: 6px;
-  display: inline-table;
+  display: inline-block;
+  border: 1px solid;
+  border-radius: 6px;
 }
 
 .run-status.idle {
@@ -344,4 +346,59 @@ table td:hover a {
   background-color: #ffebee;
   color: #d32f2f;
   border-color: #d32f2f;
+}
+
+/* Classes pour remplacer les styles inline migrés */
+.padding-x {
+  padding-inline: 30px;
+}
+
+.centered {
+  text-align: center;
+}
+
+.inline-table {
+  display: inline-table;
+  width: 100%;
+}
+
+.bg-light {
+  background-color: #f8f9fa;
+}
+
+.vh-100 {
+  min-height: 100vh;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 2rem;
+  max-width: 400px;
+  margin: auto;
+}
+
+.text-danger {
+  color: #d32f2f;
+}
+
+.paragraph {
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.highlight {
+  background: #ffe0e0;
+  border: 1px solid #d32f2f;
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: inline-block;
 }

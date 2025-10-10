@@ -45,7 +45,7 @@ function createTableFromJson(jsonData) {
           if (cell.href && cell.href !== null) {
             return `<td${cssClass}><a href="${cell.href}">${cell.content}</a></td>`;
           } else {
-            return `<td${cssClass}>${cell.content}</td>`;
+            return `<td><span${cssClass}>${cell.content}</span></td>`;
           }
         })
         .join("");

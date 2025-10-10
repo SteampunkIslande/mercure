@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/utils.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -40,8 +41,8 @@
         %}>
         <tr>
             <th>Nom du formulaire</th>
-            <th style="min-width: max-content;padding-inline:30px;">Formulaire actif</th>
-            <th style="min-width: max-content;padding-inline:30px;">Edition du formulaire</th>
+            <th class="padding-x centered">Formulaire actif</th>
+            <th class="padding-x centered">Edition du formulaire</th>
         </tr>
     </table>
     {% endfor %}
@@ -49,8 +50,8 @@
     <table id="forms-container-no-group" class="tabcontent" style="display: none;">
         <tr>
             <th>Nom du formulaire</th>
-            <th style="min-width: max-content;padding-inline:30px;">Formulaire actif</th>
-            <th style="min-width: max-content;padding-inline:30px;">Edition du formulaire</th>
+            <th class="padding-x centered">Formulaire actif</th>
+            <th class="padding-x centered">Edition du formulaire</th>
         </tr>
     </table>
     {% endif %}
@@ -100,7 +101,7 @@
                                 Actif
                             </td>
                             <td>
-                                <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
+                                <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                             </td>
                         `;
                         container.appendChild(formBox);
@@ -122,7 +123,7 @@
                                     Actif
                                 </td>
                                 <td>
-                                    <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
+                                    <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                                 </td>
                             `;
                             container_no_group.appendChild(formBoxNoGroup);
@@ -160,7 +161,7 @@
                                     Actif
                                 </td>
                                 <td>
-                                    <a href="/mercure/admin/editform/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Editer le formulaire</a>
+                                    <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
                                 </td>
                             `;
                         container_no_group.appendChild(formBoxNoGroup);
@@ -178,32 +179,14 @@
                 .then(
                     data => {
                         if (data.success) {
-                            const infodiv = document.getElementById("info-message")
-                            infodiv.style.display = "block";
-                            infodiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:blue;">info</span>${data.data}`;
-                            setTimeout(() => {
-                                infodiv.style.display = 'none';
-                            }, 2000);
+                            showMessage('info', data.data);
                         }
                         else {
-                            const errordiv = document.getElementById("error-message")
-                            errordiv.style.display = "block";
-                            errordiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${data.message}`;
-                            setTimeout(() => {
-                                errordiv.style.display = 'none';
-                            }, 2000);
+                            showMessage('error', data.message);
                         }
                     }
                 ).catch(error => {
-                    const errordiv = document.getElementById("error-message")
-                    errordiv.style.display = "block";
-                    errordiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${error}`;
-                    setTimeout(() => {
-                        errordiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('error', error);
                 })
                 ;
         }

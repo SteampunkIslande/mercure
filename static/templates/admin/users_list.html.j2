@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -23,9 +24,9 @@
     <table>
         <thead>
             <tr>
-                <th style="min-width: max-content;padding-inline:70px;">Nom de l'utilisateur</th>
-                <th style="min-width: max-content;padding-inline:70px;">Groupe</th>
-                <th style="min-width: max-content;padding-inline:70px;">Mot de passe</th>
+                <th class="padding-x centered">Nom de l'utilisateur</th>
+                <th class="padding-x centered">Groupe</th>
+                <th class="padding-x centered">Mot de passe</th>
             </tr>
         </thead>
         <tbody id="user-list">
@@ -51,7 +52,7 @@
                         const groupEditLink = document.createElement('a');
                         groupEditLink.href = `/mercure/admin/groupedit/${user.id}`;
                         groupEditLink.textContent = 'Editer les groupes';
-                        groupEditLink.style = "display:inline-table;width:100%;text-align:center;";
+                        groupEditLink.className = "inline-table centered";
                         groupEditCell.appendChild(groupEditLink);
                         row.appendChild(groupEditCell);
 
@@ -59,7 +60,7 @@
                         const passEditLink = document.createElement('a');
                         passEditLink.href = `/mercure/passedit/${user.id}`;
                         passEditLink.textContent = 'Modifier le mot de passe';
-                        passEditLink.style = "display:inline-table;width:100%;text-align:center;";
+                        passEditLink.className = "inline-table centered";
                         passEditCell.appendChild(passEditLink);
                         row.appendChild(passEditCell);
 

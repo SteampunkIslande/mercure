@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/utils.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -81,7 +82,7 @@
             endif %}>
             <tr>
                 <th>Nom du formulaire</th>
-                <th style="min-width: max-content;padding-inline:30px;">Lancement d'un run</th>
+                <th class="padding-x centered">Lancement d'un run</th>
             </tr>
         </table>
         {% endfor %}
@@ -130,7 +131,7 @@
                                     formBox.innerHTML = `
                             <td>${form.form_name} (version ${form.version})</td>
                             <td>
-                                <a href="/mercure/runs/submit/${form.formid}" style="display:inline-table;width:100%;text-align:center;">Lancer un run</a>
+                                <a href="/mercure/runs/submit/${form.formid}" class="inline-table centered">Lancer un run</a>
                             </td>
                         `;
                                     container.appendChild(formBox);
@@ -147,32 +148,14 @@
                         .then(
                             data => {
                                 if (data.success) {
-                                    const infodiv = document.getElementById("info-message")
-                                    infodiv.style.display = "block";
-                                    infodiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:blue;">info</span>${data.data}`;
-                                    setTimeout(() => {
-                                        infodiv.style.display = 'none';
-                                    }, 2000);
+                                    showMessage('info', data.data);
                                 }
                                 else {
-                                    const errordiv = document.getElementById("error-message")
-                                    errordiv.style.display = "block";
-                                    errordiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${data.message}`;
-                                    setTimeout(() => {
-                                        errordiv.style.display = 'none';
-                                    }, 2000);
+                                    showMessage('error', data.message);
                                 }
                             }
                         ).catch(error => {
-                            const errordiv = document.getElementById("error-message")
-                            errordiv.style.display = "block";
-                            errordiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${error}`;
-                            setTimeout(() => {
-                                errordiv.style.display = 'none';
-                            }, 2000);
+                            showMessage('error', error);
                         });
                 }
             }
