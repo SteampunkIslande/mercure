@@ -3,8 +3,8 @@
  * {
  *   "header": ["colA", "colB", "colC"],
  *   "data": [
- *     [{"content": "line1", "href": null}, {"content": "somelink", "href": "/link/to/whatever"}],
- *     [{"content": "line2", "href": null}, {"content": "some otherlink", "href": "/link/to/whatever"}]
+ *     [{"content": "line1", "href": null, "class": "custom-class"}, {"content": "somelink", "href": "/link/to/whatever"}],
+ *     [{"content": "line2", "href": null}, {"content": "some otherlink", "href": "/link/to/whatever", "class": "highlight"}]
  *   ]
  * }
  */
@@ -41,10 +41,11 @@ function createTableFromJson(jsonData) {
     .map((row) => {
       const cells = row
         .map((cell) => {
+          const cssClass = cell.class ? ` class="${cell.class}"` : "";
           if (cell.href && cell.href !== null) {
-            return `<td><a href="${cell.href}">${cell.content}</a></td>`;
+            return `<td${cssClass}><a href="${cell.href}">${cell.content}</a></td>`;
           } else {
-            return `<td>${cell.content}</td>`;
+            return `<td${cssClass}>${cell.content}</td>`;
           }
         })
         .join("");

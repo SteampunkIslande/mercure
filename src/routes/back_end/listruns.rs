@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use crate::models::RunStatus;
 use crate::{auth::Authenticated, models::User, routes::ApiResponse};
 use rocket::serde::json::Json;
 use rocket::{State, get};
@@ -86,13 +89,23 @@ async fn list_runs(
             let run_name: String = row.try_get("run_name").ok()?;
             let attempt_count: i64 = row.try_get("attempt_count").ok()?;
             let status_str: String = row.try_get("status").ok()?;
+            let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
 
             Some(json!(vec![
                 json!({
                     "content":run_name,
                     "href":Some(format!("/mercure/show/run/{run_id}"))
                 }),
-                json!({"content":status_str}),
+                json!({
+                    "content":status_str,
+                    "class":format!("run-status {}",match status
+                {
+                    RunStatus::Idle=>"idle",
+                    RunStatus::Failure(_)=>"failure",
+                    RunStatus::Pending=>"pending",
+                    RunStatus::Running=>"running",
+                    RunStatus::Success=>"success"
+                })}),
                 json!({"content":attempt_count.to_string()})
             ]))
         })
