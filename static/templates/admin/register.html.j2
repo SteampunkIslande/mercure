@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
 </head>
 
 <body>
@@ -15,7 +15,8 @@
         <div class="banner-content">
             <span class="banner-text">Administration - Création d'utilisateur</span>
             <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span class="material-icons icon-align">logout</span>Déconnexion</a>
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
             </div>
         </div>
     </div>
@@ -23,18 +24,21 @@
         <form id="registerForm">
             <div>
                 <label for="username">Nom d'utilisateur:</label>
-                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" autocomplete="off" required>
+                <input type="text" id="username" name="username" placeholder="Nom d'utilisateur" autocomplete="off"
+                    required>
             </div>
             <div>
                 <label for="usermail">Adresse e-mail:</label>
-                <input type="email" id="usermail" name="usermail" placeholder="Adresse e-mail" autocomplete="off" required>
+                <input type="email" id="usermail" name="usermail" placeholder="Adresse e-mail" autocomplete="off"
+                    required>
             </div>
             <div>
                 <label for="password">Mot de passe:</label>
-                <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="off" required>
+                <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="off"
+                    required>
             </div>
-            <div class="error" id="error-message" style="display: none;"></div>
-            <div class="success" id="success-message" style="display: none;"></div>
+            <div class="error-msg" id="error-message" style="display: none;"></div>
+            <div class="success-msg" id="success-message" style="display: none;"></div>
             <button id="createUserButton" class="btn btn-primary">Créer l'utilisateur</button>
             <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
         </form>
