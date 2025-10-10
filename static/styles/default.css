@@ -307,6 +307,30 @@ table td.content-column {
   min-width: 150px;
 }
 
+/* Style des liens dans les colonnes de contenu */
+table td.content-column a {
+  color: #007bff;
+  text-decoration: underline;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  display: inline;
+}
+
+table td.content-column a:hover,
+table td.content-column a:visited,
+table td.content-column a:active {
+  color: #007bff;
+  text-decoration: underline;
+  background-color: transparent !important;
+}
+
+/* Forcer le fond transparent même au hover de la ligne */
+table tbody tr:hover td.content-column a {
+  background-color: transparent !important;
+  color: #007bff;
+}
+
 table th {
   background-color: #f1f1f1;
 }
