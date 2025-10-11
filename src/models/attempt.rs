@@ -211,11 +211,12 @@ impl HgAttempt {
     ) -> Result<(), ModelError> {
         sqlx::query(
             r#"
-            UPDATE Attempts SET comment = ? WHERE attempt_id = ?
+            UPDATE Attempts SET comment = ? WHERE attempt_number = ? AND run_id = ?
             "#,
         )
         .bind(new_comment)
         .bind(attempt_number)
+        .bind(run_id)
         .execute(pool)
         .await?;
         Ok(())
