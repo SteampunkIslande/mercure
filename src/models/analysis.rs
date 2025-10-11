@@ -93,6 +93,24 @@ pub async fn complete_failure(
         .map_err(AnalysisStateMachineError::from)
 }
 
+/// Transitionne un run en échec si le run est introuvable : Pending -> Failure
+pub async fn fail_run_not_found(
+    run_id: i64,
+    reason: &str,
+    pool: &SqlitePool,
+) -> Result<(), AnalysisStateMachineError> {
+    let run = HgRun::get_run_from_id(run_id, pool).await?;
+    if !matches!(run.status, RunStatus::Pending) {
+        return Err(AnalysisStateMachineError::InvalidTransition {
+            from: run.status.to_string(),
+            to: RunStatus::Failure(reason.to_string()).to_string(),
+        });
+    }
+    super::hgrun::HgRun::complete_failure(run_id, reason, pool).await?;
+    super::attempt::HgAttempt::complete_failure(run_id, reason, pool).await?;
+    Ok(())
+}
+
 /// Commenter une tentative
 pub async fn comment_attempt(
     run_id: i64,

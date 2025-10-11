@@ -35,6 +35,10 @@ digraph Machines {
         t_failure [shape=box, label="échec", style=rounded, fillcolor=white];
         t_failure -> Failure;
 
+        Pending -> t_notfound [arrowhead=none];
+        t_notfound [shape=box, label="run introuvable", style=rounded, fillcolor=white];
+        t_notfound -> Failure;
+
         Success -> t_relancer1 [arrowhead=none];
         t_relancer1 [shape=box, label="relancer", style=rounded, fillcolor=white];
         t_relancer1 -> Idle;
@@ -60,6 +64,10 @@ digraph Machines {
         ta1_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
         ta1_runterm -> a1_Running;
 
+        a1_Pending -> ta1_notfound [arrowhead=none];
+        ta1_notfound [shape=box, label="run introuvable", style=rounded, fillcolor=white];
+        ta1_notfound -> a1_Failure;
+
         a1_Running -> ta1_success [arrowhead=none];
         ta1_success [shape=box, label="succès", style=rounded, fillcolor=white];
         ta1_success -> a1_Success;
@@ -84,6 +92,10 @@ digraph Machines {
         a2_Pending -> ta2_runterm [arrowhead=none];
         ta2_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
         ta2_runterm -> a2_Running;
+
+        a2_Pending -> ta2_notfound [arrowhead=none];
+        ta2_notfound [shape=box, label="run introuvable", style=rounded, fillcolor=white];
+        ta2_notfound -> a2_Failure;
 
         a2_Running -> ta2_success [arrowhead=none];
         ta2_success [shape=box, label="succès", style=rounded, fillcolor=white];
