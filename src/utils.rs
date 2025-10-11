@@ -121,29 +121,29 @@ pub fn format_french_date(date_str: &str) -> String {
 
     if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
         let weekday = match date.weekday() {
-            chrono::Weekday::Mon => "lundi",
-            chrono::Weekday::Tue => "mardi",
-            chrono::Weekday::Wed => "mercredi",
-            chrono::Weekday::Thu => "jeudi",
-            chrono::Weekday::Fri => "vendredi",
-            chrono::Weekday::Sat => "samedi",
-            chrono::Weekday::Sun => "dimanche",
+            chrono::Weekday::Mon => "lun.",
+            chrono::Weekday::Tue => "mar.",
+            chrono::Weekday::Wed => "mer.",
+            chrono::Weekday::Thu => "jeu.",
+            chrono::Weekday::Fri => "ven.",
+            chrono::Weekday::Sat => "sam.",
+            chrono::Weekday::Sun => "dim.",
         };
 
         let month_name = match date.month() {
-            1 => "janvier",
-            2 => "février",
+            1 => "jan.",
+            2 => "fév.",
             3 => "mars",
-            4 => "avril",
+            4 => "avr.",
             5 => "mai",
             6 => "juin",
-            7 => "juillet",
+            7 => "jui.",
             8 => "août",
-            9 => "septembre",
-            10 => "octobre",
-            11 => "novembre",
-            12 => "décembre",
-            _ => "mois_inconnu",
+            9 => "sept.",
+            10 => "oct.",
+            11 => "nov.",
+            12 => "déc.",
+            _ => "creepy",
         };
 
         format!("{} {} {} {}", weekday, date.day(), month_name, date.year())

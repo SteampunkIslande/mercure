@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fs::read_dir;
 use std::ops::Not;
 
 use rocket::State;
@@ -8,6 +9,7 @@ use sqlx::SqlitePool;
 use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
+use crate::config::get_mercure_config;
 use crate::models::Group;
 use crate::models::HgRun;
 use crate::models::RunStatus;
@@ -65,7 +67,47 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
 
     if can_see_run {
         match run.status {
-            RunStatus::Idle => Template::render("common/editrun", context! {}),
+            RunStatus::Idle => {
+                // Get sequencers list for edit form
+                let config = get_mercure_config();
+                let sequenceurs_folder = config.sequencers_folder;
+
+                let sequenceurs_list = read_dir(&sequenceurs_folder)
+                    .ok()
+                    .map(|entries| {
+                        entries
+                            .filter_map(|entry| {
+                                entry.ok().and_then(|e| {
+                                    if e.file_type().ok()?.is_dir() {
+                                        e.file_name().to_str().map(|s| s.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                            })
+                            .collect::<Vec<String>>()
+                    })
+                    .unwrap_or_default();
+
+                // Serialize user_defined_vars for JavaScript
+                let user_defined_vars_json = match serde_json::to_string(
+                    &run.form.user_defined_vars.clone().unwrap_or_default(),
+                ) {
+                    Ok(json_str) => json_str,
+                    Err(_) => "{}".to_string(),
+                };
+
+                Template::render(
+                    "common/editrun",
+                    context! {
+                        run: &run,
+                        user: auth.user,
+                        run_id: run.run_id,
+                        sequenceurs_list: sequenceurs_list,
+                        user_defined_vars_json: user_defined_vars_json
+                    },
+                )
+            }
             RunStatus::Pending => Template::render("common/pendingrun", context! {}),
             RunStatus::Running => Template::render("common/runningrun", context! {}),
             RunStatus::Success => Template::render("common/successrun", context! {}),

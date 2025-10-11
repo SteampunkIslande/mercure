@@ -91,6 +91,8 @@ async fn rocket() -> _ {
                 routes::backend::get_all_forms,
                 routes::backend::password_edit_post,
                 routes::backend::newrun_post,
+                routes::backend::editrun_post,
+                routes::backend::validate_run_post,
                 routes::backend::upload_post,
                 routes::backend::list_runs_get,
             ],

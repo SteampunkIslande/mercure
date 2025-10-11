@@ -78,6 +78,8 @@ pub struct HgRunSubmission {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRunEdit {
+    pub run_id: i64,
+
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
@@ -174,11 +176,8 @@ impl HgRun {
     }
 
     /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
-    pub async fn edit_run(
-        run_form: HgRunEdit,
-        run_id: i64,
-        pool: &SqlitePool,
-    ) -> Result<i64, ModelError> {
+    pub async fn edit_run(run_form: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
+        eprintln!("Received run edit {:?}", run_form);
         let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
@@ -188,7 +187,7 @@ impl HgRun {
             ));
         }
 
-        let run: HgRun = Self::get_run_from_id(run_id, pool).await?;
+        let run: HgRun = Self::get_run_from_id(run_form.run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
             return Err(ModelError::FormError(
                 "Impossible d'éditer un run validé, en cours d'analyse, ou terminé".to_string(),
@@ -211,10 +210,10 @@ impl HgRun {
         .bind(&run_form.sample_sheet_adn_path)
         .bind(&run_form.sample_sheet_arn_path)
         .bind(&run_form.metadata_path)
-        .bind(run_id)
+        .bind(run_form.run_id)
         .execute(pool).await?;
 
-        Ok(run_id)
+        Ok(run_form.run_id)
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données

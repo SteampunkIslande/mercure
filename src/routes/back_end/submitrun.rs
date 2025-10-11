@@ -6,7 +6,9 @@ use sqlx::SqlitePool;
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
+use crate::models::HgRunEdit;
 use crate::models::HgRunSubmission;
+use crate::models::analysis;
 use crate::models::hgrun;
 
 /// Route: /mercure/api/newrun
@@ -19,6 +21,37 @@ pub async fn newrun_post(
     match hgrun::HgRun::new_run(form.0, pool).await {
         Ok(run_id) => Json(ApiResponse::success(
             json!({"message":"Run créé avec succès!","run_id":run_id}),
+        )),
+        Err(e) => Json(ApiResponse::error(format!("{e}"))),
+    }
+}
+
+/// Route: /mercure/api/validate/<run_id>
+#[post("/validate/<run_id>")]
+pub async fn validate_run_post(
+    _auth: Authenticated,
+    pool: &State<SqlitePool>,
+    run_id: i64,
+) -> Json<ApiResponse<Value>> {
+    match analysis::validate_form(run_id, pool).await {
+        Ok(_) => Json(ApiResponse::success(
+            json!({"message":"Run validé avec succès!","run_id":run_id}),
+        )),
+        Err(e) => Json(ApiResponse::error(format!("{e}"))),
+    }
+}
+
+/// Route: /mercure/api/editrun/
+#[post("/editrun", data = "<form>")]
+pub async fn editrun_post(
+    _auth: Authenticated,
+    pool: &State<SqlitePool>,
+    form: Json<HgRunEdit>,
+) -> Json<ApiResponse<Value>> {
+    let run_id = form.run_id;
+    match hgrun::HgRun::edit_run(form.0, pool).await {
+        Ok(_) => Json(ApiResponse::success(
+            json!({"message":"Run modifié avec succès!","run_id":run_id}),
         )),
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }

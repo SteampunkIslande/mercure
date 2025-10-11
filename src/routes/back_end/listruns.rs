@@ -37,12 +37,12 @@ fn create_run_row(
         // Colonne 2 - Utilisateur
         json!({
             "content": user_name,
-            "td_class": "content-column"
+            "td_class": "badge-column"
         }),
         // Colonne 3 - Date du run
         json!({
             "content": format_french_date(run_date),
-            "td_class": "content-column"
+            "td_class": "badge-column"
         }),
         // Colonne 4 - Statut
         json!({

@@ -47,64 +47,65 @@
             }
         </style>
 
-        <input type="hidden" id="form_id" value="{{ form_id }}">
         <input type="hidden" id="run_id" value="{{ run_id }}">
-        <input type="hidden" id="user_id" value="{{ user.id }}">
 
         <div>
             <label for="run_name">Nom du run:</label>
-            <input type="text" id="run_name" required>
+            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
+            <input type="hidden" id="run_name" value="{{ run.run_name }}">
         </div>
 
         <div>
             <label for="run_date">Date du run:</label>
-            <input type="date" id="run_date" required>
+            <input type="date" id="run_date" value="{{ run.run_date }}" required>
         </div>
 
         <div>
             <label for="run_sequencer">Séquenceur:</label>
             <select id="run_sequencer" required>
                 {% for seq in sequenceurs_list %}
-                <option value="{{ seq }}">{{ seq }}</option>
+                <option value="{{ seq }}" {% if seq==run.run_sequencer %}selected{% endif %}>{{ seq }}</option>
                 {% endfor %}
             </select>
         </div>
 
         <div>
             <label for="run_flowcellid">Flowcell ID:</label>
-            <input type="text" id="run_flowcellid" required>
+            <input type="text" id="run_flowcellid" value="{{ run.run_flowcellid }}" required>
         </div>
 
         <div>
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
-            <input type="hidden" id="sample_sheet_adn_path">
+            <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
         </div>
 
         <div>
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
-            <input type="hidden" id="sample_sheet_arn_path">
+            <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
         </div>
 
         <div>
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
-            <input type="hidden" id="metadata_path">
+            <input type="hidden" id="metadata_path" value="{{ run.metadata_path }}">
         </div>
 
         <h3>Variables définies par l'utilisateur</h3>
         <div id="user-defined-vars"></div>
 
-        <button type="submit" class="btn primary">Soumettre</button>
+        <button type="submit" class="btn">Enregistrer les modifications</button>
+        <button type="button" id="validate-btn" class="btn" style="margin-left: 10px;">Valider le
+            run</button>
         <div style="text-align: center; margin-top: 20px;">
-            <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+            <a class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
         </div>
     </form>
 
-    <div id="info-message"></div>
-    <div id="error-message"></div>
-    <div id="success-message"></div>
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
 
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
@@ -146,6 +147,15 @@
                 input.id = 'udv_' + key;
                 div.appendChild(input);
                 container.appendChild(div);
+            }
+        }
+
+        // Populate user-defined variables with current values
+        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
+        for (const [key, value] of Object.entries(currentUserDefinedVars)) {
+            const element = document.getElementById('udv_' + key);
+            if (element) {
+                element.value = value;
             }
         }
 
@@ -216,15 +226,16 @@
             });
 
             const formData = {
-                form_id: parseInt(document.getElementById('form_id').value),
-                user_id: parseInt(document.getElementById('user_id').value),
-                run_name: document.getElementById('run_name').value,
+                run_id: parseInt(document.getElementById('run_id').value),
+
                 run_date: document.getElementById('run_date').value,
                 run_sequencer: document.getElementById('run_sequencer').value,
                 run_flowcellid: document.getElementById('run_flowcellid').value,
+
                 sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
                 sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
+
                 user_defined_vars: userDefinedVars
             };
 
@@ -239,19 +250,42 @@
                 .then(data => {
                     const messageDiv = document.getElementById('message');
                     if (data.success) {
-                        showMessage("info-message", data.data.message);
-                        setTimeout(() => {
-                            window.location.href = "/mercure/show/run/" + data.data.run_id;
-                        }, 1000);
+                        showMessage("info", data.data.message);
                     } else {
-                        showMessage("error-message", data.message);
+                        showMessage("error", data.message);
                     }
                 })
                 .catch(error => {
-                    showMessage("error-message", error);
+                    showMessage("error", error);
                 });
         });
 
+        // Handle validate button click
+        document.getElementById('validate-btn').addEventListener('click', function () {
+            if (confirm('Êtes-vous sûr de vouloir valider ce run ? Cette action est irréversible.')) {
+                fetch('/mercure/api/validate/' + document.getElementById('run_id').value, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showMessage("success", "Run validé avec succès !");
+                            setTimeout(() => {
+                                // Comme une redirection, mais comme c'est la même URL que l'actuelle (normalement), agit comme un rafraîchissement de la page
+                                window.location.href = "/mercure/show/run/" + document.getElementById('run_id').value;
+                            }, 1000);
+                        } else {
+                            showMessage("error", data.message);
+                        }
+                    })
+                    .catch(error => {
+                        showMessage("error", "Erreur lors de la validation: " + error);
+                    });
+            }
+        });
 
     </script>
 </body>
