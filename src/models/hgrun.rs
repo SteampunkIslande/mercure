@@ -173,7 +173,7 @@ impl HgRun {
         Ok(run_id)
     }
 
-    /// Edite un HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
+    /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
     pub async fn edit_run(
         run_form: HgRunEdit,
         run_id: i64,
@@ -185,6 +185,13 @@ impl HgRun {
         if run_form.sample_sheet_adn_path.is_empty() && run_form.sample_sheet_arn_path.is_empty() {
             return Err(ModelError::FormError(
                 "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
+            ));
+        }
+
+        let run: HgRun = Self::get_run_from_id(run_id, pool).await?;
+        if !matches!(run.status, RunStatus::Idle) {
+            return Err(ModelError::FormError(
+                "Impossible d'éditer un run validé, en cours d'analyse, ou terminé".to_string(),
             ));
         }
 

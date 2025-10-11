@@ -4,17 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nouveau Run</title>
+    <title>Editer un run</title>
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/utils.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">Nouveau Run - {{ user.username }}</span>
+            <span class="banner-text">Editer un run - {{ user.username }}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -24,29 +25,30 @@
 
 
 
-    <h2>Déclarer un nouveau run</h2>
+    <h2>Edition du run</h2>
 
-    <form id="newrun-form">
+    <form id="editrun-form">
         <style>
-            #newrun-form div {
+            #editrun-form div {
                 display: flex;
                 flex-direction: column;
                 align-items: flex-start;
                 margin-bottom: 10px;
             }
 
-            #newrun-form label {
+            #editrun-form label {
                 margin-bottom: 5px;
                 text-align: left;
             }
 
-            #newrun-form input,
+            #editrun-form input,
             {
             width: 33.3%;
             }
         </style>
 
         <input type="hidden" id="form_id" value="{{ form_id }}">
+        <input type="hidden" id="run_id" value="{{ run_id }}">
         <input type="hidden" id="user_id" value="{{ user.id }}">
 
         <div>
@@ -100,7 +102,9 @@
         </div>
     </form>
 
-    <div id="message"></div>
+    <div id="info-message"></div>
+    <div id="error-message"></div>
+    <div id="success-message"></div>
 
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
@@ -198,7 +202,7 @@
             }
         });
 
-        document.getElementById('newrun-form').addEventListener('submit', function (event) {
+        document.getElementById('editrun-form').addEventListener('submit', function (event) {
             event.preventDefault();
 
             // Collect user_defined_vars
@@ -224,7 +228,7 @@
                 user_defined_vars: userDefinedVars
             };
 
-            fetch('/mercure/api/newrun', {
+            fetch('/mercure/api/editrun/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -235,17 +239,16 @@
                 .then(data => {
                     const messageDiv = document.getElementById('message');
                     if (data.success) {
-                        messageDiv.innerHTML = '<span style="color: green;">' + data.data.message + '</span>';
-                        console.log(data.data);
+                        showMessage("info-message", data.data.message);
                         setTimeout(() => {
                             window.location.href = "/mercure/show/run/" + data.data.run_id;
                         }, 1000);
                     } else {
-                        messageDiv.innerHTML = '<span style="color: red;">' + data.message + '</span>';
+                        showMessage("error-message", data.message);
                     }
                 })
                 .catch(error => {
-                    document.getElementById('message').innerHTML = '<span style="color: red;">Erreur: ' + error + '</span>';
+                    showMessage("error-message", error);
                 });
         });
 

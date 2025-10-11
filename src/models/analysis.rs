@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AnalysisStateMachineError {
-    #[error("Invalid translation from {} to {}",.from,.to)]
+    #[error("Invalid transition from {} to {}",.from,.to)]
     InvalidTransition { from: String, to: String },
     #[error(transparent)]
     ModelError(#[from] ModelError),

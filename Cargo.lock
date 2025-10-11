@@ -1222,6 +1222,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "intersection"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "133d3551b09a5131c0ffc31eaefdafdd58b1cdd272f7d1bab4db623c245a266c"
+
+[[package]]
 name = "io-uring"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1412,6 +1418,7 @@ dependencies = [
  "clap",
  "diacritics",
  "futures",
+ "intersection",
  "rocket",
  "rocket_dyn_templates",
  "serde",

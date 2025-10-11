@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use std::ops::Not;
+
 use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
@@ -5,10 +8,72 @@ use sqlx::SqlitePool;
 use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
+use crate::models::Group;
+use crate::models::HgRun;
+use crate::models::RunStatus;
 
 #[get("/show/run/<run_id>")]
 pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
-    Template::render("common/run", context! {})
+    let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
+        Ok(run) => run,
+        Err(e) => {
+            return Template::render(
+                "common/error",
+                context! {
+                    title: "Erreur de la base de données",
+                    h2: format!("Impossible d'obtenir le run {}", run_id),
+                    message: e.to_string()
+                },
+            );
+        }
+    };
+    let can_see_run = {
+        if auth.user.is_admin {
+            true
+        } else {
+            let form_groups: HashSet<i64> = run.form.groups.iter().map(|grp| grp.id).collect();
+            let auth_groups: HashSet<i64> = match Group::get_user_groups(pool, auth.user.id).await {
+                Ok(groups) => groups.iter().map(|grp| grp.id).collect(),
+                Err(e) => {
+                    return Template::render(
+                        "common/error",
+                        context! {title: "Erreur de la base de données",
+                        h2: format!("Impossible d'obtenir les groupes de {} (vous)", auth.user.username),
+                        message: e.to_string()},
+                    );
+                }
+            };
+            let form_user_groups: HashSet<i64> = match Group::get_user_groups(pool, run.user.id)
+                .await
+            {
+                Ok(groups) => groups.iter().map(|grp| grp.id).collect(),
+                Err(e) => {
+                    return Template::render(
+                        "common/error",
+                        context! {title: "Erreur de la base de données",
+                        h2: format!("Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)", run.user.username),
+                        message: e.to_string()},
+                    );
+                }
+            };
+            // If there is a common group between the groups the form was declared for, the user that declared the run, and the authenticated user's groups, then you can see/edit the run
+            intersection::hash_set::intersection([form_groups, auth_groups, form_user_groups])
+                .is_empty()
+                .not()
+        }
+    };
+
+    if can_see_run {
+        match run.status {
+            RunStatus::Idle => Template::render("common/editrun", context! {}),
+            RunStatus::Pending => Template::render("common/pendingrun", context! {}),
+            RunStatus::Running => Template::render("common/runningrun", context! {}),
+            RunStatus::Success => Template::render("common/successrun", context! {}),
+            RunStatus::Failure(_) => Template::render("common/failurerun", context! {}),
+        }
+    } else {
+        Template::render("common/error", context! {})
+    }
 }
 
 #[get("/show/runs")]

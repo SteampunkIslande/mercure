@@ -16,7 +16,7 @@ pub struct UploadForm<'r> {
 pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<String>> {
     let config = get_mercure_config();
 
-    // Define upload directory
+    // Get upload directory
     let upload_dir = PathBuf::from(config.upload_folder);
 
     // Ensure directory exists
