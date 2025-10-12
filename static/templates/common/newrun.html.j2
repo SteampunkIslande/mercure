@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/utils.js"></script>
+    <script src="/static/scripts/json_list.js"></script>
 </head>
 
 <body>
@@ -79,6 +80,7 @@
             <input type="hidden" id="sample_sheet_adn_path">
             <div id="sample_sheet_adn_check">
             </div>
+            <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
         <div>
@@ -87,6 +89,7 @@
             <input type="hidden" id="sample_sheet_arn_path">
             <div id="sample_sheet_arn_check">
             </div>
+            <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
         <div>
@@ -184,8 +187,7 @@
                 throw new Error(result.message);
             }
         }
-
-        // Event listeners for file inputs
+        // on upload: show check message AND sample list when available
         document.getElementById('sample_sheet_adn_file').addEventListener('change', async function () {
             if (this.files.length > 0) {
                 try {
@@ -193,6 +195,11 @@
                     const { file_name, sample_names, message } = await checkSampleSheet(upload_path);
                     document.getElementById('sample_sheet_adn_path').value = file_name;
                     document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_adn_list');
+                        container.innerHTML = '';
+                        createFormattedList(sample_names, container, "Echantillons ADN détectés");
+                    }
                 } catch (error) {
                     alert('Erreur upload ADN: ' + error.message);
                 }
@@ -206,6 +213,11 @@
                     const { file_name, sample_names, message } = await checkSampleSheet(upload_path);
                     document.getElementById('sample_sheet_arn_path').value = file_name;
                     document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_arn_list');
+                        container.innerHTML = '';
+                        createFormattedList(sample_names, container, "Echantillons ARN détectés");
+                    }
                 } catch (error) {
                     alert('Erreur upload ARN: ' + error.message);
                 }
