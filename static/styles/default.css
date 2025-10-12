@@ -75,6 +75,19 @@ p {
   animation-name: fadeout;
 }
 
+.warning-msg {
+  border: 1.5px solid #eca406;
+  background-color: #fdf8ea;
+  color: #eca406;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-weight: bold;
+  animation-duration: 10s;
+  animation-iteration-count: 1;
+  animation-name: fadeout;
+}
+
 .info-msg {
   border: 1.5px solid #2f2fd3;
   background-color: #eaecfd;

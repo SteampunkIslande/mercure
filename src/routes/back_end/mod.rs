@@ -9,6 +9,7 @@ mod newform;
 mod newgroup;
 mod newuser;
 mod passedit;
+mod samplesheet;
 mod submitrun;
 mod upload;
 
@@ -23,5 +24,6 @@ pub use newform::*;
 pub use newgroup::*;
 pub use newuser::*;
 pub use passedit::*;
+pub use samplesheet::*;
 pub use submitrun::*;
 pub use upload::*;

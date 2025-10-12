@@ -77,12 +77,16 @@
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path">
+            <div id="sample_sheet_adn_check">
+            </div>
         </div>
 
         <div>
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path">
+            <div id="sample_sheet_arn_check">
+            </div>
         </div>
 
         <div>
@@ -163,13 +167,32 @@
                 throw new Error(result.message);
             }
         }
+        // Function to check sample sheet
+        async function checkSampleSheet(filename) {
+            const formData = new FormData();
+            formData.append('file_name', filename);
+
+            const response = await fetch('/mercure/api/samplesheet/check', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                return result.data;
+            } else {
+                throw new Error(result.message);
+            }
+        }
 
         // Event listeners for file inputs
         document.getElementById('sample_sheet_adn_file').addEventListener('change', async function () {
             if (this.files.length > 0) {
                 try {
-                    const path = await uploadFile(this.files[0]);
-                    document.getElementById('sample_sheet_adn_path').value = path;
+                    const upload_path = await uploadFile(this.files[0]);
+                    const { file_name, sample_names, message } = await checkSampleSheet(upload_path);
+                    document.getElementById('sample_sheet_adn_path').value = file_name;
+                    document.getElementById('sample_sheet_adn_check').innerHTML = message;
                 } catch (error) {
                     alert('Erreur upload ADN: ' + error.message);
                 }
@@ -179,8 +202,10 @@
         document.getElementById('sample_sheet_arn_file').addEventListener('change', async function () {
             if (this.files.length > 0) {
                 try {
-                    const path = await uploadFile(this.files[0]);
-                    document.getElementById('sample_sheet_arn_path').value = path;
+                    const upload_path = await uploadFile(this.files[0]);
+                    const { file_name, sample_names, message } = await checkSampleSheet(upload_path);
+                    document.getElementById('sample_sheet_arn_path').value = file_name;
+                    document.getElementById('sample_sheet_arn_check').innerHTML = message;
                 } catch (error) {
                     alert('Erreur upload ARN: ' + error.message);
                 }

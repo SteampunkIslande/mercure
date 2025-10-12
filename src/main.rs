@@ -35,6 +35,7 @@ async fn rocket() -> _ {
     rocket::build()
         .register("/", catchers![unauthorized])
         .mount("/static", FileServer::from(config.static_dir))
+        .mount("/uploads", FileServer::from(config.upload_folder))
         .mount(
             "/mercure",
             routes![
@@ -95,6 +96,8 @@ async fn rocket() -> _ {
                 routes::backend::validate_run_post,
                 routes::backend::upload_post,
                 routes::backend::list_runs_get,
+                routes::backend::check_samplesheet,
+                routes::backend::list_samples_from_samplesheet,
             ],
         )
         .manage(pool)
