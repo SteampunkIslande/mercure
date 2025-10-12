@@ -469,3 +469,9 @@ table td:hover a {
   color: #555;
   margin-bottom: 1rem;
 }
+
+/* Empêche le débordement du contenu des onglets */
+.tabcontent {
+    max-width: 100%;
+    box-sizing: border-box;
+}

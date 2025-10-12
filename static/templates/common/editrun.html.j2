@@ -122,6 +122,7 @@
                 label.for = 'udv_' + key;
                 label.textContent = key + ':';
                 div.appendChild(label);
+                div.appendChild(document.createTextNode(' '));
                 const select = document.createElement('select');
                 select.id = 'udv_' + key;
                 value.FromValuesList.allowed.forEach(val => {
@@ -138,6 +139,7 @@
                 label.for = 'udv_' + key;
                 label.textContent = key + ':';
                 div.appendChild(label);
+                div.appendChild(document.createTextNode(' '));
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.id = 'udv_' + key;
