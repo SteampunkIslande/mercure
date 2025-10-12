@@ -52,15 +52,16 @@ async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<Result<HgAttempt, Rou
 }
 
 async fn treat_attempt(
-    run_result: Result<HgAttempt, RoutineError>,
+    pending_run: Result<HgAttempt, RoutineError>,
     pool: &sqlx::SqlitePool,
 ) -> Result<(), RoutineError> {
-    match run_result {
+    match pending_run {
         Ok(attempt) => {
             println!(
                 "Traitement de la tentative {} pour le run {}...",
                 attempt.attempt_number, attempt.run_id
             );
+            // Check if run is complete (build the raw dir name as it should be, if found then wait for Complete.txt. If not found set run to "Not found" error)
             analysis::start_run_analysis(attempt.run_id, &pool).await?;
         }
         Err(e) => {
@@ -89,8 +90,8 @@ async fn run_routine_loop(
         if pending_runs.is_empty() {
             println!("Aucun run en attente.");
         } else {
-            for run_result in pending_runs {
-                match treat_attempt(run_result, &pool).await {
+            for pending_run in pending_runs {
+                match treat_attempt(pending_run, &pool).await {
                     Ok(()) => {}
                     Err(e) => {
                         eprintln!("Erreur lors de l'exécution de la routine: {e}");
