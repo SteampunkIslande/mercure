@@ -42,9 +42,8 @@
                 text-align: left;
             }
 
-            #editrun-form input,
-            {
-            width: 33.3%;
+            #editrun-form input {
+                width: 33.3%;
             }
         </style>
 
@@ -75,29 +74,34 @@
             <input type="text" id="run_flowcellid" value="{{ run.run_flowcellid }}" required>
         </div>
 
-        <div>
+        <div class="tab">
+            <button id="tab-adn" class="tablinks active" onclick="openFilesTab(event,`adn`)">ADN</button>
+            <button id="tab-arn" class="tablinks" onclick="openFilesTab(event,`arn`)">ARN</button>
+            <button id="tab-metadata" class="tablinks" onclick="openFilesTab(event,`metadata`)">Metadata</button>
+        </div>
+
+        <div class="tabcontent" id="tabcontent-adn" style="display:block">
             <label for="sample_sheet_adn_file">Modifier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
-            <div id="sample_sheet_adn_check">
-            </div>
+            <div id="sample_sheet_adn_check"></div>
             <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
-        <div>
+        <div class="tabcontent" id="tabcontent-arn" style="display:none">
             <label for="sample_sheet_arn_file">Modifier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
-            <div id="sample_sheet_arn_check">
-            </div>
+            <div id="sample_sheet_arn_check"></div>
             <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
-        <div>
+        <div class="tabcontent" id="tabcontent-metadata" style="display:none">
             <label for="metadata_file">Modifier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path" value="{{ run.metadata_path }}">
         </div>
+
 
         <h3>Variables définies par l'utilisateur</h3>
         <div id="user-defined-vars"></div>
@@ -200,6 +204,31 @@
             } else {
                 throw new Error(result.message);
             }
+        }
+
+        // Tabs initialization for file-type panels (use same classes as home.html)
+        function openFilesTab(evt, tabName) {
+            // Prevent default button behavior (avoids submitting the form)
+            evt.preventDefault();
+
+            // Declare all variables
+            var i, tabcontent, tablinks;
+
+            // Get all elements with class="tabcontent" and hide them
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            // Get all elements with class="tablinks" and remove the class "active"
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            document.getElementById(`tabcontent-${tabName}`).style.display = "block";
+            evt.currentTarget.className += " active";
         }
 
         // on upload: show check message AND sample list when available
@@ -324,7 +353,7 @@
 
         // Handle validate button click
         document.getElementById('validate-btn').addEventListener('click', function () {
-            if (confirm('Êtes-vous sûr de vouloir valider ce run ? Cette action est irréversible.')) {
+            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
                 fetch('/mercure/api/validate/' + document.getElementById('run_id').value, {
                     method: 'POST',
                     headers: {

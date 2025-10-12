@@ -74,25 +74,29 @@
             <input type="text" id="run_flowcellid" required>
         </div>
 
-        <div>
+        <div class="tab">
+            <button class="tablinks active" onclick="openFilesTab(event,`adn`)">ADN</button>
+            <button class="tablinks" onclick="openFilesTab(event,`arn`)">ARN</button>
+            <button class="tablinks" onclick="openFilesTab(event,`metadata`)">Metadata</button>
+        </div>
+
+        <div class="tabcontent" id="tabcontent-adn" style="display:block">
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path">
-            <div id="sample_sheet_adn_check">
-            </div>
+            <div id="sample_sheet_adn_check"></div>
             <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
-        <div>
+        <div class="tabcontent" id="tabcontent-arn" style="display:none">
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path">
-            <div id="sample_sheet_arn_check">
-            </div>
+            <div id="sample_sheet_arn_check"></div>
             <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
-        <div>
+        <div class="tabcontent" id="tabcontent-meta" style="display:none">
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path">
@@ -187,6 +191,32 @@
                 throw new Error(result.message);
             }
         }
+
+        // Tabs initialization for file-type panels (use same classes as home.html)
+        function openFilesTab(evt, tabName) {
+            // Prevent default button behavior (avoids submitting the form)
+            evt.preventDefault();
+
+            // Declare all variables
+            var i, tabcontent, tablinks;
+
+            // Get all elements with class="tabcontent" and hide them
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            // Get all elements with class="tablinks" and remove the class "active"
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            document.getElementById(`tabcontent-${tabName}`).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
         // on upload: show check message AND sample list when available
         document.getElementById('sample_sheet_adn_file').addEventListener('change', async function () {
             if (this.files.length > 0) {
