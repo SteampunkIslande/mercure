@@ -6,6 +6,11 @@ function createFormattedList(itemList, container, title) {
     throw new Error("Input should be an array of strings");
   }
 
+  // Ensure previous content is removed so repeated calls replace the list
+  if (container) {
+    container.innerHTML = "";
+  }
+
   // Apply some basic styling to the container
   container.style.padding = "10px";
   container.style.border = "1px solid #ccc";
