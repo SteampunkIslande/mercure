@@ -29,22 +29,6 @@
 
     <form id="newrun-form">
         <style>
-            #newrun-form div {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                margin-bottom: 10px;
-            }
-
-            #newrun-form label {
-                margin-bottom: 5px;
-                text-align: left;
-            }
-
-            #newrun-form input,
-            {
-            width: 33.3%;
-            }
         </style>
 
         <input type="hidden" id="form_id" value="{{ form_id }}">
@@ -75,12 +59,12 @@
         </div>
 
         <div class="tab">
-            <button class="tablinks active" onclick="openFilesTab(event,`adn`)">ADN</button>
-            <button class="tablinks" onclick="openFilesTab(event,`arn`)">ARN</button>
-            <button class="tablinks" onclick="openFilesTab(event,`metadata`)">Metadata</button>
+            <button class="tablinks active" onclick="openTab(event,`adn`)">ADN</button>
+            <button class="tablinks" onclick="openTab(event,`arn`)">ARN</button>
+            <button class="tablinks" onclick="openTab(event,`metadata`)">Metadata</button>
         </div>
 
-        <div class="tabcontent" id="tabcontent-adn" style="display:block">
+        <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path">
@@ -88,7 +72,7 @@
             <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-arn" style="display:none">
+        <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path">
@@ -96,7 +80,7 @@
             <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-meta" style="display:none">
+        <div class="tabcontent" id="tabcontent-meta" style="display:none; overflow:auto;">
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path">
@@ -193,7 +177,7 @@
         }
 
         // Tabs initialization for file-type panels (use same classes as home.html)
-        function openFilesTab(evt, tabName) {
+        function openTab(evt, tabName) {
             // Prevent default button behavior (avoids submitting the form)
             evt.preventDefault();
 

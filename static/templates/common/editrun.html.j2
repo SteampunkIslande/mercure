@@ -30,21 +30,6 @@
 
     <form id="editrun-form">
         <style>
-            #editrun-form div {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                margin-bottom: 10px;
-            }
-
-            #editrun-form label {
-                margin-bottom: 5px;
-                text-align: left;
-            }
-
-            #editrun-form input {
-                width: 33.3%;
-            }
         </style>
 
         <input type="hidden" id="run_id" value="{{ run_id }}">
@@ -75,12 +60,12 @@
         </div>
 
         <div class="tab">
-            <button id="tab-adn" class="tablinks active" onclick="openFilesTab(event,`adn`)">ADN</button>
-            <button id="tab-arn" class="tablinks" onclick="openFilesTab(event,`arn`)">ARN</button>
-            <button id="tab-metadata" class="tablinks" onclick="openFilesTab(event,`metadata`)">Metadata</button>
+            <button id="tab-adn" class="tablinks active" onclick="openTab(event,`adn`)">ADN</button>
+            <button id="tab-arn" class="tablinks" onclick="openTab(event,`arn`)">ARN</button>
+            <button id="tab-metadata" class="tablinks" onclick="openTab(event,`metadata`)">Metadata</button>
         </div>
 
-        <div class="tabcontent" id="tabcontent-adn" style="display:block">
+        <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
             <label for="sample_sheet_adn_file">Modifier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
@@ -88,7 +73,7 @@
             <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-arn" style="display:none">
+        <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
             <label for="sample_sheet_arn_file">Modifier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
@@ -96,7 +81,7 @@
             <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-metadata" style="display:none">
+        <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
             <label for="metadata_file">Modifier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path" value="{{ run.metadata_path }}">
@@ -207,7 +192,7 @@
         }
 
         // Tabs initialization for file-type panels (use same classes as home.html)
-        function openFilesTab(evt, tabName) {
+        function openTab(evt, tabName) {
             // Prevent default button behavior (avoids submitting the form)
             evt.preventDefault();
 
