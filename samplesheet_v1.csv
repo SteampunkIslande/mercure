@@ -1,0 +1,20 @@
+[Header]
+IEMFileVersion,4
+Investigator Name,Name
+Experiment Name,Exp Name
+Date,08/08/2025
+Workflow,GenerateFASTQ
+Application,FASTQ Only
+Assay,Nextera XT v2
+Description,Une description
+Chemistry,Amplicon
+[Reads]
+149
+149
+[Settings]
+CustomRead1PrimerMix,C1
+ReverseComplement,0
+[Data]
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2
+NomDeLEchantillon,NomDeLEchantillon,Plate B,A08,NQDIB153,CGTTATTGTC,SQDIB153,CGGCTTAATT
+

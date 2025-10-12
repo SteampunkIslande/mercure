@@ -1,118 +1,137 @@
 use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
-use std::collections::HashMap;
-use std::io::BufRead;
-use std::path::PathBuf;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum UtilsError {
-    #[error("Erreur dans la samplesheet:{0}")]
-    SampleSheetError(String),
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
-}
 
 /// Fonction utilitaire pour nettoyer une chaîne de caractères
 fn clean_string(input: &str) -> String {
-    let no_spaces = input.replace(' ', "").replace("\t", "");
-    remove_diacritics(&no_spaces)
+    // Supprimer tous les caractères d'espacement (espaces, tabulations, retours, etc.)
+    let no_whitespace: String = input.chars().filter(|c| !c.is_whitespace()).collect();
+    remove_diacritics(&no_whitespace)
 }
 
-pub fn parse_sample_sheet(
-    path: &PathBuf,
-) -> Result<(String, HashMap<String, Vec<String>>), UtilsError> {
-    let mut result: HashMap<String, Vec<String>> = HashMap::new();
-    let reader = std::fs::File::open(path).map(std::io::BufReader::new)?;
+pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String> {
+    // Séparer en lignes en gardant l'ordre
+    let lines: Vec<&str> = input.lines().collect();
+    let mut cleaned_lines: Vec<String> = Vec::new();
+    let mut in_data = false;
     let mut column_names: Vec<String> = Vec::new();
-    let mut clean_column_names: Vec<String> = Vec::new();
-    let mut lines = reader.lines();
-    let mut in_data_section = false;
-    let mut cleaned_samplesheet_lines = Vec::new();
+    let mut sample_col_index: Option<usize> = None;
+    let mut samples: Vec<String> = Vec::new();
 
-    while let Some(line) = lines.next() {
-        let line = line?;
-        let line = line.trim();
+    let mut i: usize = 0;
+    while i < lines.len() {
+        let line = lines[i];
 
-        // Ignorer les lignes vides
+        // Conserver les lignes vides telles quelles
         if line.is_empty() {
+            cleaned_lines.push(line.to_string());
+            i += 1;
             continue;
         }
 
-        // Si on n'est pas encore dans la section Data, copier la ligne telle quelle
-        if !in_data_section && line != "[Data]" {
-            cleaned_samplesheet_lines.push(line.to_string());
+        // Avant la section [Data], conserver telles quelles
+        if !in_data && line != "[Data]" {
+            cleaned_lines.push(line.to_string());
+            i += 1;
             continue;
         }
 
-        // Détecter le début de la section [Data]
+        // Début de la section [Data]
         if line == "[Data]" {
-            in_data_section = true;
-            cleaned_samplesheet_lines.push(line.to_string());
+            in_data = true;
+            cleaned_lines.push(line.to_string());
 
-            // Lire la ligne suivante qui contient les noms de colonnes
-            if let Some(header_line) = lines.next() {
-                let header_line = header_line?;
-                column_names = header_line
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .collect();
-
-                // Créer les noms de colonnes nettoyés pour la samplesheet de sortie
-                clean_column_names = column_names.iter().map(|col| clean_string(col)).collect();
-
-                // Ajouter l'en-tête nettoyé à la samplesheet de sortie
-                cleaned_samplesheet_lines.push(clean_column_names.join(","));
-
-                // Initialiser le HashMap avec des vecteurs vides pour chaque colonne originale
-                for column_name in &column_names {
-                    result.insert(column_name.clone(), Vec::new());
+            // Trouver la première ligne non vide qui suit comme en-tête
+            i += 1;
+            let mut header_line_opt: Option<&str> = None;
+            while i < lines.len() {
+                if lines[i].is_empty() {
+                    cleaned_lines.push(lines[i].to_string());
+                    i += 1;
+                    continue;
                 }
-            } else {
-                return Err(UtilsError::SampleSheetError(
-                    "Aucune ligne d'en-tête trouvée après [Data]".to_string(),
+                header_line_opt = Some(lines[i]);
+                break;
+            }
+
+            let header_line = match header_line_opt {
+                Some(h) => h,
+                None => return Err("Aucune ligne d'en-tête trouvée après [Data]".to_string()),
+            };
+
+            column_names = header_line.split(',').map(|s| s.to_string()).collect();
+
+            // En-tête nettoyée
+            let clean_column_names: Vec<String> =
+                column_names.iter().map(|c| clean_string(c)).collect();
+            cleaned_lines.push(clean_column_names.join(","));
+
+            // Déterminer l'index de la colonne "sample"
+
+            sample_col_index = column_names.iter().position(|col| col == "Sample_ID");
+
+            if sample_col_index.is_none() {
+                return Err("Impossible d'extraire la liste des échantillons: aucune colonne 'sample' trouvée"
+                    .to_string());
+            }
+
+            // Passer à la ligne suivant l'en-tête pour lire les données
+            i += 1;
+            continue;
+        }
+
+        // Dans la section Data : traiter les lignes jusqu'à la fin ou une nouvelle section
+        if in_data && !column_names.is_empty() {
+            if line.starts_with('[') {
+                // nouvelle section rencontrée : sortir du mode Data et conserver la ligne
+                in_data = false;
+                cleaned_lines.push(line.to_string());
+                i += 1;
+                continue;
+            }
+
+            let values: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+            if values.len() != column_names.len() {
+                return Err(format!(
+                    "Le nombre de colonnes diffère à la ligne {}",
+                    i + 1
                 ));
             }
-            continue;
-        }
 
-        // Si on est dans la section Data et qu'on a des noms de colonnes, traiter les données
-        if in_data_section && !column_names.is_empty() {
-            let values: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
-
-            // Vérifier que le nombre de valeurs correspond au nombre de colonnes
-            if values.len() != column_names.len() {
-                return Err(UtilsError::SampleSheetError(format!(
-                    "Nombre de valeurs ({}) ne correspond pas au nombre de colonnes ({})",
-                    values.len(),
-                    column_names.len()
-                )));
+            // Construire une ligne nettoyée en respectant le nombre de colonnes (pad si nécessaire)
+            let mut cleaned_values: Vec<String> = Vec::new();
+            for col_idx in 0..column_names.len() {
+                let v = values.get(col_idx).copied().unwrap_or("");
+                cleaned_values.push(clean_string(v));
             }
+            cleaned_lines.push(cleaned_values.join(","));
 
-            // Ajouter chaque valeur au HashMap (valeurs originales)
-            for (i, value) in values.iter().enumerate() {
-                if let Some(column_vec) = result.get_mut(&column_names[i]) {
-                    column_vec.push(value.to_string());
+            // Extraire l'échantillon si présent
+            if let Some(sample_idx) = sample_col_index {
+                if let Some(val) = values.get(sample_idx) {
+                    let cleaned_sample = clean_string(val);
+                    if !cleaned_sample.is_empty() {
+                        samples.push(cleaned_sample);
+                    }
                 }
             }
 
-            // Ajouter la ligne nettoyée à la samplesheet de sortie
-            let cleaned_values: Vec<String> = values.iter().map(|v| clean_string(v)).collect();
-            cleaned_samplesheet_lines.push(cleaned_values.join(","));
+            i += 1;
+            continue;
         }
+
+        // Cas général : avancer
+        cleaned_lines.push(line.to_string());
+        i += 1;
     }
 
-    // Vérifier qu'on a trouvé au moins la section Data
-    if column_names.is_empty() {
-        return Err(UtilsError::SampleSheetError(
-            "Section [Data] non trouvée dans le samplesheet".to_string(),
-        ));
+    if samples.is_empty() {
+        return Err(
+            "Impossible d'extraire la liste des échantillons: aucune valeur trouvée".to_string(),
+        );
     }
 
-    // Créer la samplesheet nettoyée
-    let cleaned_samplesheet = cleaned_samplesheet_lines.join("\n");
-
-    Ok((cleaned_samplesheet, result))
+    let cleaned = cleaned_lines.join("\n");
+    Ok((samples, cleaned))
 }
 
 pub fn format_french_date(date_str: &str) -> String {
@@ -129,15 +148,14 @@ pub fn format_french_date(date_str: &str) -> String {
             chrono::Weekday::Sat => "sam.",
             chrono::Weekday::Sun => "dim.",
         };
-
         let month_name = match date.month() {
-            1 => "jan.",
+            1 => "janv.",
             2 => "fév.",
             3 => "mars",
             4 => "avr.",
             5 => "mai",
             6 => "juin",
-            7 => "jui.",
+            7 => "juill.",
             8 => "août",
             9 => "sept.",
             10 => "oct.",
