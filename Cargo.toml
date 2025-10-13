@@ -6,6 +6,7 @@ edition = "2024"
 default-run = "mercure"
 
 [dependencies]
+mercure-lib = { path = "./mercure-lib" }
 rocket = { version = "0.5", features = ["secrets", "json"] }
 sqlx = { version = "0.7", features = [
     "runtime-tokio-rustls",
@@ -37,8 +38,8 @@ rocket = { version = "0.5", features = ["secrets", "json"] }
 
 [[bin]]
 name = "mercure-admin"
-path = "src/bin/admin.rs"
+path = "mercure-admin/src/main.rs"
 
 [[bin]]
 name = "mercure-routine"
-path = "src/bin/routine.rs"
+path = "mercure-routine/src/main.rs"

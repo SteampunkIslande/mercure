@@ -4,12 +4,9 @@ use rocket_dyn_templates::{Template, context};
 #[macro_use]
 extern crate rocket;
 
-mod auth;
-mod config;
-mod db;
-mod models;
-mod routes;
-mod utils;
+use mercure_lib::config;
+use mercure_lib::db;
+use mercure_lib::routes;
 
 #[catch(401)]
 pub async fn unauthorized() -> Template {

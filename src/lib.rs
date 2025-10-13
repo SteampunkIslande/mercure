@@ -1,7 +1,6 @@
-pub mod auth;
-pub mod config;
-pub mod db;
-pub mod models;
-pub mod routes;
-
-pub mod utils;
+pub use mercure_lib::auth;
+pub use mercure_lib::config;
+pub use mercure_lib::db;
+pub use mercure_lib::models;
+pub use mercure_lib::routes;
+pub use mercure_lib::utils;

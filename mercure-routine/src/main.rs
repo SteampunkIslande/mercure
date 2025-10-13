@@ -1,9 +1,9 @@
 use chrono::Local;
 use env_logger::Builder;
 use log::{error, info};
-use mercure::config::get_mercure_config;
-use mercure::models::HgRun;
-use mercure::models::analysis;
+use mercure_lib::config::get_mercure_config;
+use mercure_lib::models::HgRun;
+use mercure_lib::models::analysis;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
@@ -20,15 +20,15 @@ fn init_logger() {
         .init();
 }
 
-use mercure::models::AnalysisStateMachineError;
+use mercure_lib::models::AnalysisStateMachineError;
 use sqlx;
 use sqlx::Row;
 use thiserror::Error;
 use tokio::sync::watch;
 
-use mercure::models::HgAttempt;
-use mercure::models::InvalidRunStatusError;
-use mercure::models::RunStatus;
+use mercure_lib::models::HgAttempt;
+use mercure_lib::models::InvalidRunStatusError;
+use mercure_lib::models::RunStatus;
 
 #[derive(Error, Debug)]
 enum RoutineError {
