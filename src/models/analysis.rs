@@ -93,8 +93,8 @@ pub async fn complete_failure(
         .map_err(AnalysisStateMachineError::from)
 }
 
-/// Transitionne un run en échec si le run est introuvable : Pending -> Failure
-pub async fn fail_run_not_found(
+/// Transitionne un run en échec si le run est introuvable, ou toute ature erreur empêchant le lancement : Pending -> Failure
+pub async fn fail_cannot_analyse_run(
     run_id: i64,
     reason: &str,
     pool: &SqlitePool,

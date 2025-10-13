@@ -9,6 +9,8 @@ pub struct MercureConfig {
     pub upload_folder: String,
     pub analysis_folder: String,
     pub static_dir: String,
+    pub pipeline_dir: String,
+    pub todo_dir: String,
 }
 
 impl Default for MercureConfig {
@@ -19,6 +21,8 @@ impl Default for MercureConfig {
             upload_folder: "/home/charles/mercure/uploads".into(),
             analysis_folder: "/home/charles/mercure/analysis".into(),
             static_dir: "/home/charles/mercure/static".into(),
+            pipeline_dir: "/home/charles/mercure/pipelines".into(),
+            todo_dir: "/home/charles/mercure/jobs/todo".into(),
         }
     }
 }

@@ -2,7 +2,10 @@ use chrono::Local;
 use env_logger::Builder;
 use log::{error, info};
 use mercure::config::get_mercure_config;
+use mercure::models::HgRun;
+use mercure::models::analysis;
 use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 
 // Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
@@ -43,6 +46,10 @@ enum RoutineError {
     DateParseError(#[from] chrono::ParseError),
     #[error("{0}")]
     CustomParseError(String),
+    #[error(transparent)]
+    ModelError(#[from] mercure::models::ModelError),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
@@ -62,18 +69,25 @@ async fn run_routine_loop(
         }
 
         // Recherche et traitement des runs en attente
-        let pending_runs = find_pending_runs(&pool).await;
-        for run in pending_runs {
-            match treat_pending(run, &pool).await {
+        let pending_attempts = find_pending_runs(&pool).await;
+        for attempt in pending_attempts {
+            match treat_pending(&attempt, &pool).await {
                 Ok(_) => {}
-                Err(e) => error!("Erreur lors du traitement d'un run en attente: {e}"),
+                Err(e) => {
+                    error!(
+                        "Erreur lors du traitement de la tentive {} du run {}: {e}",
+                        attempt.attempt_number, attempt.run_id
+                    );
+                    analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool)
+                        .await?;
+                }
             }
         }
 
         // Recherche et traitement des runs en cours
-        let running_runs = find_running_runs(&pool).await;
-        for run in running_runs {
-            match treat_running(run, &pool).await {
+        let running_attempts = find_running_runs(&pool).await;
+        for attempt in running_attempts {
+            match treat_running(attempt, &pool).await {
                 Ok(_) => {}
                 Err(e) => error!("Erreur lors du traitement d'un run en cours d'analyse: {e}"),
             }
@@ -92,7 +106,7 @@ async fn run_routine_loop(
 
 // Cette fonction crée un fichier tel que spécifié dans le formulaire
 // C'est HgRun qui a un membre dédié
-fn start_analysis(
+async fn start_analysis(
     attempt: &HgAttempt,
     run_dir: &PathBuf,
     pool: &sqlx::SqlitePool,
@@ -135,6 +149,67 @@ fn start_analysis(
         }
         info!("Dossier d'analyse créé: {}", analysis_dir.display());
     }
+
+    // Obtention des informations sur le pipeline et le launcher choisis
+    let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
+
+    // Le chemin du launcher doit être absolu. C'est ce chemin qui va se trouver dans le script généré
+    let launcher_abs_path = format!(
+        "{base}/{pipeline}/launchers/{launcher}",
+        base = config.pipeline_dir,
+        pipeline = run.form.pipeline_name,
+        launcher = run.form.launcher_name
+    );
+    if !std::fs::exists(&launcher_abs_path)? {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "Impossible de trouver le launcher au chemin suivant: {}",
+                launcher_abs_path
+            ),
+        ))
+        .map_err(RoutineError::from);
+    }
+
+    let script_path = format!(
+        "{todo_dir}/jobs-{run_id}-{attempt_number}",
+        todo_dir = config.todo_dir,
+        run_id = attempt.run_id,
+        attempt_number = attempt.attempt_number
+    );
+    if std::fs::exists(&script_path)? {
+        return Err(RoutineError::IOError(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("Le fichier {} existe déjà!", &script_path),
+        )));
+    }
+
+    let exported_vars = attempt
+        .user_defined_vars
+        .iter()
+        .map(|(k, v)| format!("export {k}={v}"))
+        .chain([
+            format!("export HG_RAWDIR={}", run_dir.display()),
+            format!("export HG_ANALYSIS_DIR={}", analysis_dir.display()),
+        ])
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut script_file = std::fs::OpenOptions::new()
+        .mode(0o775)
+        .create(true)
+        .open(&script_path)?;
+
+    write!(
+        &mut script_file,
+        r#"#!/bin/bash
+
+export PATH=/usr/bin:$PATH
+{}
+{}
+"#,
+        exported_vars, launcher_abs_path
+    )?;
 
     Ok(())
 }
@@ -228,7 +303,7 @@ fn get_supposed_run_dir_glob(run: &HgAttempt) -> String {
     )
 }
 
-async fn treat_pending(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
+async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     use chrono::{Duration, Local, NaiveDate};
     let supposed_run_dir = get_supposed_run_dir_glob(&attempt);
     let paths: Vec<PathBuf> = glob::glob(&supposed_run_dir)
@@ -248,7 +323,7 @@ async fn treat_pending(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
             attempt.attempt_number, attempt.run_id, supposed_run_dir
         );
         let reason = "Le run ne se trouvait pas à l'emplacement prévu. Il peut s'agir d'une erreur dans la date, le numéro de flowcell, ou du séquenceur";
-        mercure::models::analysis::fail_run_not_found(attempt.run_id, reason, pool)
+        mercure::models::analysis::fail_cannot_analyse_run(attempt.run_id, reason, pool)
             .await
             .map_err(RoutineError::from)?;
         Ok(())
@@ -262,7 +337,9 @@ async fn treat_pending(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
     } else {
         let run_dir = &paths[0];
         // On démarre l'analyse
-        start_analysis(&attempt, run_dir, pool)?;
+        start_analysis(&attempt, run_dir, pool).await?;
+
+        // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
         mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
             .await
             .map_err(RoutineError::from)?;

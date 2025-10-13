@@ -6,6 +6,8 @@ use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 
+use crate::config::MercureConfig;
+use crate::config::get_mercure_config;
 use crate::models::Group;
 use std::collections::HashMap;
 use std::fs;
@@ -47,7 +49,8 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
     } else {
         let groups = (Group::get_groups_with_ids(pool).await).unwrap_or_default();
-        let pipelines_struct = list_folders_with_launchers("pipelines");
+        let config: MercureConfig = get_mercure_config();
+        let pipelines_struct = list_folders_with_launchers(config.pipeline_dir);
 
         Template::render(
             "admin/newform",
