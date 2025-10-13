@@ -35,11 +35,3 @@ features = ["minijinja"]
 
 [dev-dependencies]
 rocket = { version = "0.5", features = ["secrets", "json"] }
-
-[[bin]]
-name = "mercure-admin"
-path = "mercure-admin/src/main.rs"
-
-[[bin]]
-name = "mercure-routine"
-path = "mercure-routine/src/main.rs"
