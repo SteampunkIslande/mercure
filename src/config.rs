@@ -7,6 +7,7 @@ pub struct MercureConfig {
     pub mercure_db: String,
     pub sequencers_folder: String,
     pub upload_folder: String,
+    pub analysis_folder: String,
     pub static_dir: String,
 }
 
@@ -16,6 +17,7 @@ impl Default for MercureConfig {
             mercure_db: "sqlite://mercure.db".into(),
             sequencers_folder: "/data/raw/sequenceurs".into(),
             upload_folder: "/home/charles/mercure/uploads".into(),
+            analysis_folder: "/home/charles/mercure/analysis".into(),
             static_dir: "/home/charles/mercure/static".into(),
         }
     }
