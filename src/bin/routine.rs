@@ -172,8 +172,8 @@ async fn start_analysis(
     }
 
     let script_path = format!(
-        "{todo_dir}/jobs-{run_id}-{attempt_number}",
-        todo_dir = config.todo_dir,
+        "{jobs_dir}/TODO/jobs-{run_id}-{attempt_number}",
+        jobs_dir = config.jobs_dir,
         run_id = attempt.run_id,
         attempt_number = attempt.attempt_number
     );
@@ -351,8 +351,60 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     }
 }
 async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
-    // À implémenter
-    Ok(())
+    let config = get_mercure_config();
+
+    let running_dir = format!("{}/RUNNING", config.jobs_dir);
+    let fails_dir = format!("{}/FAILS", config.jobs_dir);
+    let done_dir = format!("{}/DONE", config.jobs_dir);
+
+    let file_pattern = format!("*-job-{}-{}.sh", attempt.run_id, attempt.attempt_number);
+
+    let fails_files_pattern = format!("{}/{}", &fails_dir, file_pattern);
+    let fails_paths: Vec<PathBuf> = glob::glob(&fails_files_pattern)
+        .map_err(RoutineError::from)?
+        .filter_map(Result::ok)
+        .collect();
+    let done_files_pattern = format!("{}/{}", &done_dir, file_pattern);
+    let done_paths: Vec<PathBuf> = glob::glob(&done_files_pattern)
+        .map_err(RoutineError::from)?
+        .filter_map(Result::ok)
+        .collect();
+
+    // Chercher le chemin running en dernier dans le cas hautement improbable où le système de fichier a déplacé le script de running à done/fail entre le moment où on l'a trouvé dans running et le moment où on le cherche dans done/fail.
+    let running_files_pattern = format!("{}/{}", &running_dir, file_pattern);
+    let running_paths: Vec<PathBuf> = glob::glob(&running_files_pattern)
+        .map_err(RoutineError::from)?
+        .filter_map(Result::ok)
+        .collect();
+
+    if running_paths.len() + fails_paths.len() + done_paths.len() > 1 {
+        Err(RoutineError::CustomParseError(format!(
+            "La tentative {} pour le run {} apparaît dans plusieurs états à la fois",
+            attempt.attempt_number, attempt.run_id
+        )))
+    } else {
+        if running_paths.len() == 1 {
+            info!(
+                "La tentative {} du run {} n'est pas encore terminée.",
+                attempt.attempt_number, attempt.run_id
+            );
+        }
+        if fails_paths.len() == 1 {
+            info!(
+                "La tentative {} du run {} s'est terminée avec une erreur.",
+                attempt.attempt_number, attempt.run_id
+            );
+            analysis::complete_failure(attempt.run_id, "".into(), pool).await?;
+        }
+        if done_paths.len() == 1 {
+            info!(
+                "La tentative {} du run {} s'est terminée avec succès.",
+                attempt.attempt_number, attempt.run_id
+            );
+            analysis::complete_success(attempt.run_id, pool).await?;
+        }
+        Ok(())
+    }
 }
 
 #[tokio::main]
