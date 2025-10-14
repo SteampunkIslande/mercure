@@ -145,7 +145,7 @@ impl HgFormDef {
             // This is fine, we just want to update the groups
             duplicate_form_id
         } else {
-            sqlx::query(
+            let new_form_id = sqlx::query(
                 r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
             VALUES (?, ?, ?, ?, ?)
@@ -159,7 +159,58 @@ impl HgFormDef {
             .bind(new_formdef.version)
             .fetch_one(pool)
             .await?
-            .try_get(0usize)?
+            .try_get(0usize)?;
+            // Insert into UDV table
+            if let Some(user_defined_vars) = &new_formdef.user_defined_vars {
+                // Insert user_defined_vars into UDV table
+                for (varname, udv) in user_defined_vars {
+                    match udv {
+                        UserDefinedVar::FromValuesList { allowed } => {
+                            let values = allowed.join("\n");
+                            sqlx::query(
+                                r#"
+                        INSERT INTO UDV (form_id, varname, default_values, type)
+                        VALUES (?, ?, ?, 'FromValuesList')
+                        "#,
+                            )
+                            .bind(new_form_id)
+                            .bind(varname)
+                            .bind(values)
+                            .execute(pool)
+                            .await?;
+                        }
+                        UserDefinedVar::Constant(val) => {
+                            sqlx::query(
+                                r#"
+                        INSERT INTO UDV (form_id, varname, default_values, type)
+                        VALUES (?, ?, ?, 'Constant')
+                        "#,
+                            )
+                            .bind(new_form_id)
+                            .bind(varname)
+                            .bind(val)
+                            .execute(pool)
+                            .await?;
+                        }
+                        UserDefinedVar::RunDefined => {
+                            sqlx::query(
+                                r#"
+                        INSERT INTO UDV (form_id, varname, default_values, type)
+                        VALUES (?, ?, NULL, 'RunDefined')
+                        "#,
+                            )
+                            .bind(new_form_id)
+                            .bind(varname)
+                            .execute(pool)
+                            .await?;
+                        }
+                        _ => {
+                            eprintln!("Should be unreachable");
+                        }
+                    }
+                }
+            }
+            new_form_id
         };
 
         // Prepare groups associations by clearing them
@@ -185,55 +236,6 @@ impl HgFormDef {
             .await?;
         }
 
-        if let Some(user_defined_vars) = &new_formdef.user_defined_vars {
-            // Insert user_defined_vars into UDV table
-            for (varname, udv) in user_defined_vars {
-                match udv {
-                    UserDefinedVar::FromValuesList { allowed } => {
-                        let values = allowed.join("\n");
-                        sqlx::query(
-                            r#"
-                        INSERT INTO UDV (form_id, varname, default_values, type)
-                        VALUES (?, ?, ?, 'FromValuesList')
-                        "#,
-                        )
-                        .bind(form_id)
-                        .bind(varname)
-                        .bind(values)
-                        .execute(pool)
-                        .await?;
-                    }
-                    UserDefinedVar::Constant(val) => {
-                        sqlx::query(
-                            r#"
-                        INSERT INTO UDV (form_id, varname, default_values, type)
-                        VALUES (?, ?, ?, 'Constant')
-                        "#,
-                        )
-                        .bind(form_id)
-                        .bind(varname)
-                        .bind(val)
-                        .execute(pool)
-                        .await?;
-                    }
-                    UserDefinedVar::RunDefined => {
-                        sqlx::query(
-                            r#"
-                        INSERT INTO UDV (form_id, varname, default_values, type)
-                        VALUES (?, ?, NULL, 'RunDefined')
-                        "#,
-                        )
-                        .bind(form_id)
-                        .bind(varname)
-                        .execute(pool)
-                        .await?;
-                    }
-                    _ => {
-                        eprintln!("Should be unreachable");
-                    }
-                }
-            }
-        }
         Ok(())
     }
 
