@@ -17,7 +17,7 @@ impl Default for MercureConfig {
     fn default() -> Self {
         Self {
             mercure_db: "sqlite://mercure.db".into(),
-            sequencers_dir: "/data/raw/sequenceurs".into(),
+            sequencers_dir: "/home/charles/mercure/sequenceurs".into(),
             upload_dir: "/home/charles/mercure/uploads".into(),
             analysis_dir: "/home/charles/mercure/analysis".into(),
             static_dir: "/home/charles/mercure/static".into(),

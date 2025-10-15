@@ -104,8 +104,8 @@ async fn run_routine_loop(
     Ok(())
 }
 
-// Cette fonction crée un fichier tel que spécifié dans le formulaire
-// C'est HgRun qui a un membre dédié
+/// Cette fonction crée un fichier tel que spécifié dans le formulaire
+/// C'est HgRun qui a un membre dédié
 async fn start_analysis(
     attempt: &HgAttempt,
     run_dir: &PathBuf,
