@@ -12,6 +12,9 @@ pub struct JobInfo {
     pub wildcards: String,
 }
 
+/// Cette fonction lit un fichier de log ligne par ligne, et enregistre, pour chaque workflow lancé,
+/// les jobs associés avec leurs informations (ID SLURM, chemin du log, nom de la règle, wildcards).
+/// Elle retourne une HashMap où la clé est un tuple (run_id, order) et la valeur est une liste de JobInfo.
 pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobInfo>>, String> {
     let reader = BufReader::new(file);
 
@@ -34,8 +37,6 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
             let run_id = cap[1].to_string();
             current_run_id = Some(run_id.clone());
             current_order = 0;
-
-            println!("Inserting key: ({}, {})", run_id, current_order);
             runs.insert((run_id, current_order), Vec::new());
 
             continue;
@@ -45,7 +46,6 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
         if let Some(cap) = re_job.captures(&line) {
             if current_run_id.is_some() {
                 let slurm_id = cap[1].to_string();
-                println!("Extracted slurm_id: {}", slurm_id);
                 let log_path = cap[2].to_string();
 
                 let rule_name = Path::new(&log_path)
@@ -66,7 +66,6 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
 
                 if let Some(run_id) = current_run_id.as_ref() {
                     runs.entry((run_id.clone(), current_order)).and_modify(|v| {
-                        println!("Adding JobInfo to key: ({}, {})", run_id, current_order);
                         v.push(JobInfo {
                             slurm_id,
                             log_path,
