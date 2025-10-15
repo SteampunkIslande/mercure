@@ -70,7 +70,7 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
             RunStatus::Idle => {
                 // Get sequencers list for edit form
                 let config = get_mercure_config();
-                let sequenceurs_folder = config.sequencers_folder;
+                let sequenceurs_folder = config.sequencers_dir;
 
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
                     .ok()

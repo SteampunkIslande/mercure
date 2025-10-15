@@ -15,10 +15,10 @@ mercure_db = "sqlite://mercure.db"
 
 template_dir = "/home/charles/mercure/static/templates"
 static_dir = "/home/charles/mercure/static"
-upload_folder = "/home/charles/mercure-arena/uploads"
+upload_dir = "/home/charles/mercure-arena/uploads"
 
 pipeline_dir = "/home/charles/mercure/pipelines"
 todo_dir = "/home/charles/mercure-arena/OPT/JOBS/TODO"
 
-sequencers_folder = "/home/charles/mercure-arena/data/raw/sequenceurs"
-analysis_folder = "/home/charles/mercure-arena/data/analysis"
+sequencers_dir = "/home/charles/mercure-arena/data/raw/sequenceurs"
+analysis_dir = "/home/charles/mercure-arena/data/analysis"

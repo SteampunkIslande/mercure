@@ -17,7 +17,7 @@ pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<Str
     let config = get_mercure_config();
 
     // Get upload directory
-    let upload_dir = PathBuf::from(config.upload_folder);
+    let upload_dir = PathBuf::from(config.upload_dir);
 
     // Ensure directory exists
     if !upload_dir.exists() && std::fs::create_dir_all(&upload_dir).is_err() {

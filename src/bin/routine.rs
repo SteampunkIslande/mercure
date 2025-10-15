@@ -114,7 +114,7 @@ async fn start_analysis(
     use std::fs;
 
     let config = get_mercure_config();
-    let analysis_base_dir = PathBuf::from(&config.analysis_folder);
+    let analysis_base_dir = PathBuf::from(&config.analysis_dir);
 
     // Extraction du nom brut du dossier de run
     let run_rawdir_basename =
@@ -296,7 +296,7 @@ fn get_supposed_run_dir_glob(run: &HgAttempt) -> String {
     let config = get_mercure_config();
     format!(
         "{raw}/{seq}/output/{date}_{seq}_*_{flowcellid}",
-        raw = config.sequencers_folder,
+        raw = config.sequencers_dir,
         seq = run.run_sequencer,
         date = run.run_date[2..].replace("-", ""),
         flowcellid = run.run_flowcellid

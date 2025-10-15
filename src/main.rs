@@ -32,7 +32,7 @@ async fn rocket() -> _ {
     rocket::build()
         .register("/", catchers![unauthorized])
         .mount("/static", FileServer::from(config.static_dir))
-        .mount("/uploads", FileServer::from(config.upload_folder))
+        .mount("/uploads", FileServer::from(config.upload_dir))
         .mount(
             "/mercure",
             routes![

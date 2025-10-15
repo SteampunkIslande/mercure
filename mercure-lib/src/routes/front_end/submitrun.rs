@@ -11,7 +11,7 @@ use std::fs::read_dir;
 #[get("/runs/submit/<form_id>")]
 pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqlitePool>) -> Template {
     let config = get_mercure_config();
-    let sequenceurs_folder = config.sequencers_folder;
+    let sequenceurs_folder = config.sequencers_dir;
 
     // List directories at the top level of sequencers_folder
     let sequenceurs_list = read_dir(&sequenceurs_folder)

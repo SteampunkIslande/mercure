@@ -5,9 +5,9 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct MercureConfig {
     pub mercure_db: String,
-    pub sequencers_folder: String,
-    pub upload_folder: String,
-    pub analysis_folder: String,
+    pub sequencers_dir: String,
+    pub upload_dir: String,
+    pub analysis_dir: String,
     pub static_dir: String,
     pub pipeline_dir: String,
     pub jobs_dir: String,
@@ -17,9 +17,9 @@ impl Default for MercureConfig {
     fn default() -> Self {
         Self {
             mercure_db: "sqlite://mercure.db".into(),
-            sequencers_folder: "/data/raw/sequenceurs".into(),
-            upload_folder: "/home/charles/mercure/uploads".into(),
-            analysis_folder: "/home/charles/mercure/analysis".into(),
+            sequencers_dir: "/data/raw/sequenceurs".into(),
+            upload_dir: "/home/charles/mercure/uploads".into(),
+            analysis_dir: "/home/charles/mercure/analysis".into(),
             static_dir: "/home/charles/mercure/static".into(),
             pipeline_dir: "/home/charles/mercure/pipelines".into(),
             jobs_dir: "/home/charles/mercure/JOBS".into(),

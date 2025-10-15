@@ -42,7 +42,7 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
     };
     let config = get_mercure_config();
     // Get upload directory
-    let upload_dir = PathBuf::from(config.upload_folder);
+    let upload_dir = PathBuf::from(config.upload_dir);
 
     let samplesheet_rel_path = match Path::new(form.file_name).strip_prefix(upload_dir) {
         Ok(p) => p,
