@@ -72,76 +72,111 @@
                 return response.json();
             }).then((res) => {
                 const formDefinition = res.data;
+                const pipelinesStruct = {{ pipelines_struct | tojson
+            }};
+        updateLauncherField();
 
+        // PIPELINE
+        if (formDefinition.pipeline_name) {
+            if (!pipelinesStruct.hasOwnProperty(formDefinition.pipeline_name)) {
+                // Pipeline archivé
+                document.getElementById("pipeline_name").style.display = "none";
+                let archivedLabel = document.getElementById("archived-pipeline-label");
+                if (!archivedLabel) {
+                    archivedLabel = document.createElement("span");
+                    archivedLabel.id = "archived-pipeline-label";
+                    archivedLabel.style.fontWeight = "bold";
+                    archivedLabel.textContent = formDefinition.pipeline_name + " (archivé)";
+                    document.getElementById("pipeline_name").parentElement.appendChild(archivedLabel);
+                }
+            } else {
+                document.getElementById("pipeline_name").onchange = null;
+                document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
                 updateLauncherField();
+                document.getElementById("pipeline_name").onchange = updateLauncherField;
+                let archivedLabel = document.getElementById("archived-pipeline-label");
+                if (archivedLabel) archivedLabel.remove();
+                document.getElementById("pipeline_name").style.display = "";
+            }
+        }
 
-                // Update form fields based on the fetched definition
-                if (formDefinition.pipeline_name) {
-                    // Temporarily disable onchange to avoid clearing the launcher field
-                    document.getElementById("pipeline_name").onchange = null;
-                    document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
-                    // Met à jour la liste des launchers après avoir sélectionné le pipeline
-                    updateLauncherField();
-                    // Re-enable onchange handler
-                    document.getElementById("pipeline_name").onchange = updateLauncherField;
+        // LAUNCHER
+        if (formDefinition.launcher_name) {
+            let validLauncher = false;
+            if (formDefinition.pipeline_name && pipelinesStruct.hasOwnProperty(formDefinition.pipeline_name)) {
+                validLauncher = pipelinesStruct[formDefinition.pipeline_name].includes(formDefinition.launcher_name);
+            }
+            if (!validLauncher) {
+                document.getElementById("launcher_name").style.display = "none";
+                let archivedLabel = document.getElementById("archived-launcher-label");
+                if (!archivedLabel) {
+                    archivedLabel = document.createElement("span");
+                    archivedLabel.id = "archived-launcher-label";
+                    archivedLabel.style.fontWeight = "bold";
+                    archivedLabel.textContent = formDefinition.launcher_name + " (archivé)";
+                    document.getElementById("launcher_name").parentElement.appendChild(archivedLabel);
                 }
+                document.getElementById("launcher-container").style.display = "block";
+            } else {
+                document.getElementById("launcher_name").value = formDefinition.launcher_name;
+                document.getElementById("launcher_name").style.display = "";
+                let archivedLabel = document.getElementById("archived-launcher-label");
+                if (archivedLabel) archivedLabel.remove();
+                document.getElementById("launcher-container").style.display = "block";
+            }
+        }
 
-                if (formDefinition.launcher_name) {
-                    document.getElementById("launcher_name").value = formDefinition.launcher_name;
-                    document.getElementById("launcher-container").style.display = "block";
-                }
+        if (formDefinition.version) {
+            document.getElementById("version").value = formDefinition.version;
+        }
 
-                if (formDefinition.version) {
-                    document.getElementById("version").value = formDefinition.version;
-                }
+        if (formDefinition.form_name) {
+            document.getElementById("form_name").value = formDefinition.form_name;
+        }
 
-                if (formDefinition.form_name) {
-                    document.getElementById("form_name").value = formDefinition.form_name;
-                }
-
-                if (formDefinition.groups && Array.isArray(formDefinition.groups)) {
-                    const groupsContainer = document.getElementById("groups-container");
-                    formDefinition.groups.forEach(group => {
-                        const groupDiv = document.getElementById(`group_${group.id}`)
-                        groupDiv.setAttribute("checked", null);
-                    });
-                }
-
-                if (formDefinition.user_defined_vars) {
-                    const userVarsContainer = document.getElementById("user-vars-container");
-                    userVarsContainer.innerHTML = ""; // Clear existing user vars
-                    userVarCounter = 0;
-
-                    Object.entries(formDefinition.user_defined_vars).forEach(([varName, varDetails], index) => {
-                        addUserVar();
-                        document.getElementById(`var_name_${index}`).value = varName;
-                        if (isVarTypeOf(varDetails, Object)) {
-                            if (varDetails.Constant) {
-                                document.getElementById(`var_type_${index}`).value = "Constant";
-                                document.getElementById(`var_values_${index}`).style.display = "block";
-                                document.getElementById(`var_content_${index}`).value = varDetails.Constant;
-                            }
-                            if (varDetails.FromValuesList) {
-                                document.getElementById(`var_type_${index}`).value = "FromValuesList";
-                                document.getElementById(`var_values_${index}`).style.display = "block";
-                                document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
-                            }
-                        }
-                        else {
-                            // Seule exception, si on n'a ni valeurs permises, ni valeur constante, c'est que c'est une variable définie au lancement
-                            document.getElementById(`var_type_${index}`).value = "RunDefined";
-                        }
-                    });
-                }
-            }).catch((error) => {
-                console.error("Erreur:", error);
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = error;
-                errorDiv.style.display = "block";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 8000);
+        if (formDefinition.groups && Array.isArray(formDefinition.groups)) {
+            const groupsContainer = document.getElementById("groups-container");
+            formDefinition.groups.forEach(group => {
+                const groupDiv = document.getElementById(`group_${group.id}`)
+                groupDiv.setAttribute("checked", null);
             });
+        }
+
+        if (formDefinition.user_defined_vars) {
+            const userVarsContainer = document.getElementById("user-vars-container");
+            userVarsContainer.innerHTML = ""; // Clear existing user vars
+            userVarCounter = 0;
+
+            Object.entries(formDefinition.user_defined_vars).forEach(([varName, varDetails], index) => {
+                addUserVar();
+                document.getElementById(`var_name_${index}`).value = varName;
+                if (isVarTypeOf(varDetails, Object)) {
+                    if (varDetails.Constant) {
+                        document.getElementById(`var_type_${index}`).value = "Constant";
+                        document.getElementById(`var_values_${index}`).style.display = "block";
+                        document.getElementById(`var_content_${index}`).value = varDetails.Constant;
+                    }
+                    if (varDetails.FromValuesList) {
+                        document.getElementById(`var_type_${index}`).value = "FromValuesList";
+                        document.getElementById(`var_values_${index}`).style.display = "block";
+                        document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
+                    }
+                }
+                else {
+                    // Seule exception, si on n'a ni valeurs permises, ni valeur constante, c'est que c'est une variable définie au lancement
+                    document.getElementById(`var_type_${index}`).value = "RunDefined";
+                }
+            });
+        }
+            }).catch ((error) => {
+            console.error("Erreur:", error);
+            const errorDiv = document.getElementById("error-message");
+            errorDiv.textContent = error;
+            errorDiv.style.display = "block";
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 8000);
+        });
         }
 
         {% endif %}
