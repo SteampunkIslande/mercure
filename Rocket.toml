@@ -17,8 +17,8 @@ template_dir = "/home/charles/mercure/static/templates"
 static_dir = "/home/charles/mercure/static"
 upload_dir = "/home/charles/mercure-arena/uploads"
 
-pipeline_dir = "/home/charles/mercure/pipelines"
-todo_dir = "/home/charles/mercure-arena/OPT/JOBS/TODO"
+pipeline_dir = "/home/charles/mercure-arena/OPT/pipelines"
+jobs_dir = "/home/charles/mercure-arena/OPT/JOBS"
 
 sequencers_dir = "/home/charles/mercure-arena/data/raw/sequenceurs"
 analysis_dir = "/home/charles/mercure-arena/data/analysis"

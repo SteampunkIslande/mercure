@@ -30,5 +30,5 @@ impl Default for MercureConfig {
 pub fn get_mercure_config() -> MercureConfig {
     config::Config::figment()
         .extract::<MercureConfig>()
-        .unwrap_or_default()
+        .expect("Invalid rocket configuration")
 }
