@@ -39,57 +39,51 @@
         var initialState = {};
         var userId = "{{ user.id }}";
 
-        function init() {
+        async function init() {
             const userId = "{{ user.id }}";
             initialState = {};
             const groupsContainer = document.getElementById("groups-container");
             groupsContainer.innerHTML = ""; // Clear existing groups
 
-            fetch("/mercure/api/groups/list")
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error("Erreur lors du chargement des groupes.");
-                    }
-                    return response.json();
-                })
-                .then((data) => {
-                    if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-                        data.data.forEach((group) => {
-                            const groupDiv = document.createElement("div");
-                            groupDiv.className = "group-checkbox";
-                            groupDiv.innerHTML = `
+            try {
+                const response = await fetch("/mercure/api/groups/list");
+                if (!response.ok) {
+                    throw new Error("Erreur lors du chargement des groupes.");
+                }
+                const data = await response.json();
+                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+                    data.data.forEach((group) => {
+                        const groupDiv = document.createElement("div");
+                        groupDiv.className = "group-checkbox";
+                        groupDiv.innerHTML = `
             <input type="checkbox" id="group-${group.id}" name="selected_groups" value="${group.id}">
             <label id="label-group-${group.id}" for="group_${group.id}">${group.name}</label>
           `;
-                            groupsContainer.appendChild(groupDiv);
-                        });
-                    }
-                    if (data.success && Array.isArray(data.data) && data.data.length == 0) {
-                        groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
-                    }
-                })
-                .then(() => {
-                    fetch(`/mercure/api/groups/list/${userId}`)
-                        .then(res => res.json())
-                        .then((userGroupsData) => {
-                            userGroupsData.data.forEach(userGroup => {
-                                const checkbox = document.getElementById(`group-${userGroup.id}`);
-                                checkbox.checked = true;
-                            })
-                        }).then(() => {
-                            const checkboxes = document.querySelectorAll("input[name='selected_groups']");
-                            checkboxes.forEach(checkbox => {
-                                initialState[checkbox.id] = checkbox.checked;
-                            });
-                        })
-                })
-                .catch((error) => {
-                    console.error(error);
-                    alert(error.message);
+                        groupsContainer.appendChild(groupDiv);
+                    });
+                }
+                if (data.success && Array.isArray(data.data) && data.data.length == 0) {
+                    groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
+                }
+
+                const userGroupsRes = await fetch(`/mercure/api/groups/list/${userId}`);
+                const userGroupsData = await userGroupsRes.json();
+                userGroupsData.data.forEach(userGroup => {
+                    const checkbox = document.getElementById(`group-${userGroup.id}`);
+                    if (checkbox) checkbox.checked = true;
                 });
+
+                const checkboxes = document.querySelectorAll("input[name='selected_groups']");
+                checkboxes.forEach(checkbox => {
+                    initialState[checkbox.id] = checkbox.checked;
+                });
+            } catch (error) {
+                console.error(error);
+                alert(error.message);
+            }
         }
 
-        function submitForm() {
+        async function submitForm() {
             const checkboxes = document.querySelectorAll("input[name='selected_groups']");
             const to_add = [];
             const to_remove = [];
@@ -107,14 +101,16 @@
             const payload = JSON.stringify({ user_id: parseInt(userId), to_add, to_remove });
             console.log(payload);
 
-            fetch("/mercure/api/groups/update", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: payload
-            }).then((response) => response.json()).then((data) => {
-                init(); // Re-initialize to reflect changes
+            try {
+                const response = await fetch("/mercure/api/groups/update", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: payload
+                });
+                const data = await response.json();
+                await init(); // Re-initialize to reflect changes
                 if (!data.success) {
                     alert("Erreur lors de la mise à jour des groupes : " + data.message);
                     const infoDiv = document.getElementById("info-message");
@@ -138,21 +134,22 @@
                         infoDiv.style.display = 'none';
                     }, 2000);
                 }
-            })
-                .catch((e) => {
-                    const infoDiv = document.getElementById("info-message");
-                    const errorDiv = document.getElementById("error-message");
-                    infoDiv.style.display = 'none';
-                    errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = `<span class="material-icons icon-align"
+            } catch (e) {
+                const infoDiv = document.getElementById("info-message");
+                const errorDiv = document.getElementById("error-message");
+                infoDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = `<span class="material-icons icon-align"
             style="color:red;">error</span>${e}`;
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 2000);
-                });
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 2000);
+            }
         }
 
-        window.onload = init;
+        window.addEventListener("DOMContentLoaded", async () => {
+            await init();
+        });
 
 
     </script>

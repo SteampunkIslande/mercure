@@ -47,39 +47,40 @@
         }
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            init();
+        document.addEventListener("DOMContentLoaded", async function () {
+            await init();
             addUserVar();
-            load_groups();
+            await load_groups();
             updateLauncherField();
             {%if formid %}
-            fetchFormDefinition();
+            await fetchFormDefinition();
             {% endif %}
         });
 
-        function init() {
+        async function init() {
             userVarCounter = 0;
         }
 
         // Only fetch form definition in case we are in edit mode
         {%if formid %}
 
-        function fetchFormDefinition() {
+        async function fetchFormDefinition() {
 
             const formId = "{{ formid }}"; // Read formid from template context
 
             const endpoint = `/mercure/api/forms/${formId}`;
-            fetch(endpoint, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }).then(response => {
+            try {
+                const response = await fetch(endpoint, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    }
+                });
+
                 if (!response.ok) {
                     throw new Error("Erreur lors de la récupération du formulaire.");
                 }
-                return response.json();
-            }).then((res) => {
+                const res = await response.json();
                 const formDefinition = res.data;
                 const pipelinesStruct = {{ pipelines_struct | tojson
             }};
@@ -101,7 +102,7 @@
             } else {
                 document.getElementById("pipeline_name").onchange = null;
                 document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
-                updateLauncherField();
+                await updateLauncherField();
                 document.getElementById("pipeline_name").onchange = updateLauncherField;
                 let archivedLabel = document.getElementById("archived-pipeline-label");
                 if (archivedLabel) archivedLabel.remove();
@@ -159,7 +160,7 @@
             Object.entries(formDefinition.user_defined_vars).forEach(([varName, varDetails], index) => {
                 addUserVar();
                 document.getElementById(`var_name_${index}`).value = varName;
-                if (isVarTypeOf(varDetails, Object)) {
+                if (varDetails.constructor === Object) {
                     if (varDetails.Constant) {
                         document.getElementById(`var_type_${index}`).value = "Constant";
                         document.getElementById(`var_values_${index}`).style.display = "block";
@@ -177,7 +178,7 @@
                 }
             });
         }
-            }).catch ((error) => {
+            } catch (error) {
             console.error("Erreur:", error);
             const errorDiv = document.getElementById("error-message");
             errorDiv.textContent = error;
@@ -185,14 +186,14 @@
             setTimeout(() => {
                 errorDiv.style.display = 'none';
             }, 8000);
-        });
+        }
         }
 
         {% endif %}
     </script>
 
     <script>
-        function submitForm() {
+        async function submitForm() {
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
             const formName = document.getElementById("form_name").value;
@@ -243,36 +244,32 @@
                 version: parseInt(version) || -1
             };
 
-            fetch("/mercure/api/newform", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(formData),
-            })
-                .then((response) => {
-                    if (response.ok) {
-                        return response.json(); // Extract JSON from the response
-                    } else {
-                        throw new Error("Erreur lors de la soumission du formulaire.");
-                    }
-                })
-                .then((data) => {
-                    if (!data.success) {
-                        throw new Error(data.message);
-                    }
-                    const message = data.data || "Opération réussie"; // Retrieve the message
-                    window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
-                })
-                .catch((error) => {
-                    console.error("Erreur:", error);
-                    const errorDiv = document.getElementById("error-message");
-                    errorDiv.textContent = error;
-                    errorDiv.style.display = "block";
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 8000);
+            try {
+                const response = await fetch("/mercure/api/newform", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(formData),
                 });
+                if (!response.ok) {
+                    throw new Error("Erreur lors de la soumission du formulaire.");
+                }
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+                const message = data.data || "Opération réussie";
+                window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
+            } catch (error) {
+                console.error("Erreur:", error);
+                const errorDiv = document.getElementById("error-message");
+                errorDiv.textContent = error;
+                errorDiv.style.display = "block";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 8000);
+            }
         }
     </script>
 
