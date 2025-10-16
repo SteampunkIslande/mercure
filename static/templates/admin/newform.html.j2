@@ -25,6 +25,15 @@
         // Clear previous options
         launcherSelect.innerHTML = '';
 
+        // Ajoute l'option vide par défaut
+        var defaultOption = document.createElement('option');
+        defaultOption.value = "";
+        defaultOption.text = "-- Sélectionnez un launcher --";
+        launcherSelect.appendChild(defaultOption);
+
+        // Réinitialise la sélection à vide
+        launcherSelect.value = "";
+
         if (selectedPipeline && schema[selectedPipeline]) {
             schema[selectedPipeline].forEach(function (val) {
                 var option = document.createElement('option');
