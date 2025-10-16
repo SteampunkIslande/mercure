@@ -73,7 +73,7 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
                 {
                     Ok(_) => Json(ApiResponse::success(json!(
                     {
-                        "message":format!(r#"<div class="warning-msg" style="animation:none;"><span class="material-icons icon-align" style="color:orange;">warning</span>La samplesheet a pu être corrigée, aucune action requise de votre part. Le résultat est disponible à <a href="/uploads/{}" download>cette adresse</a></div>"#, samplesheet_rel_path.to_string_lossy()),
+                        "message":format!(r#"<div class="warning-msg" style="animation:none;"><span class="material-icons icon-align" style="color:orange;">warning</span>La samplesheet a été corrigée car elle contenait une ou des erreur(s), veuillez tracer l'incident. La samplesheet modifiée est disponible à <a href="/uploads/{}" download>cette adresse</a></div>"#, samplesheet_rel_path.to_string_lossy()),
 
                         "check":"fixable",
 
