@@ -73,14 +73,22 @@
             }).then((res) => {
                 const formDefinition = res.data;
 
+                updateLauncherField();
+
                 // Update form fields based on the fetched definition
                 if (formDefinition.pipeline_name) {
+                    // Temporarily disable onchange to avoid clearing the launcher field
+                    document.getElementById("pipeline_name").onchange = null;
                     document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
-                    updateLauncherField(); // Update launcher options
+                    // Met à jour la liste des launchers après avoir sélectionné le pipeline
+                    updateLauncherField();
+                    // Re-enable onchange handler
+                    document.getElementById("pipeline_name").onchange = updateLauncherField;
                 }
 
                 if (formDefinition.launcher_name) {
                     document.getElementById("launcher_name").value = formDefinition.launcher_name;
+                    document.getElementById("launcher-container").style.display = "block";
                 }
 
                 if (formDefinition.version) {

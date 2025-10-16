@@ -1,3 +1,4 @@
+use crate::config::{MercureConfig, get_mercure_config};
 use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
@@ -16,7 +17,8 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
     } else {
         let groups = (Group::get_groups_with_ids(pool).await).unwrap_or_default();
-        let pipelines_struct = list_folders_with_launchers("pipelines");
+        let config: MercureConfig = get_mercure_config();
+        let pipelines_struct = list_folders_with_launchers(config.pipeline_dir);
 
         Template::render(
             "admin/newform",
