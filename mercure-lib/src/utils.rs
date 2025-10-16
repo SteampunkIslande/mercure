@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
 
@@ -168,5 +170,41 @@ pub fn format_french_date(date_str: &str) -> String {
     } else {
         // Fallback si le parsing échoue
         date_str.to_string()
+    }
+}
+
+pub fn parse_launcher(launcher_content: &str) -> Result<HashMap<String, String>, String> {
+    // In the launcher content, look for lines starting with ## VAR_NAME description
+    let mut vars: HashMap<String, String> = HashMap::new();
+    let re = regex::Regex::new(r"(?m)^##\s*(\S+)\s+(.+)$").map_err(|e| e.to_string())?;
+
+    for cap in re.captures_iter(launcher_content) {
+        if let (Some(var), Some(desc)) = (cap.get(1), cap.get(2)) {
+            let var_name = var.as_str().to_string();
+            vars.insert(var_name, desc.as_str().to_string());
+        }
+    }
+
+    Ok(vars)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_launcher() {
+        let launcher_content = r#"
+## VAR1 Description of var1
+## VAR2 Description of var2
+Some other content
+## VAR3 Description of var3
+        "#;
+
+        let vars = parse_launcher(launcher_content).unwrap();
+        assert_eq!(vars.get("VAR1"), Some(&"Description of var1".to_string()));
+        assert_eq!(vars.get("VAR2"), Some(&"Description of var2".to_string()));
+        assert_eq!(vars.get("VAR3"), Some(&"Description of var3".to_string()));
+        assert_eq!(vars.len(), 3);
     }
 }

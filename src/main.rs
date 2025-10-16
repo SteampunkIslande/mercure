@@ -95,6 +95,7 @@ async fn rocket() -> _ {
                 routes::backend::list_runs_get,
                 routes::backend::check_samplesheet,
                 routes::backend::list_samples_from_samplesheet,
+                routes::backend::parse_launcher_endpoint,
             ],
         )
         .manage(pool)
