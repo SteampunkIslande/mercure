@@ -118,9 +118,9 @@ impl HgFormDef {
 
         // If there is already a form with the same name and version, check if the user-defined variables are the same
         // If they are, this means the user may have only tried to change the associated groups, so we allow it
-        let form_id = if let Some(duplicate_form_id) = sqlx::query(
+        let form_id = if let Some((duplicate_form_id,launcher_name,pipeline_name)) = sqlx::query(
             r#"
-            SELECT form_name,version,form_id FROM Formdef WHERE form_name = ? AND version = ?
+            SELECT form_name,version,form_id,launcher_name,pipeline_name FROM Formdef WHERE form_name = ? AND version = ?
             "#,
         )
         .bind(&new_formdef.form_name)
@@ -129,7 +129,11 @@ impl HgFormDef {
         .await
         .ok()
         .iter()
-        .filter_map(|row| row.try_get::<i64, &str>("form_id").ok())
+        .filter_map(|row| Some(
+            (row.try_get::<i64, &str>("form_id").ok()?,
+             row.try_get::<String, &str>("launcher_name").ok()?,
+             row.try_get::<String, &str>("pipeline_name").ok()?))
+        )
         .next()
         {
             // Reduce empty map to None, to make it easier to compare
@@ -140,6 +144,11 @@ impl HgFormDef {
             if old_user_defined_vars.as_ref() != new_formdef.user_defined_vars.as_ref() {
                 return Err(ModelError::FormError(String::from(
                     "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
+                )));
+            }
+            if pipeline_name != new_formdef.pipeline_name || launcher_name != new_formdef.launcher_name {
+                return Err(ModelError::FormError(String::from(
+                    "Un formulaire avec le même nom et la même version existe déjà, mais avec un pipeline ou un launcher différent. Veuillez augmenter le numéro de version",
                 )));
             }
             // This is fine, we just want to update the groups
