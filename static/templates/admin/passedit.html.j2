@@ -19,6 +19,11 @@
             </div>
         </div>
     </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
     <div class="container">
         <input type="hidden" name="user_id" id="user_id" value="{{ edited_user.id }}">
         {% if not auth_user.is_admin %}
@@ -44,9 +49,6 @@
             <a class="btn btn-secondary" href="/mercure/home">Retour</a>
             {% endif %}
         </div>
-
-        <div id="error-message" class="error-msg" style="display:none;"></div>
-        <div id="info-message" class="info-msg" style="display:none;"></div>
     </div>
     <script>
         function submitForm() {

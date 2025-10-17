@@ -23,6 +23,10 @@
         </div>
     </div>
 
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
     <div class="tab">
         {% for group in user_groups %}
 
@@ -198,8 +202,6 @@
 
     </script>
     <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
-    <div class="error-msg" id="error-message" style="display: none;"></div>
-    <div class="info-msg" id="info-message" style="display: none;"></div>
 </body>
 
 </html>

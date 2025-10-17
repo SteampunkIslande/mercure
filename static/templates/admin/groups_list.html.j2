@@ -20,6 +20,11 @@
             </div>
         </div>
     </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
     <div id="groups-container">
     </div>
     <div style="text-align: center; margin-top: 20px;">
@@ -30,8 +35,6 @@
         <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
         <a class="btn btn-secondary" href="/mercure/admin/dashboard">Retour au tableau de bord</a>
     </div>
-    <div id="error-message" style="display: none;" class="error-msg"></div>
-    <div id="info-message" style="display: none;" class="info-msg"></div>
     </form>
 
     <script>
@@ -99,7 +102,6 @@
             });
 
             const payload = JSON.stringify({ user_id: parseInt(userId), to_add, to_remove });
-            console.log(payload);
 
             try {
                 const response = await fetch("/mercure/api/groups/update", {
