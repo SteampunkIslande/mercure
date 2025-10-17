@@ -73,7 +73,7 @@
         }
 
         // Fetch users on page load
-        fetchUsers();
+        document.addEventListener("DOMContentLoaded", async () => { await fetchUsers() });
     </script>
     <div style="text-align: center; margin-top: 20px;">
         <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>

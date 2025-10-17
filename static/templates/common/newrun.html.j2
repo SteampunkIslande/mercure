@@ -8,7 +8,7 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/utils.js"></script>
+
     <script src="/static/scripts/json_list.js"></script>
 </head>
 
@@ -251,7 +251,7 @@
             }
         });
 
-        document.getElementById('newrun-form').addEventListener('submit', function (event) {
+        document.getElementById('newrun-form').addEventListener('submit', async function (event) {
             event.preventDefault();
 
             // Collect user_defined_vars
@@ -277,29 +277,28 @@
                 user_defined_vars: userDefinedVars
             };
 
-            fetch('/mercure/api/newrun', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            })
-                .then(response => response.json())
-                .then(data => {
-                    const messageDiv = document.getElementById('message');
-                    if (data.success) {
-                        messageDiv.innerHTML = '<span style="color: green;">' + data.data.message + '</span>';
-                        console.log(data.data);
-                        setTimeout(() => {
-                            window.location.href = "/mercure/show/run/" + data.data.run_id;
-                        }, 1000);
-                    } else {
-                        messageDiv.innerHTML = '<span style="color: red;">' + data.message + '</span>';
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('message').innerHTML = '<span style="color: red;">Erreur: ' + error + '</span>';
+            try {
+                const response = await fetch('/mercure/api/newrun', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
                 });
+                const data = await response.json();
+                const messageDiv = document.getElementById('message');
+                if (data.success) {
+                    messageDiv.innerHTML = '<span style="color: green;">' + data.data.message + '</span>';
+                    console.log(data.data);
+                    setTimeout(() => {
+                        window.location.href = "/mercure/show/run/" + data.data.run_id;
+                    }, 1000);
+                } else {
+                    messageDiv.innerHTML = '<span style="color: red;">' + data.message + '</span>';
+                }
+            } catch (error) {
+                document.getElementById('message').innerHTML = '<span style="color: red;">Erreur: ' + error + '</span>';
+            }
         });
 
 

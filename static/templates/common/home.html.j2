@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/utils.js"></script>
+
     <script src="/static/scripts/show_message.js"></script>
 </head>
 
@@ -114,10 +114,11 @@
             const userGroups = {{ user_groups | tojson }};
 
             if (userGroups) {
-                userGroups.forEach((group, index, _) => {
-                    fetch(`/mercure/api/forms/groups/${group.id}`)
-                        .then(response => response.json())
-                        .then(forms => {
+                async function loadGroupForms() {
+                    for (let group of userGroups) {
+                        try {
+                            const response = await fetch(`/mercure/api/forms/groups/${group.id}`);
+                            const forms = await response.json();
                             // Always append to tbody if present, otherwise to table
                             let table = document.getElementById(`forms-container-${group.id}`);
                             let container = table.querySelector('tbody');
@@ -137,26 +138,28 @@
                                     container.appendChild(formBox);
                                 }
                             });
-                        })
-                        .catch(error => console.error('Error fetching forms:', error));
+                        } catch (error) {
+                            console.error('Error fetching forms:', error);
+                        }
+                    }
+                }
+                document.addEventListener('DOMContentLoaded', () => {
+                    loadGroupForms();
                 });
 
-                function toggleFormActive(e, formId) {
+                async function toggleFormActive(e, formId) {
                     let toggle = e.target.checked ? "enable" : "disable";
-                    fetch(`/mercure/api/${toggle}/${formId}`)
-                        .then(response => response.json())
-                        .then(
-                            data => {
-                                if (data.success) {
-                                    showMessage('info', data.data);
-                                }
-                                else {
-                                    showMessage('error', data.message);
-                                }
-                            }
-                        ).catch(error => {
-                            showMessage('error', error);
-                        });
+                    try {
+                        const response = await fetch(`/mercure/api/${toggle}/${formId}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            showMessage('info', data.data);
+                        } else {
+                            showMessage('error', data.message);
+                        }
+                    } catch (error) {
+                        showMessage('error', error);
+                    }
                 }
             }
         </script>

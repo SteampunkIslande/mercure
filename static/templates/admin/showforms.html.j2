@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/utils.js"></script>
+
     <script src="/static/scripts/show_message.js"></script>
 </head>
 
@@ -81,10 +81,11 @@
 
     <script>
         const userGroups = {{ user_groups | tojson }};
-        userGroups.forEach((group, index, _) => {
-            fetch(`/mercure/api/forms/groups/${group.id}`)
-                .then(response => response.json())
-                .then(forms => {
+        async function loadGroupForms() {
+            for (let [index, group] of userGroups.entries()) {
+                try {
+                    const response = await fetch(`/mercure/api/forms/groups/${group.id}`);
+                    const forms = await response.json();
                     // Always append to tbody if present, otherwise to table
                     let table = document.getElementById(`forms-container-${group.id}`);
                     let container = table.querySelector('tbody');
@@ -107,7 +108,7 @@
                         container.appendChild(formBox);
                     });
                     {% if is_admin %}
-                    if (index == 0) {
+                    if (index === 0) {
                         let table_no_group = document.getElementById(`forms-container-no-group`);
                         let container_no_group = table_no_group.querySelector('tbody');
                         if (!container_no_group) {
@@ -130,18 +131,21 @@
                         });
                     }
                     {% endif %}
-                })
-                .catch(error => console.error('Error fetching forms:', error));
-        });
+                } catch (error) {
+                    console.error('Error fetching forms:', error);
+                }
+            }
+        }
 
         {% if is_admin %}
         if (userGroups.length == 0) {
-            // If no groups, show the no-group tab by default
+            // Si aucun groupe, afficher l’onglet no-group par défaut
             document.getElementById('tab-no-group').click();
-            // Will have to load all the forms, since we cannot count on the /mercure/api/forms/groups/${group.id} endpoint
-            fetch(`/mercure/api/forms/all`)
-                .then(response => response.json())
-                .then(forms => {
+            // Charger tous les formulaires
+            await(async () => {
+                try {
+                    const response = await fetch(`/mercure/api/forms/all`);
+                    const forms = await response.json();
                     let table_no_group = document.getElementById(`forms-container-no-group`);
                     let container_no_group = table_no_group.querySelector('tbody');
                     if (!container_no_group) {
@@ -166,30 +170,32 @@
                             `;
                         container_no_group.appendChild(formBoxNoGroup);
                     });
-                })
-                .catch(error => console.error('Error fetching forms:', error));
-
+                } catch (error) {
+                    console.error('Error fetching forms:', error);
+                }
+            })();
         }
         {% endif %}
 
-        function toggleFormActive(e, formId) {
+        async function toggleFormActive(e, formId) {
             let toggle = e.target.checked ? "enable" : "disable";
-            fetch(`/mercure/api/${toggle}/${formId}`)
-                .then(response => response.json())
-                .then(
-                    data => {
-                        if (data.success) {
-                            showMessage('info', data.data);
-                        }
-                        else {
-                            showMessage('error', data.message);
-                        }
-                    }
-                ).catch(error => {
-                    showMessage('error', error);
-                })
-                ;
+            try {
+                const response = await fetch(`/mercure/api/${toggle}/${formId}`);
+                const data = await response.json();
+                if (data.success) {
+                    showMessage('info', data.data);
+                } else {
+                    showMessage('error', data.message);
+                }
+            } catch (error) {
+                showMessage('error', error);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadGroupForms();
+        });
+
     </script>
     <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
     <div class="error-msg" id="error-message" style="display: none;"></div>

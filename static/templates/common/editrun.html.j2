@@ -8,7 +8,7 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/utils.js"></script>
+
     <script src="/static/scripts/json_list.js"></script>
     <script src="/static/scripts/show_message.js"></script>
 </head>
@@ -290,7 +290,7 @@
             }
         });
 
-        document.getElementById('editrun-form').addEventListener('submit', function (event) {
+        document.getElementById('editrun-form').addEventListener('submit', async function (event) {
             event.preventDefault();
 
             // Collect user_defined_vars
@@ -317,51 +317,47 @@
                 user_defined_vars: userDefinedVars
             };
 
-            fetch('/mercure/api/editrun/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            })
-                .then(response => response.json())
-                .then(data => {
-                    const messageDiv = document.getElementById('message');
-                    if (data.success) {
-                        showMessage("info", data.data.message);
-                    } else {
-                        showMessage("error", data.message);
-                    }
-                })
-                .catch(error => {
-                    showMessage("error", error);
-                });
-        });
-
-        // Handle validate button click
-        document.getElementById('validate-btn').addEventListener('click', function () {
-            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
-                fetch('/mercure/api/validate/' + document.getElementById('run_id').value, {
+            try {
+                const response = await fetch('/mercure/api/editrun/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            showMessage("success", "Run validé avec succès !");
-                            setTimeout(() => {
-                                // Comme une redirection, mais comme c'est la même URL que l'actuelle (normalement), agit comme un rafraîchissement de la page
-                                window.location.href = "/mercure/show/run/" + document.getElementById('run_id').value;
-                            }, 1000);
-                        } else {
-                            showMessage("error", data.message);
+                    },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage("info", data.data.message);
+                } else {
+                    showMessage("error", data.message);
+                }
+            } catch (error) {
+                showMessage("error", error);
+            }
+        });
+
+        // Handle validate button click
+        document.getElementById('validate-btn').addEventListener('click', async function () {
+            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
+                try {
+                    const response = await fetch('/mercure/api/validate/' + document.getElementById('run_id').value, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
                         }
-                    })
-                    .catch(error => {
-                        showMessage("error", "Erreur lors de la validation: " + error);
                     });
+                    const data = await response.json();
+                    if (data.success) {
+                        showMessage("success", "Run validé avec succès !");
+                        setTimeout(() => {
+                            window.location.href = "/mercure/show/run/" + document.getElementById('run_id').value;
+                        }, 1000);
+                    } else {
+                        showMessage("error", data.message);
+                    }
+                } catch (error) {
+                    showMessage("error", "Erreur lors de la validation: " + error);
+                }
             }
         });
 

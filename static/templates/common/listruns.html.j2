@@ -52,34 +52,33 @@
         let totalPages = 1;
         let pageSize = 5;
 
-        function loadRuns(page, size = pageSize) {
-            fetch(`/mercure/api/listruns?page=${page}&page_size=${size}`)
-                .then(response => response.json())
-                .then(json => {
-                    if (json.success) {
-                        document.getElementById("banner-title").textContent = json.data.title || "Liste des runs";
-                        if (json.data.table) {
-                            generateJsonTable(json.data, "runs-table");
-                        } else {
-                            document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";
-                        }
-
-                        // Update pagination info
-                        if (json.data.pagination) {
-                            currentPage = json.data.pagination.current_page;
-                            totalPages = json.data.pagination.total_pages;
-                            updatePaginationControls();
-                        }
+        async function loadRuns(page, size = pageSize) {
+            try {
+                const response = await fetch(`/mercure/api/listruns?page=${page}&page_size=${size}`);
+                const json = await response.json();
+                if (json.success) {
+                    document.getElementById("banner-title").textContent = json.data.title || "Liste des runs";
+                    if (json.data.table) {
+                        generateJsonTable(json.data, "runs-table");
                     } else {
-                        document.getElementById("error-message").textContent = json.message || "Erreur inconnue";
+                        document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";
                     }
-                })
-                .catch(() => {
-                    const errorDiv = document.getElementById("error-message");
-                    errorDiv.style.display = "block";
-                    errorDiv.textContent = "Erreur de chargement des données.";
-                    setTimeout(() => { errorDiv.style.display = "none"; }, 5000);
-                });
+
+                    // Update pagination info
+                    if (json.data.pagination) {
+                        currentPage = json.data.pagination.current_page;
+                        totalPages = json.data.pagination.total_pages;
+                        updatePaginationControls();
+                    }
+                } else {
+                    document.getElementById("error-message").textContent = json.message || "Erreur inconnue";
+                }
+            } catch {
+                const errorDiv = document.getElementById("error-message");
+                errorDiv.style.display = "block";
+                errorDiv.textContent = "Erreur de chargement des données.";
+                setTimeout(() => { errorDiv.style.display = "none"; }, 5000);
+            }
         }
 
         function updatePaginationControls() {
@@ -100,49 +99,49 @@
             pageInfo.textContent = `/ ${totalPages}`;
         }
 
-        function goToPage(page) {
+        async function goToPage(page) {
             if (page >= 1 && page <= totalPages) {
-                loadRuns(page);
+                await loadRuns(page);
             }
         }
 
-        function previousPage() {
+        async function previousPage() {
             if (currentPage > 1) {
-                goToPage(currentPage - 1);
+                await goToPage(currentPage - 1);
             }
         }
 
-        function nextPage() {
+        async function nextPage() {
             if (currentPage < totalPages) {
-                goToPage(currentPage + 1);
+                await goToPage(currentPage + 1);
             }
         }
 
-        function firstPage() {
-            goToPage(1);
+        async function firstPage() {
+            await goToPage(1);
         }
 
-        function lastPage() {
-            goToPage(totalPages);
+        async function lastPage() {
+            await goToPage(totalPages);
         }
 
-        function onPageInputChange() {
+        async function onPageInputChange() {
             const pageInput = document.getElementById("page-input");
             const page = parseInt(pageInput.value);
             if (page >= 1 && page <= totalPages) {
-                goToPage(page);
+                await goToPage(page);
             } else {
                 pageInput.value = currentPage;
             }
         }
 
-        function onPageSizeChange() {
+        async function onPageSizeChange() {
             const pageSizeInput = document.getElementById("page-size-input");
             const newSize = parseInt(pageSizeInput.value);
             if (newSize >= 1 && newSize <= 100) {
                 pageSize = newSize;
                 // Reset to page 1 when changing page size
-                loadRuns(1, pageSize);
+                await loadRuns(1, pageSize);
             } else {
                 pageSizeInput.value = pageSize;
             }
