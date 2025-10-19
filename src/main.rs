@@ -64,6 +64,7 @@ async fn rocket() -> _ {
                 routes::frontend::show_forms_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
+                routes::frontend::edit_groups_get
             ],
         )
         .mount(
@@ -96,6 +97,7 @@ async fn rocket() -> _ {
                 routes::backend::check_samplesheet,
                 routes::backend::list_samples_from_samplesheet,
                 routes::backend::parse_launcher_endpoint,
+                routes::backend::edit_form_groups,
             ],
         )
         .manage(pool)

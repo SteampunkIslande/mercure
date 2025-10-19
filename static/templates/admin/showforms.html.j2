@@ -45,8 +45,9 @@
         %}>
         <tr>
             <th class="content-column">Nom du formulaire</th>
-            <th class="content-column padding-x centered">Formulaire actif</th>
-            <th class="content-column padding-x centered">Edition du formulaire</th>
+            <th class="numeric-column padding-x centered">Actif ?</th>
+            <th class="numeric-column padding-x centered">Groupes</th>
+            <th class="numeric-column padding-x centered">Editer</th>
         </tr>
     </table>
     {% endfor %}
@@ -54,8 +55,9 @@
     <table id="forms-container-no-group" class="tabcontent" style="display: none;">
         <tr>
             <th class="content-column">Nom du formulaire</th>
-            <th class="numeric-column padding-x centered">Formulaire actif</th>
-            <th class="numeric-column padding-x centered">Edition du formulaire</th>
+            <th class="numeric-column padding-x centered">Actif ?</th>
+            <th class="numeric-column padding-x centered">Groupes</th>
+            <th class="numeric-column padding-x centered">Editer</th>
         </tr>
     </table>
     {% endif %}
@@ -106,7 +108,10 @@
                                 Actif
                             </td>
                             <td class="numeric-column">
-                                <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer le formulaire</a>
+                                <a href="/mercure/admin/editform/groups?form_id=${form.formid}" class="inline-table centered">Editer les groupes</a>
+                            </td>
+                            <td class="numeric-column">
+                                <a href="/mercure/admin/editform/${form.formid}" class="inline-table centered">Editer</a>
                             </td>
                         `;
                         container.appendChild(formBox);

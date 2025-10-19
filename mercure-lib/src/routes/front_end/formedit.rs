@@ -43,7 +43,16 @@ pub async fn edit_groups_get(
         Template::render("errors/admin_only", context! {user_name:auth.user.username})
     } else {
         let groups = Group::get_groups_with_ids(pool).await.unwrap_or_default();
-        Template::render("admin/formgroupedit", context! {groups, form_id})
+        let form_groups = Group::get_groups_for_form(pool, form_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|g| g.id)
+            .collect::<Vec<i64>>();
+        Template::render(
+            "admin/formgroupedit",
+            context! {groups, form_id, form_groups},
+        )
     }
 }
 

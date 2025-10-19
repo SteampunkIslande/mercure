@@ -38,7 +38,7 @@ pub struct FormGroupEdit {
     group_ids: Vec<i64>,
 }
 
-#[post("/formedit", data = "<data>")]
+#[post("/formgroupedit", data = "<data>")]
 pub async fn edit_form_groups(
     auth: Authenticated,
     pool: &State<SqlitePool>,

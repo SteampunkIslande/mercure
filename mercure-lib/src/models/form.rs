@@ -353,13 +353,13 @@ impl HgFormDef {
         group_ids: Vec<i64>,
     ) -> Result<(), sqlx::Error> {
         // Supprime les associations existantes
-        sqlx::query("DELETE FROM FormHasGroup WHERE form_id = ?")
+        sqlx::query("DELETE FROM FormdefHasGroup WHERE form_id = ?")
             .bind(form_id)
             .execute(pool)
             .await?;
         // Ajoute les nouvelles associations
         for gid in group_ids {
-            sqlx::query("INSERT INTO FormHasGroup (form_id, group_id) VALUES (?, ?)")
+            sqlx::query("INSERT INTO FormdefHasGroup (form_id, group_id) VALUES (?, ?)")
                 .bind(form_id)
                 .bind(gid)
                 .execute(pool)

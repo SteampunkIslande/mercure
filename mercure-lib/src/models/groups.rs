@@ -91,4 +91,28 @@ WHERE gh.user_id = ?; "#,
         let group_id: i64 = row.try_get("group_id")?;
         Ok(group_id)
     }
+
+    /// Get all groups this form_id is part of
+    pub async fn get_groups_for_form(
+        pool: &SqlitePool,
+        form_id: i64,
+    ) -> Result<Vec<Group>, sqlx::Error> {
+        Ok(sqlx::query(
+            r#"SELECT g.group_id, g.group_name
+               FROM Groups g
+               JOIN FormdefHasGroup fg ON g.group_id = fg.group_id
+               WHERE fg.form_id = ?;"#,
+        )
+        .bind(form_id)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .filter_map(|row| {
+            Some(Group {
+                id: row.try_get("group_id").ok()?,
+                name: row.try_get("group_name").ok()?,
+            })
+        })
+        .collect())
+    }
 }

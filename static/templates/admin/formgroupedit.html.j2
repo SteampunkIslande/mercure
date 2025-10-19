@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Édition des groupes du formulaire</title>
+    <link rel="stylesheet" href="/static/styles/default.css" />
+    <link rel="stylesheet" href="/static/icon-font/material-icons.css" />
+</head>
+
+<body>
+    <div class="banner">
+        <span class="banner-text">Éditer les groupes d’un formulaire</span>
+        <div class="logout-button">
+            <a href="/mercure/logout" class="btn btn-danger"><span
+                    class="material-icons icon-align">logout</span>Déconnexion</a>
+        </div>
+    </div>
+    <div id="error-message" style="display: none;" class="error-msg"></div>
+    <form id="group-edit-form">
+        <input type="hidden" id="formdef_id" value="{{ form_id }}">
+        <fieldset>
+            <legend>Groupes</legend>
+            <div id="groups-container">
+                {% for group in groups %}
+                <label>
+                    <input type="checkbox" class="group-checkbox" value="{{ group.id }}" data-group-id="{{ group.id }}">
+                    {{ group.name }}
+                </label><br>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-primary" type="button" onclick="submitGroups()">Enregistrer les groupes</button>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+            <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
+            <a class="btn btn-secondary" href="/mercure/admin/dashboard">Retour au tableau de bord</a>
+        </div>
+    </form>
+    <script>
+        // form_groups est injecté comme liste d'ids dans le contexte Jinja
+        const formGroups = {{ form_groups | tojson }};
+        window.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.group-checkbox').forEach(cb => {
+                const gid = parseInt(cb.getAttribute('data-group-id'));
+                if (formGroups.includes(gid)) {
+                    cb.checked = true;
+                }
+            });
+        });
+
+        async function submitGroups() {
+            const formId = document.getElementById('formdef_id').value;
+            const checkedBoxes = document.querySelectorAll('.group-checkbox:checked');
+            const groupIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+            try {
+                const response = await fetch('/mercure/api/formgroupedit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        form_id: parseInt(formId),
+                        group_ids: groupIds
+                    })
+                });
+                if (!response.ok) throw new Error('Erreur lors de la modification des groupes');
+                const data = await response.json();
+                if (!data.success) throw new Error(data.message);
+                window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(data.data || 'Groupes modifiés')}`;
+            } catch (error) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = error;
+                errorDiv.style.display = 'block';
+                setTimeout(() => { errorDiv.style.display = 'none'; }, 8000);
+            }
+        }
+    </script>
+</body>
+
+</html>
