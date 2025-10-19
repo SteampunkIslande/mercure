@@ -8,6 +8,7 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -114,38 +115,13 @@
                 const data = await response.json();
                 await init(); // Re-initialize to reflect changes
                 if (!data.success) {
-                    alert("Erreur lors de la mise à jour des groupes : " + data.message);
-                    const infoDiv = document.getElementById("info-message");
-                    const errorDiv = document.getElementById("error-message");
-                    infoDiv.style.display = 'none';
-                    errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${data.message}`;
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('error', "Erreur lors de la mise à jour des groupes : " + data.message);
                 }
                 else {
-                    const errorDiv = document.getElementById("error-message");
-                    const infoDiv = document.getElementById("info-message");
-                    errorDiv.style.display = 'none';
-                    infoDiv.style.display = 'block';
-                    infoDiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:blue;">info</span>${data.data}`;
-                    setTimeout(() => {
-                        infoDiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('info', data.data);
                 }
             } catch (e) {
-                const infoDiv = document.getElementById("info-message");
-                const errorDiv = document.getElementById("error-message");
-                infoDiv.style.display = 'none';
-                errorDiv.style.display = 'block';
-                errorDiv.innerHTML = `<span class="material-icons icon-align"
-            style="color:red;">error</span>${e}`;
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', e);
             }
         }
 

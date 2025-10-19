@@ -8,6 +8,7 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -52,8 +53,6 @@
     <script>
         document.getElementById('createUserButton').addEventListener('click', async (e) => {
             e.preventDefault();
-            const errorDiv = document.getElementById('error-message');
-            const successDiv = document.getElementById('success-message');
             const usermail = document.getElementById('usermail').value;
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -70,28 +69,13 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    errorDiv.style.display = 'none';
-                    successDiv.style.display = 'block';
-                    successDiv.innerHTML = `<span class="material-icons icon-align" style="color:green;">check_circle</span>Utilisateur créé avec succès`;
-                    setTimeout(() => {
-                        successDiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('success', 'Utilisateur créé avec succès');
                     document.getElementById('registerForm').reset();
                 } else {
-                    successDiv.style.display = 'none';
-                    errorDiv.style.display = 'block';
-                    errorDiv.innerHTML = `<span class="material-icons icon-align" style="color:red;">error</span>${data.message}`;
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('error', data.message);
                 }
             } catch (error) {
-                successDiv.style.display = 'none';
-                errorDiv.style.display = 'block';
-                errorDiv.innerHTML = '<span class="material-icons icon-align"style="color:red;">error</span>Erreur de connexion au serveur';
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', 'Erreur de connexion au serveur');
             }
         });
 

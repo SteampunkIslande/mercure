@@ -7,6 +7,7 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -62,53 +63,22 @@
             const new_password_confirm = document.getElementById('new_password_confirm').value;
 
             if (new_password != new_password_confirm) {
-                const errorDiv = document.getElementById("error-message");
-                const infoDiv = document.getElementById("info-message");
-                errorDiv.style = "display:block;";
-                errorDiv.innerHTML = `<span class="material-icons icon-align" style="color:red;">error</span>Les deux mots de passe ne correspondent pas`;
-                infoDiv.style = "display:none;";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', 'Les deux mots de passe ne correspondent pas');
                 return;
             }
 
             if (old_password == "") {
-                const errorDiv = document.getElementById("error-message");
-                const infoDiv = document.getElementById("info-message");
-                errorDiv.style = "display:block;";
-                errorDiv.innerHTML = `<span class="material-icons icon-align" style="color:red;">error</span>
-                Veuillez entrer votre mot de passe actuel`;
-                infoDiv.style = "display:none;";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', 'Veuillez entrer votre mot de passe actuel');
                 return;
             }
 
             if (new_password == "") {
-                const errorDiv = document.getElementById("error-message");
-                const infoDiv = document.getElementById("info-message");
-                errorDiv.style = "display:block;";
-                errorDiv.innerHTML = errorDiv.innerHTML = `< span class="material-icons icon-align"
-                style = "color:red;" > error</span > Veuillez entrer un nouveau mot de passe`;;
-                infoDiv.style = "display:none;";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', 'Veuillez entrer un nouveau mot de passe');
                 return;
             }
 
             if (new_password_confirm == "") {
-                const errorDiv = document.getElementById("error-message");
-                const infoDiv = document.getElementById("info-message");
-                errorDiv.style = "display:block;";
-                errorDiv.innerHTML = `< span class="material-icons icon-align"
-                style = "color:red;" > error</span > Veuillez confirmer votre nouveau mot de passe`;
-                infoDiv.style = "display:none;";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
+                showMessage('error', 'Veuillez confirmer votre nouveau mot de passe');
                 return;
             }
 
@@ -133,25 +103,11 @@
                     window.location.href = "/mercure/home"
                     {% endif %}
                 } else {
-                    const infoDiv = document.getElementById("info-message");
-                    const errorDiv = document.getElementById("error-message");
-                    errorDiv.innerHTML = `< span class="material-icons icon-align"
-                style = "color:red;" > error</span > ${res_json.message} `;
-                    errorDiv.style = "display:block;";
-                    infoDiv.style = "display:none;";
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 2000);
+                    showMessage('error', res_json.message);
                 }
             }).catch((e) => {
-                const infoDiv = document.getElementById("info-message");
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.innerHTML = `< span class="material-icons icon-align"
-                style = "color:red;" > error</span > ${e}`;
-                errorDiv.style = "display:block;";
-                infoDiv.style = "display:none;";
+                showMessage('error', e);
             })
-
         }
     </script>
 </body>

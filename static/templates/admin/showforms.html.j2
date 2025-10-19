@@ -136,7 +136,7 @@
                     }
                     {% endif %}
                 } catch (error) {
-                    console.error('Error fetching forms:', error);
+                    showMessage("error", error);
                 }
             }
         }
@@ -175,7 +175,7 @@
                         container_no_group.appendChild(formBoxNoGroup);
                     });
                 } catch (error) {
-                    console.error('Error fetching forms:', error);
+                    showMessage("error", error);
                 }
             })();
         }

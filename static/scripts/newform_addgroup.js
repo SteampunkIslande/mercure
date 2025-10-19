@@ -32,7 +32,7 @@ async function create_group(groupName) {
   if (data.success && data.data) {
     const { group_id, group_name } = data.data;
     if (group_id && group_name) {
-      console.log(`Succesfully added ${group_name} with ID ${group_id}`);
+      //A.O.K.
     } else {
       throw new Error(`Réponse invalide pour le groupe : ${groupName}`);
     }
@@ -66,7 +66,6 @@ async function load_groups() {
       throw new Error("Données de groupe invalides.");
     }
   } catch (error) {
-    console.error(error);
     alert("Impossible de charger les groupes. Veuillez réessayer plus tard.");
   }
 }

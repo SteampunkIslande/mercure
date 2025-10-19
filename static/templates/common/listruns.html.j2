@@ -74,10 +74,7 @@
                     document.getElementById("error-message").textContent = json.message || "Erreur inconnue";
                 }
             } catch {
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.style.display = "block";
-                errorDiv.textContent = "Erreur de chargement des données.";
-                setTimeout(() => { errorDiv.style.display = "none"; }, 5000);
+                showMessage("error", "Erreur de chargement des données.");
             }
         }
 
