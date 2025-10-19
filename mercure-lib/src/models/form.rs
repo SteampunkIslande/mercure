@@ -347,6 +347,27 @@ impl HgFormDef {
         Ok((rows_with_group, rows_without_group))
     }
 
+    pub async fn set_form_groups(
+        pool: &SqlitePool,
+        form_id: i64,
+        group_ids: Vec<i64>,
+    ) -> Result<(), sqlx::Error> {
+        // Supprime les associations existantes
+        sqlx::query("DELETE FROM FormHasGroup WHERE form_id = ?")
+            .bind(form_id)
+            .execute(pool)
+            .await?;
+        // Ajoute les nouvelles associations
+        for gid in group_ids {
+            sqlx::query("INSERT INTO FormHasGroup (form_id, group_id) VALUES (?, ?)")
+                .bind(form_id)
+                .bind(gid)
+                .execute(pool)
+                .await?;
+        }
+        Ok(())
+    }
+
     async fn formdef_from_row(
         row: &sqlx::sqlite::SqliteRow,
         pool: &SqlitePool,

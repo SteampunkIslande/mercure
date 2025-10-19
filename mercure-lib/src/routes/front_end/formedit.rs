@@ -33,6 +33,20 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
     }
 }
 
+#[get("/editform/groups?<form_id>")]
+pub async fn edit_groups_get(
+    auth: Authenticated,
+    pool: &State<SqlitePool>,
+    form_id: i64,
+) -> Template {
+    if !auth.user.is_admin {
+        Template::render("errors/admin_only", context! {user_name:auth.user.username})
+    } else {
+        let groups = Group::get_groups_with_ids(pool).await.unwrap_or_default();
+        Template::render("admin/formgroupedit", context! {groups, form_id})
+    }
+}
+
 #[get("/show/forms")]
 pub async fn show_forms_get(auth: Authenticated, pool: &State<SqlitePool>) -> Template {
     let user_groups: Option<Vec<Group>> = Group::get_user_groups(pool, auth.user.id).await.ok();
