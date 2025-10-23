@@ -54,46 +54,10 @@ pub struct HgFormDef {
 /// - if type is `Constant`, column `value` will be its value
 /// - if type is `RunDefined`, columns `value` will be `NULL`.
 impl HgFormDef {
-    async fn userdefined_vars_from_form(
-        form_id: i64,
-        pool: &SqlitePool,
-    ) -> Result<HashMap<String, UserDefinedVar>, sqlx::Error> {
-        Ok(sqlx::query(r#"SELECT * FROM UDV WHERE form_id = ?"#)
-            .bind(form_id)
-            .fetch_all(pool)
-            .await?
-            .iter()
-            .filter_map(|row| {
-                let udv = match row.try_get("type").ok()? {
-                    "FromValuesList" => (
-                        row.try_get("varname").ok()?,
-                        UserDefinedVar::FromValuesList {
-                            allowed: row
-                                .try_get::<String, &str>("default_values")
-                                .ok()?
-                                .split("\n")
-                                .map(String::from)
-                                .collect(),
-                        },
-                    ),
-                    "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
-                    "Constant" => (
-                        row.try_get("varname").ok()?,
-                        UserDefinedVar::Constant(row.try_get("default_values").ok()?),
-                    ),
-                    _ => ("".to_string(), UserDefinedVar::Invalid),
-                };
-                Some(udv)
-            })
-            .collect())
-    }
-
     /// Add new form definition to the database
     /// Each form will be used as a template for actual runs
     pub async fn new_form_def(new_formdef: HgFormDef, pool: &SqlitePool) -> Result<(), ModelError> {
         // Insert into Formdef table
-
-        eprintln!("{:?}", new_formdef);
 
         if new_formdef.version <= 0 {
             return Err(ModelError::FormError(String::from(
@@ -116,111 +80,69 @@ impl HgFormDef {
             )));
         }
 
-        // If there is already a form with the same name and version, check if the user-defined variables are the same
-        // If they are, this means the user may have only tried to change the associated groups, so we allow it
-        let form_id = if let Some((duplicate_form_id,launcher_name,pipeline_name)) = sqlx::query(
+        let form_id: i64 = sqlx::query(
             r#"
-            SELECT form_name,version,form_id,launcher_name,pipeline_name FROM Formdef WHERE form_name = ? AND version = ?
-            "#,
-        )
-        .bind(&new_formdef.form_name)
-        .bind(new_formdef.version)
-        .fetch_one(pool)
-        .await
-        .ok()
-        .iter()
-        .filter_map(|row| Some(
-            (row.try_get::<i64, &str>("form_id").ok()?,
-             row.try_get::<String, &str>("launcher_name").ok()?,
-             row.try_get::<String, &str>("pipeline_name").ok()?))
-        )
-        .next()
-        {
-            // Reduce empty map to None, to make it easier to compare
-            let old_user_defined_vars = {
-                let vars = Self::userdefined_vars_from_form(duplicate_form_id, pool).await?;
-                if vars.is_empty() { None } else { Some(vars) }
-            };
-            if old_user_defined_vars.as_ref() != new_formdef.user_defined_vars.as_ref() {
-                return Err(ModelError::FormError(String::from(
-                    "Un formulaire avec le même nom et la même version existe déjà. Veuillez augmenter le numéro de version",
-                )));
-            }
-            if pipeline_name != new_formdef.pipeline_name || launcher_name != new_formdef.launcher_name {
-                return Err(ModelError::FormError(String::from(
-                    "Un formulaire avec le même nom et la même version existe déjà, mais avec un pipeline ou un launcher différent. Veuillez augmenter le numéro de version",
-                )));
-            }
-            // This is fine, we just want to update the groups
-            duplicate_form_id
-        } else {
-            let new_form_id = sqlx::query(
-                r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
             VALUES (?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
-            )
-            .bind(&new_formdef.pipeline_name)
-            .bind(&new_formdef.launcher_name)
-            .bind(&new_formdef.form_name)
-            .bind(new_formdef.enabled)
-            .bind(new_formdef.version)
-            .fetch_one(pool)
-            .await?
-            .try_get(0usize)?;
-            // Insert into UDV table
-            if let Some(user_defined_vars) = &new_formdef.user_defined_vars {
-                // Insert user_defined_vars into UDV table
-                for (varname, udv) in user_defined_vars {
-                    match udv {
-                        UserDefinedVar::FromValuesList { allowed } => {
-                            let values = allowed.join("\n");
-                            sqlx::query(
-                                r#"
+        )
+        .bind(&new_formdef.pipeline_name)
+        .bind(&new_formdef.launcher_name)
+        .bind(&new_formdef.form_name)
+        .bind(new_formdef.enabled)
+        .bind(new_formdef.version)
+        .fetch_one(pool)
+        .await?
+        .try_get(0usize)?;
+        // Insert into UDV table
+        // Insert user_defined_vars into UDV table
+        for (varname, udv) in new_formdef.user_defined_vars.unwrap_or_default() {
+            match udv {
+                UserDefinedVar::FromValuesList { allowed } => {
+                    let values = allowed.join("\n");
+                    sqlx::query(
+                        r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, ?, 'FromValuesList')
                         "#,
-                            )
-                            .bind(new_form_id)
-                            .bind(varname)
-                            .bind(values)
-                            .execute(pool)
-                            .await?;
-                        }
-                        UserDefinedVar::Constant(val) => {
-                            sqlx::query(
-                                r#"
+                    )
+                    .bind(form_id)
+                    .bind(varname)
+                    .bind(values)
+                    .execute(pool)
+                    .await?;
+                }
+                UserDefinedVar::Constant(val) => {
+                    sqlx::query(
+                        r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, ?, 'Constant')
                         "#,
-                            )
-                            .bind(new_form_id)
-                            .bind(varname)
-                            .bind(val)
-                            .execute(pool)
-                            .await?;
-                        }
-                        UserDefinedVar::RunDefined => {
-                            sqlx::query(
-                                r#"
+                    )
+                    .bind(form_id)
+                    .bind(varname)
+                    .bind(val)
+                    .execute(pool)
+                    .await?;
+                }
+                UserDefinedVar::RunDefined => {
+                    sqlx::query(
+                        r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
                         VALUES (?, ?, NULL, 'RunDefined')
                         "#,
-                            )
-                            .bind(new_form_id)
-                            .bind(varname)
-                            .execute(pool)
-                            .await?;
-                        }
-                        _ => {
-                            eprintln!("Should be unreachable");
-                        }
-                    }
+                    )
+                    .bind(form_id)
+                    .bind(varname)
+                    .execute(pool)
+                    .await?;
+                }
+                _ => {
+                    eprintln!("Should be unreachable");
                 }
             }
-            new_form_id
-        };
+        }
 
         // Prepare groups associations by clearing them
         sqlx::query(

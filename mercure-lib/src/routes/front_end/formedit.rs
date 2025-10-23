@@ -21,12 +21,11 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
         let pipelines_struct = list_folders_with_launchers(config.pipeline_dir);
 
         Template::render(
-            "admin/newform",
+            "admin/editform",
             context! {
                 pipelines_struct,
                 groups,
                 formid,
-                submit_string: "Editer",
                 title: "Editer un formulaire de pipeline"
             },
         )

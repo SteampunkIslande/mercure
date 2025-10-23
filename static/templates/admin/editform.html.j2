@@ -14,7 +14,7 @@
     <script>
 
         let userVarCounter = 0;
-        let existingUserVars = {}; // Stocke les UDV en cours
+        let existingUserVars = {}; // Stocke les UDV du formulaire chargé
 
         async function mergeAndDisplayUserVars() {
             const pipelineName = document.getElementById("pipeline_name").value;
@@ -89,7 +89,7 @@
             }
         }
 
-        function updateLauncherField() {
+        async function updateLauncherField() {
             var schema = {{ pipelines_struct | tojson
         }};
         var pipelineSelect = document.getElementById('pipeline_name');
@@ -126,19 +126,89 @@
             addUserVar();
             await load_groups();
             updateLauncherField();
+            // Déclencher la fusion des UDV si un launcher est sélectionné
+            const currentLauncher = document.getElementById('launcher_name').value;
+            if (currentLauncher) {
+                await mergeAndDisplayUserVars();
+            }
+            await fetchFormDefinition();
         });
 
         async function init() {
             userVarCounter = 0;
         }
 
-        async function calculateNextVersion(formName) {
-            if (!formName || !formName.trim()) {
-                document.getElementById("version").value = 1;
-                document.getElementById("version_display").textContent = 1;
-                return;
-            }
+        async function fetchFormDefinition() {
+            const formId = "{{ formid }}";
+            const endpoint = `/mercure/api/forms/${formId}`;
 
+            try {
+                const response = await fetch(endpoint, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error("Erreur lors de la récupération du formulaire.");
+                }
+
+                const res = await response.json();
+                const formDefinition = res.data;
+
+                // Définir le nom du formulaire
+                if (formDefinition.form_name) {
+                    document.getElementById("form_name").value = formDefinition.form_name;
+                    document.getElementById("form_name_display").textContent = formDefinition.form_name;
+                    // Calculer la nouvelle version automatiquement
+                    await calculateNextVersion(formDefinition.form_name);
+                }
+
+                // PIPELINE - sélectionner le pipeline existant si disponible
+                if (formDefinition.pipeline_name) {
+                    document.getElementById("pipeline_name").value = formDefinition.pipeline_name;
+                    await updateLauncherField();
+                }
+
+                // LAUNCHER - sélectionner le launcher existant si disponible
+                if (formDefinition.launcher_name) {
+                    document.getElementById("launcher_name").value = formDefinition.launcher_name;
+                }
+
+                // Stocker les UDV existantes pour la fusion
+                if (formDefinition.user_defined_vars) {
+                    existingUserVars = formDefinition.user_defined_vars;
+                }
+
+                // Fusionner et afficher les UDV
+                await mergeAndDisplayUserVars();
+
+                // GROUPES
+                if (formDefinition.groups && Array.isArray(formDefinition.groups)) {
+                    formDefinition.groups.forEach(group => {
+                        const groupDiv = document.getElementById(`group_${group.id}`);
+                        if (groupDiv) {
+                            groupDiv.setAttribute("checked", null);
+                        }
+                    });
+                }
+
+            } catch (error) {
+                console.error("Erreur:", error);
+                const errorDiv = document.getElementById("error-message");
+                errorDiv.textContent = error;
+                errorDiv.style.display = "block";
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 8000);
+            }
+        }
+
+    </script>
+
+    <script>
+        async function calculateNextVersion(formName) {
             try {
                 const response = await fetch("/mercure/api/forms/all");
                 if (!response.ok) {
@@ -160,10 +230,6 @@
             }
         }
 
-
-    </script>
-
-    <script>
         async function submitForm() {
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
@@ -224,13 +290,13 @@
                     body: JSON.stringify(formData),
                 });
                 if (!response.ok) {
-                    throw new Error("Erreur lors de la soumission du formulaire.");
+                    throw new Error("Erreur lors de la création de la nouvelle version du formulaire.");
                 }
                 const data = await response.json();
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                const message = data.data || "Opération réussie";
+                const message = data.data || "Nouvelle version du formulaire créée avec succès";
                 window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
             } catch (error) {
                 console.error("Erreur:", error);
@@ -275,14 +341,15 @@
             </select>
         </div>
         <div>
-            <label for="form_name">Nom du formulaire :</label>
-            <input type="text" id="form_name" name="form_name" onblur="calculateNextVersion(this.value)" required>
+            <label>Nom du formulaire :</label>
+            <strong id="form_name_display"></strong>
+            <input type="hidden" id="form_name" name="form_name">
         </div>
 
         <div>
             <label>Version :</label>
-            <strong id="version_display">1</strong>
-            <input type="hidden" id="version" name="version" value="1">
+            <strong id="version_display"></strong>
+            <input type="hidden" id="version" name="version">
         </div>
 
         <fieldset>
@@ -305,7 +372,7 @@
     </form>
 
     <div style="text-align: center; margin-top: 20px;">
-        <button class="btn btn-primary" onclick="submitForm()">Créer</button>
+        <button class="btn btn-primary" onclick="submitForm()">Créer une nouvelle version</button>
     </div>
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
@@ -327,24 +394,6 @@
         // Déclencher la fusion des UDV quand le launcher change
         document.getElementById('launcher_name').addEventListener('change', async function () {
             if (this.value) {
-                // Sauvegarder les UDV actuelles avant de fusionner
-                const currentVars = {};
-                document.querySelectorAll(".user-var-item").forEach((item) => {
-                    const varName = item.querySelector('input[type="text"]').value;
-                    const varType = item.querySelector("select").value;
-                    if (varName.trim() && varType.trim()) {
-                        const varContent = item.querySelector("textarea")?.value || null;
-                        currentVars[varName] = {};
-                        if (varType === "FromValuesList") {
-                            currentVars[varName][varType] = { allowed: varContent.split("\n") };
-                        } else if (varType === "RunDefined") {
-                            currentVars[varName][varType] = null;
-                        } else if (varType === "Constant") {
-                            currentVars[varName][varType] = varContent;
-                        }
-                    }
-                });
-                existingUserVars = currentVars;
                 await mergeAndDisplayUserVars();
             }
         });

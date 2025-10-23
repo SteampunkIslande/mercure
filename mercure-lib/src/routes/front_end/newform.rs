@@ -58,7 +58,6 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
                 pipelines_struct,
                 groups,
                 formid: None::<i64>,
-                submit_string: "Créer",
                 title: "Nouveau formulaire de pipeline"
             },
         )
