@@ -16,6 +16,7 @@ mercure_db = "sqlite://mercure.db"
 template_dir = "/home/charles/mercure/static/templates"
 static_dir = "/home/charles/mercure/static"
 upload_dir = "/home/charles/mercure-arena/uploads"
+logs_dir = "/home/charles/mercure-arena/OPT/JOBS/LOGS"
 
 pipeline_dir = "/home/charles/mercure-arena/OPT/pipelines"
 jobs_dir = "/home/charles/mercure-arena/OPT/JOBS"

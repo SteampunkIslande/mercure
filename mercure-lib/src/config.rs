@@ -11,6 +11,7 @@ pub struct MercureConfig {
     pub static_dir: String,
     pub pipeline_dir: String,
     pub jobs_dir: String,
+    pub logs_dir: String,
 }
 
 impl Default for MercureConfig {
@@ -23,6 +24,7 @@ impl Default for MercureConfig {
             static_dir: "/home/charles/mercure/static".into(),
             pipeline_dir: "/home/charles/mercure/pipelines".into(),
             jobs_dir: "/home/charles/mercure/JOBS".into(),
+            logs_dir: "/home/charles/mercure/LOGS".into(),
         }
     }
 }

@@ -33,6 +33,7 @@ async fn rocket() -> _ {
         .register("/", catchers![unauthorized])
         .mount("/static", FileServer::from(config.static_dir))
         .mount("/uploads", FileServer::from(config.upload_dir))
+        .mount("/logs", FileServer::from(config.logs_dir))
         .mount(
             "/mercure",
             routes![

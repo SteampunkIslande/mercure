@@ -16,6 +16,7 @@ mercure_db = "sqlite://mercure.db"
 template_dir = "/app/static/templates"
 static_dir = "/app/static"
 upload_dir = "/OPT/hermes/uploads"
+logs_dir = "/OPT/JOBS/LOGS"
 
 pipeline_dir = "/OPT/pipelines"
 jobs_dir = "/OPT/JOBS"
