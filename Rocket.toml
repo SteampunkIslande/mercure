@@ -1,5 +1,5 @@
 [debug]
-address = "127.0.0.1"
+address = "10.12.53.64"
 secret_key = "hLtkhUgxdZJffXn6+YjJL7E3z0OwPAnx92NUZy8mpCQ="
 log_level = "normal"
 max_blocking = 512
