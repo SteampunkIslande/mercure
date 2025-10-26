@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Run en cours - {{ run.run_name }}</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <style>
+        .progress {
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 24px;
+        }
+
+        .progress-bar {
+            background: #007bff;
+            height: 100%;
+            color: #fff;
+            text-align: center;
+            white-space: nowrap;
+            line-height: 24px;
+        }
+
+        .field {
+            margin: 10px 0;
+        }
+
+        .banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .btn {
+            padding: 6px 10px;
+            border-radius: 4px;
+            background: #eee;
+            text-decoration: none;
+            color: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="banner">
+        <h1 id="run-name">{{ run.run_name }}</h1>
+        <a id="back-to-runs" class="btn" href="/mercure/show/runs">Retour</a>
+    </div>
+
+    <div class="field"><strong>Tentative :</strong> <span id="attempt-number">{{ attempt.attempt_number }}</span></div>
+
+    <div class="field">
+        <strong>SampleSheet :</strong>
+        <span id="samplesheet-links">
+            {% if run.sample_sheet_adn_path %}
+            <a href="{{ run.sample_sheet_adn_path }}" download>Télécharger ADN</a>
+            {% endif %}
+            {% if run.sample_sheet_arn_path %}
+            {% if run.sample_sheet_adn_path %} | {% endif %}
+            <a href="{{ run.sample_sheet_arn_path }}" download>Télécharger ARN</a>
+            {% endif %}
+            {% if not run.sample_sheet_adn_path and not run.sample_sheet_arn_path %}
+            <em>Aucune SampleSheet disponible</em>
+            {% endif %}
+        </span>
+    </div>
+
+    <div class="field">
+        <strong>Étape :</strong> <span id="current-step"><em>Non renseignée</em></span>
+    </div>
+
+    <div class="field">
+        <strong>Progression :</strong>
+        <div id="progress-container">
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="progress-bar" class="progress-bar" style="width:0%">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="field" id="slurm-state">
+        <strong>État des jobs SLURM :</strong> <span id="slurm-info"><em>Information non disponible</em></span>
+    </div>
+
+    <script>
+        const runId = {{ run_id }};
+        const attemptNumber = {{ attempt_number }};
+
+        function setProgress(percent) {
+            const p = Math.max(0, Math.min(100, Number(percent) || 0));
+            const bar = document.getElementById('progress-bar');
+            bar.style.width = p + '%';
+            bar.textContent = p + '%';
+            bar.parentElement.setAttribute('aria-valuenow', String(p));
+        }
+
+        function updateJobInfo(info) {
+            const stepEl = document.getElementById('current-step');
+            if (info && info.current_step_string) stepEl.textContent = info.current_step_string;
+            else stepEl.innerHTML = '<em>Non renseignée</em>';
+
+            if (info && typeof info.current_progress === 'number') setProgress(info.current_progress);
+
+            const slurmInfoEl = document.getElementById('slurm-info');
+            if (info && (info.pending_jobs_count || info.running_jobs_count || info.done_jobs_count)) {
+                slurmInfoEl.textContent = `Pending: ${info.pending_jobs_count || 0} — Running: ${info.running_jobs_count || 0} — Done: ${info.done_jobs_count || 0}`;
+            } else {
+                slurmInfoEl.innerHTML = '<em>Information non disponible</em>';
+            }
+        }
+
+        async function startEventSource() {
+            try {
+                const esUrl = `/mercure/watch/${runId}/${attemptNumber}`;
+                const es = new EventSource(esUrl);
+                es.addEventListener('update', ev => {
+                    try { const data = JSON.parse(ev.data); updateJobInfo(data); } catch (e) { console.error(e); }
+                });
+                es.addEventListener('error', ev => { console.warn('EventSource error', ev); });
+            } catch (e) {
+                console.error('Impossible d\'ouvrir EventSource', e);
+            }
+        }
+
+        (async () => {
+            // Les variables run_name, run_id et attempt_number sont fournies par le template Jinja2.
+            document.getElementById('run-name').textContent = {{ run.run_name | tojson }
+        };
+        document.getElementById('attempt-number').textContent = attemptNumber;
+        await startEventSource();
+}) ();
+    </script>
+</body>
+
+</html>

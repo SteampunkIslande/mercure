@@ -11,6 +11,7 @@ use rocket_dyn_templates::{Template, context};
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::models::Group;
+use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
 
@@ -109,7 +110,47 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 )
             }
             RunStatus::Pending => Template::render("common/pendingrun", context! {}),
-            RunStatus::Running => Template::render("common/runningrun", context! {}),
+            RunStatus::Running => {
+                let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
+                    Ok(run) => run,
+                    Err(e) => {
+                        return Template::render(
+                            "common/error",
+                            context! {
+                                title: "Erreur de la base de données",
+                                h2: format!("Impossible d'obtenir le run {}", run_id),
+                                message: e.to_string()
+                            },
+                        );
+                    }
+                };
+                let attempt: HgAttempt = match HgAttempt::get_attempt_from_number(
+                    run.attempt_count as i64,
+                    run_id,
+                    pool,
+                )
+                .await
+                {
+                    Ok(at) => at,
+                    Err(e) => {
+                        return Template::render(
+                            "common/error",
+                            context! {
+                                title: "Erreur de la base de données",
+                                h2: format!("Impossible d'obtenir la tentative {} pour le run {}",run.attempt_count,run_id),
+                                message: e.to_string()
+                            },
+                        );
+                    }
+                };
+                Template::render(
+                    "common/runningrun",
+                    context! {
+                        run,
+                        attempt
+                    },
+                )
+            }
             RunStatus::Success => Template::render("common/successrun", context! {}),
             RunStatus::Failure(_) => Template::render("common/failurerun", context! {}),
         }

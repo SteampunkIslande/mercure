@@ -1,5 +1,6 @@
 mod editgroups;
 mod getform;
+mod jobprogresswatch;
 mod listgroups;
 mod listruns;
 mod listusers;
@@ -15,6 +16,7 @@ mod upload;
 
 pub use editgroups::*;
 pub use getform::*;
+pub use jobprogresswatch::*;
 pub use listgroups::*;
 pub use listruns::*;
 pub use listusers::*;

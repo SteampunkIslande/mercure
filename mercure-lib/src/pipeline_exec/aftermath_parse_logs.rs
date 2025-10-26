@@ -14,7 +14,16 @@ pub struct JobInfo {
 
 /// Cette fonction lit un fichier de log ligne par ligne, et enregistre, pour chaque workflow lancé,
 /// les jobs associés avec leurs informations (ID SLURM, chemin du log, nom de la règle, wildcards).
+///
 /// Elle retourne une HashMap où la clé est un tuple (run_id, order) et la valeur est une liste de JobInfo.
+///
+/// Cette fonction ne doit être appelée qu'à la fin de l'exécution du pipeline, pour générer les différents rapports.
+///
+/// Tous les rapports se trouvent dans une archive zip, stockée dans /OPT/JOBS/REPORTS
+///
+/// Cette archive contient:
+/// - Un rapport au format PDF avec l'efficacité des jobs, où les titres H1 sont les règles, et le contenu est un tableau avec pour colonnes: `Wildcards|Mémoire utilisée|Durée d'exécution|Pourcentage mémoire utilisée/mémoire demandée à SLURM|Pourcentage durée d'exécution/durée demandée à SLURM`
+/// - Les fichiers de log, triés par nom de règle et par wildcard, exactement selon la structure générée par le plugin snakemake SLURM executor
 pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobInfo>>, String> {
     let reader = BufReader::new(file);
 
@@ -30,13 +39,12 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
 
     for line in reader.lines() {
         let line = line.map_err(|e| e.to_string())?;
-        println!("Processing line: {}", line);
 
         // Détection d’un nouveau workflow
         if let Some(cap) = re_run_id.captures(&line) {
             let run_id = cap[1].to_string();
             current_run_id = Some(run_id.clone());
-            current_order = 0;
+            current_order += 1;
             runs.insert((run_id, current_order), Vec::new());
 
             continue;
@@ -53,7 +61,7 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
                     .and_then(|p| p.parent())
                     .and_then(|p| p.file_name())
                     .and_then(|s| s.to_str())
-                    .unwrap_or("no_wildcards")
+                    .unwrap_or("no_rulename")
                     .to_string();
 
                 // Extraire le dernier dossier parent
@@ -94,7 +102,7 @@ SLURM run ID: 92db70f3-2c3b-4b45-9f5a-d01c2c49f821
 Job 1 has been submitted with SLURM jobid 420 (log: /full/path/to/log/rule_DD/wildcardAC_wildcardDC/420.log)."#;
         let parsed = parse_log_file(test_log_string.as_bytes()).unwrap();
         assert_eq!(
-            parsed.get(&(String::from("8cb8c359-3930-40ec-a5df-3da736d2b4e9"), 0)),
+            parsed.get(&(String::from("8cb8c359-3930-40ec-a5df-3da736d2b4e9"), 1)),
             Some(&vec![
                 JobInfo {
                     slurm_id: "321".to_string(),
@@ -111,7 +119,7 @@ Job 1 has been submitted with SLURM jobid 420 (log: /full/path/to/log/rule_DD/wi
             ])
         );
         assert_eq!(
-            parsed.get(&(String::from("92db70f3-2c3b-4b45-9f5a-d01c2c49f821"), 0)),
+            parsed.get(&(String::from("92db70f3-2c3b-4b45-9f5a-d01c2c49f821"), 2)),
             Some(&vec![JobInfo {
                 slurm_id: "420".to_string(),
                 log_path: "/full/path/to/log/rule_DD/wildcardAC_wildcardDC/420.log".to_string(),
