@@ -70,9 +70,6 @@ p {
   border-radius: 6px;
   margin: 1rem 0;
   font-weight: bold;
-  animation-duration: 10s;
-  animation-iteration-count: 1;
-  animation-name: fadeout;
 }
 
 .warning-msg {
@@ -472,6 +469,6 @@ table td:hover a {
 
 /* Empêche le débordement du contenu des onglets */
 .tabcontent {
-    max-width: 100%;
-    box-sizing: border-box;
+  max-width: 100%;
+  box-sizing: border-box;
 }

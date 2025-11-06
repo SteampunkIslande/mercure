@@ -26,8 +26,10 @@ function showMessage(type, message) {
   if (msgDiv) {
     msgDiv.style.display = "block";
     msgDiv.innerHTML = `<span class="material-icons icon-align" style="color:${colors[type]};">${icons[type]}</span>${message}`;
-    setTimeout(() => {
-      msgDiv.style.display = "none";
-    }, 2000);
+    if (type !== "error") {
+      setTimeout(() => {
+        msgDiv.style.display = "none";
+      }, 2000);
+    }
   }
 }

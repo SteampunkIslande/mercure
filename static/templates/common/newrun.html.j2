@@ -10,6 +10,7 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
 
     <script src="/static/scripts/json_list.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -288,18 +289,16 @@
                     body: JSON.stringify(formData)
                 });
                 const data = await response.json();
-                const messageDiv = document.getElementById('message');
                 if (data.success) {
-                    messageDiv.innerHTML = '<span style="color: green;">' + data.data.message + '</span>';
-                    console.log(data.data);
+                    showMessage("success", data.data.message);
                     setTimeout(() => {
                         window.location.href = "/mercure/show/run/" + data.data.run_id;
                     }, 1000);
                 } else {
-                    messageDiv.innerHTML = '<span style="color: red;">' + data.message + '</span>';
+                    showMessage("error", data.message);
                 }
             } catch (error) {
-                document.getElementById('message').innerHTML = '<span style="color: red;">Erreur: ' + error + '</span>';
+                showMessage("error", `Erreur: ${error.message}`);
             }
         });
 
