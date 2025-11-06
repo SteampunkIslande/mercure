@@ -42,7 +42,7 @@
                 Object.entries(requiredVars).forEach(([varName, varDesc]) => {
                     if (!mergedVars[varName]) {
                         // Stocker la description comme string
-                        mergedVars[varName] = varDesc;
+                        mergedVars[varName] = { "description": varDesc };
                     }
                 });
 
@@ -54,20 +54,8 @@
                 Object.entries(mergedVars).forEach(([varName, varDetails], index) => {
                     addUserVar();
                     document.getElementById(`var_name_${index}`).value = varName;
-
-                    // Si varDetails est une string, c'est une description du launcher
-                    if (typeof varDetails === 'string') {
-                        // Afficher la description
-                        const descText = document.getElementById(`var_description_text_${index}`);
-                        const descDiv = document.getElementById(`var_description_${index}`);
-                        if (descText && descDiv) {
-                            descText.textContent = varDetails;
-                            descDiv.style.display = "block";
-                        }
-                        // Ne pas sélectionner de type par défaut, laisser l'utilisateur choisir
-                    }
                     // Si c'est un objet, c'est une UDV déjà configurée
-                    else if (varDetails && typeof varDetails === 'object') {
+                    if (varDetails && typeof varDetails === 'object') {
                         if (varDetails.Constant) {
                             document.getElementById(`var_type_${index}`).value = "Constant";
                             document.getElementById(`var_values_${index}`).style.display = "block";
@@ -76,8 +64,16 @@
                             document.getElementById(`var_type_${index}`).value = "FromValuesList";
                             document.getElementById(`var_values_${index}`).style.display = "block";
                             document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
-                        } else if (varDetails.RunDefined !== undefined) {
+                        } else if (varDetails.RunDefined) {
                             document.getElementById(`var_type_${index}`).value = "RunDefined";
+                        } else if (varDetails.description) {
+                            // Afficher la description
+                            const descText = document.getElementById(`var_description_text_${index}`);
+                            const descDiv = document.getElementById(`var_description_${index}`);
+                            if (descText && descDiv) {
+                                descText.textContent = varDetails.description;
+                                descDiv.style.display = "block";
+                            }
                         }
                     }
                 });
@@ -190,13 +186,13 @@
                 const varContent = item.querySelector("textarea")?.value || null;
 
                 userVars[varName] = {};
-                if (varType === "FromValuesList") {
+                if (varType === "FromValuesList" && varContent) {
                     userVars[varName][varType] = { allowed: varContent.split("\n") };
                 }
                 if (varType === "RunDefined") {
                     userVars[varName][varType] = null;
                 }
-                if (varType === "Constant") {
+                if (varType === "Constant" && varContent) {
                     userVars[varName][varType] = varContent;
                 }
             });
