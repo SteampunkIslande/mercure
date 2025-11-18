@@ -363,8 +363,9 @@
 
     <script>
         // Show/hide launcher container based on pipeline selection
-        document.getElementById('pipeline_name').addEventListener('change', function () {
-            var launcherContainer = document.getElementById('launcher-container');
+        document.getElementById('pipeline_name').addEventListener('change', async function () {
+            const launcherContainer = document.getElementById('launcher-container');
+            await init();
             if (this.value) {
                 launcherContainer.style.display = 'block';
             } else {
@@ -374,11 +375,9 @@
 
         // Déclencher la fusion des UDV quand le launcher change
         document.getElementById('launcher_name').addEventListener('change', async function () {
+            await init();
             if (this.value) {
                 await updateUserVars();
-            }
-            else {
-                await init();
             }
         });
     </script>
