@@ -13,10 +13,9 @@
 
     <script>
 
-        let userVarCounter = 0;
-        let existingUserVars = {}; // Stocke les UDV en cours
+        var userVarCounter = 0;
 
-        async function mergeAndDisplayUserVars() {
+        async function updateUserVars() {
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
 
@@ -25,72 +24,49 @@
             }
 
             try {
-                // Récupérer les UDV requises par le launcher
+                // 1) Récupérer les UDV requises pour le launcher
                 const response = await fetch(`/mercure/api/parselauncher?pipeline=${encodeURIComponent(pipelineName)}&launcher=${encodeURIComponent(launcherName)}`);
                 if (!response.ok) {
                     console.warn("Impossible de récupérer les UDV du launcher");
                     return;
                 }
-
                 const data = await response.json();
-                const requiredVars = data.data || [];
+                let requiredVars = data.data || [];
 
-                // Fusionner : garder les UDV existantes + ajouter les nouvelles requises
-                const mergedVars = { ...existingUserVars };
-
-                // Ajouter les UDV requises qui n'existent pas encore
+                // Normaliser les UDV requises
                 Object.entries(requiredVars).forEach(([varName, varDesc]) => {
-                    if (!mergedVars[varName]) {
-                        // Stocker la description comme string
-                        mergedVars[varName] = { "description": varDesc };
-                    }
+                    requiredVars[varName] = { "description": varDesc };
                 });
 
-                // Afficher les UDV fusionnées
-                const userVarsContainer = document.getElementById("user-vars-container");
-                userVarsContainer.innerHTML = "";
-                userVarCounter = 0;
+                await init();
 
-                Object.entries(mergedVars).forEach(([varName, varDetails], index) => {
+                // 3) Afficher uniquement les cartes pour les variables requises
+                Object.entries(requiredVars).forEach(([varName, varDetails], index) => {
                     addUserVar();
                     document.getElementById(`var_name_${index}`).value = varName;
-                    // Si c'est un objet, c'est une UDV déjà configurée
-                    if (varDetails && typeof varDetails === 'object') {
-                        if (varDetails.Constant) {
-                            document.getElementById(`var_type_${index}`).value = "Constant";
-                            document.getElementById(`var_values_${index}`).style.display = "block";
-                            document.getElementById(`var_content_${index}`).value = varDetails.Constant;
-                        } else if (varDetails.FromValuesList) {
-                            document.getElementById(`var_type_${index}`).value = "FromValuesList";
-                            document.getElementById(`var_values_${index}`).style.display = "block";
-                            document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
-                        } else if (varDetails.RunDefined) {
-                            document.getElementById(`var_type_${index}`).value = "RunDefined";
-                        } else if (varDetails.description) {
-                            // Afficher la description
-                            const descText = document.getElementById(`var_description_text_${index}`);
-                            const descDiv = document.getElementById(`var_description_${index}`);
-                            if (descText && descDiv) {
-                                descText.textContent = varDetails.description;
-                                descDiv.style.display = "block";
-                            }
+
+                    // Toujours afficher la description si présente
+                    if (varDetails.description) {
+                        const descText = document.getElementById(`var_description_text_${index}`);
+                        const descDiv = document.getElementById(`var_description_${index}`);
+                        if (descText && descDiv) {
+                            descText.textContent = varDetails.description;
+                            descDiv.style.display = "block";
                         }
                     }
                 });
 
-                // Mettre à jour existingUserVars pour les futures modifications
-                existingUserVars = mergedVars;
             } catch (error) {
-                console.error("Erreur lors de la fusion des UDV:", error);
+                console.error("Erreur lors du chargement des UDV:", error);
             }
         }
 
-        function updateLauncherField() {
+        async function updateLauncherField() {
             var schema = {{ pipelines_struct | tojson
         }};
-        var pipelineSelect = document.getElementById('pipeline_name');
-        var launcherSelect = document.getElementById('launcher_name');
-        var selectedPipeline = pipelineSelect.value;
+        const pipelineSelect = document.getElementById('pipeline_name');
+        const launcherSelect = document.getElementById('launcher_name');
+        let selectedPipeline = pipelineSelect.value;
 
         // Clear previous options
         launcherSelect.innerHTML = '';
@@ -119,22 +95,20 @@
 
         document.addEventListener("DOMContentLoaded", async function () {
             await init();
-            addUserVar();
             await load_groups();
-            updateLauncherField();
+            await fetchFormDefinition();
         });
 
         async function init() {
+            const userVarsContainer = document.getElementById("user-vars-container");
+            userVarsContainer.innerHTML = "";
             userVarCounter = 0;
         }
 
-        async function calculateNextVersion(formName) {
-            if (!formName || !formName.trim()) {
-                document.getElementById("version").value = 1;
-                document.getElementById("version_display").textContent = 1;
-                return;
-            }
+    </script>
 
+    <script>
+        async function calculateNextVersion(formName) {
             try {
                 const response = await fetch("/mercure/api/forms/all");
                 if (!response.ok) {
@@ -156,10 +130,6 @@
             }
         }
 
-
-    </script>
-
-    <script>
         async function submitForm() {
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
@@ -186,13 +156,13 @@
                 const varContent = item.querySelector("textarea")?.value || null;
 
                 userVars[varName] = {};
-                if (varType === "FromValuesList" && varContent) {
+                if (varType === "FromValuesList") {
                     userVars[varName][varType] = { allowed: varContent.split("\n") };
                 }
                 if (varType === "RunDefined") {
                     userVars[varName][varType] = null;
                 }
-                if (varType === "Constant" && varContent) {
+                if (varType === "Constant") {
                     userVars[varName][varType] = varContent;
                 }
             });
@@ -220,13 +190,13 @@
                     body: JSON.stringify(formData),
                 });
                 if (!response.ok) {
-                    throw new Error("Erreur lors de la soumission du formulaire.");
+                    throw new Error("Erreur lors de la création de la nouvelle version du formulaire.");
                 }
                 const data = await response.json();
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                const message = data.data || "Opération réussie";
+                const message = data.data || "Nouvelle version du formulaire créée avec succès";
                 window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
             } catch (error) {
                 console.error("Erreur:", error);
@@ -277,8 +247,8 @@
 
         <div>
             <label>Version :</label>
-            <strong id="version_display">1</strong>
-            <input type="hidden" id="version" name="version" value="1">
+            <strong id="version_display"></strong>
+            <input type="hidden" id="version" name="version">
         </div>
 
         <fieldset>
@@ -292,16 +262,15 @@
             </div>
         </fieldset>
 
-        <div>
+        <div id="udv_section">
             <h3 class="title">Variables définies par l'utilisateur</h3>
             <div id="user-vars-container">
             </div>
-            <button type="button" onclick="addUserVar()">Ajouter une variable</button>
         </div>
     </form>
 
     <div style="text-align: center; margin-top: 20px;">
-        <button class="btn btn-primary" onclick="submitForm()">Créer</button>
+        <button class="btn btn-primary" onclick="submitForm()">Créer une nouvelle version</button>
     </div>
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: center; margin-top: 20px;">
@@ -311,8 +280,9 @@
 
     <script>
         // Show/hide launcher container based on pipeline selection
-        document.getElementById('pipeline_name').addEventListener('change', function () {
-            var launcherContainer = document.getElementById('launcher-container');
+        document.getElementById('pipeline_name').addEventListener('change', async function () {
+            const launcherContainer = document.getElementById('launcher-container');
+            await init();
             if (this.value) {
                 launcherContainer.style.display = 'block';
             } else {
@@ -322,26 +292,9 @@
 
         // Déclencher la fusion des UDV quand le launcher change
         document.getElementById('launcher_name').addEventListener('change', async function () {
+            await init();
             if (this.value) {
-                // Sauvegarder les UDV actuelles avant de fusionner
-                const currentVars = {};
-                document.querySelectorAll(".user-var-item").forEach((item) => {
-                    const varName = item.querySelector('input[type="text"]').value;
-                    const varType = item.querySelector("select").value;
-                    if (varName.trim() && varType.trim()) {
-                        const varContent = item.querySelector("textarea")?.value || null;
-                        currentVars[varName] = {};
-                        if (varType === "FromValuesList") {
-                            currentVars[varName][varType] = { allowed: varContent.split("\n") };
-                        } else if (varType === "RunDefined") {
-                            currentVars[varName][varType] = null;
-                        } else if (varType === "Constant") {
-                            currentVars[varName][varType] = varContent;
-                        }
-                    }
-                });
-                existingUserVars = currentVars;
-                await mergeAndDisplayUserVars();
+                await updateUserVars();
             }
         });
     </script>
