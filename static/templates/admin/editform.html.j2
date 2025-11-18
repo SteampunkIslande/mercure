@@ -13,10 +13,10 @@
 
     <script>
 
-        let userVarCounter = 0;
-        let existingUserVars = {}; // Stocke les UDV du formulaire chargé
+        var userVarCounter = 0;
+        var originalUserVars = {};
 
-        async function mergeAndDisplayUserVars() {
+        async function updateUserVars() {
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
 
@@ -25,73 +25,63 @@
             }
 
             try {
-                // Récupérer les UDV requises par le launcher
+                // 1) Récupérer les UDV requises pour le launcher
                 const response = await fetch(`/mercure/api/parselauncher?pipeline=${encodeURIComponent(pipelineName)}&launcher=${encodeURIComponent(launcherName)}`);
                 if (!response.ok) {
                     console.warn("Impossible de récupérer les UDV du launcher");
                     return;
                 }
-
                 const data = await response.json();
-                const requiredVars = data.data || [];
+                let requiredVars = data.data || [];
 
-                // Fusionner : garder les UDV existantes + ajouter les nouvelles requises
-                const mergedVars = { ...existingUserVars };
-
-                // Ajouter les UDV requises qui n'existent pas encore
+                // Normaliser les UDV requises
                 Object.entries(requiredVars).forEach(([varName, varDesc]) => {
-                    if (!mergedVars[varName]) {
-                        // Stocker la description comme string
-                        mergedVars[varName] = { "description": varDesc };
-                    }
+                    requiredVars[varName] = { "description": varDesc };
                 });
 
-                // Afficher les UDV fusionnées
-                const userVarsContainer = document.getElementById("user-vars-container");
-                userVarsContainer.innerHTML = "";
-                userVarCounter = 0;
+                await init();
 
-                Object.entries(mergedVars).forEach(([varName, varDetails], index) => {
+                // 3) Afficher uniquement les cartes pour les variables requises
+                Object.entries(requiredVars).forEach(([varName, varDetails], index) => {
                     addUserVar();
                     document.getElementById(`var_name_${index}`).value = varName;
 
-                    // Si c'est un objet, c'est une UDV déjà configurée
-                    if (varDetails && typeof varDetails === 'object') {
-                        if (varDetails.Constant) {
+                    let original = originalUserVars[varName];
+                    if (original && typeof original === 'object') {
+                        if (original.Constant) {
                             document.getElementById(`var_type_${index}`).value = "Constant";
                             document.getElementById(`var_values_${index}`).style.display = "block";
-                            document.getElementById(`var_content_${index}`).value = varDetails.Constant;
-                        } else if (varDetails.FromValuesList) {
+                            document.getElementById(`var_content_${index}`).value = original.Constant;
+                        } else if (original.FromValuesList) {
                             document.getElementById(`var_type_${index}`).value = "FromValuesList";
                             document.getElementById(`var_values_${index}`).style.display = "block";
-                            document.getElementById(`var_content_${index}`).value = varDetails.FromValuesList.allowed.join("\n");
-                        } else if (varDetails.RunDefined) {
+                            document.getElementById(`var_content_${index}`).value = original.FromValuesList.allowed.join("\n");
+                        } else if (original.RunDefined) {
                             document.getElementById(`var_type_${index}`).value = "RunDefined";
-                        } else if (varDetails.description) {
-                            // Afficher la description
-                            const descText = document.getElementById(`var_description_text_${index}`);
-                            const descDiv = document.getElementById(`var_description_${index}`);
-                            if (descText && descDiv) {
-                                descText.textContent = varDetails.description;
-                                descDiv.style.display = "block";
-                            }
+                        }
+                    }
+                    // Toujours afficher la description si présente
+                    if (varDetails.description) {
+                        const descText = document.getElementById(`var_description_text_${index}`);
+                        const descDiv = document.getElementById(`var_description_${index}`);
+                        if (descText && descDiv) {
+                            descText.textContent = varDetails.description;
+                            descDiv.style.display = "block";
                         }
                     }
                 });
 
-                // Mettre à jour existingUserVars pour les futures modifications
-                existingUserVars = mergedVars;
             } catch (error) {
-                console.error("Erreur lors de la fusion des UDV:", error);
+                console.error("Erreur lors du chargement des UDV:", error);
             }
         }
 
         async function updateLauncherField() {
             var schema = {{ pipelines_struct | tojson
         }};
-        var pipelineSelect = document.getElementById('pipeline_name');
-        var launcherSelect = document.getElementById('launcher_name');
-        var selectedPipeline = pipelineSelect.value;
+        const pipelineSelect = document.getElementById('pipeline_name');
+        const launcherSelect = document.getElementById('launcher_name');
+        let selectedPipeline = pipelineSelect.value;
 
         // Clear previous options
         launcherSelect.innerHTML = '';
@@ -120,18 +110,13 @@
 
         document.addEventListener("DOMContentLoaded", async function () {
             await init();
-            addUserVar();
             await load_groups();
-            updateLauncherField();
-            // Déclencher la fusion des UDV si un launcher est sélectionné
-            const currentLauncher = document.getElementById('launcher_name').value;
-            if (currentLauncher) {
-                await mergeAndDisplayUserVars();
-            }
             await fetchFormDefinition();
         });
 
         async function init() {
+            const userVarsContainer = document.getElementById("user-vars-container");
+            userVarsContainer.innerHTML = "";
             userVarCounter = 0;
         }
 
@@ -175,11 +160,11 @@
 
                 // Stocker les UDV existantes pour la fusion
                 if (formDefinition.user_defined_vars) {
-                    existingUserVars = formDefinition.user_defined_vars;
+                    originalUserVars = formDefinition.user_defined_vars;
                 }
 
                 // Fusionner et afficher les UDV
-                await mergeAndDisplayUserVars();
+                await updateUserVars();
 
                 // GROUPES
                 if (formDefinition.groups && Array.isArray(formDefinition.groups)) {
@@ -360,11 +345,10 @@
             </div>
         </fieldset>
 
-        <div>
+        <div id="udv_section">
             <h3 class="title">Variables définies par l'utilisateur</h3>
             <div id="user-vars-container">
             </div>
-            <button type="button" onclick="addUserVar()">Ajouter une variable</button>
         </div>
     </form>
 
@@ -391,7 +375,10 @@
         // Déclencher la fusion des UDV quand le launcher change
         document.getElementById('launcher_name').addEventListener('change', async function () {
             if (this.value) {
-                await mergeAndDisplayUserVars();
+                await updateUserVars();
+            }
+            else {
+                await init();
             }
         });
     </script>
