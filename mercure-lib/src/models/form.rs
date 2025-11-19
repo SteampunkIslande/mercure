@@ -80,6 +80,22 @@ impl HgFormDef {
             )));
         }
 
+        if sqlx::query(
+            r#"
+            SELECT COUNT(*) AS n FROM Formdef WHERE form_name = ? AND version = ?"#,
+        )
+        .bind(&new_formdef.form_name)
+        .bind(&new_formdef.version)
+        .fetch_one(pool)
+        .await?
+        .try_get::<i64, &str>("n")?
+            > 0
+        {
+            return Err(ModelError::FormError(String::from(
+                "Un formulaire avec le même nom et la même version existe déjà. Abandon.",
+            )));
+        }
+
         let form_id: i64 = sqlx::query(
             r#"
             INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
