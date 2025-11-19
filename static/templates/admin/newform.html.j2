@@ -108,18 +108,14 @@
     </script>
 
     <script>
-        async function calculateNextVersion(formName) {
+        async function getNextVersion(formName) {
             try {
-                const response = await fetch("/mercure/api/forms/all");
+                const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
                 if (!response.ok) {
                     throw new Error("Erreur lors de la récupération des formulaires.");
                 }
                 const data = await response.json();
-                const forms = data.data || [];
-
-                // Compter les formulaires avec le même nom
-                const sameNameForms = forms.filter(f => f.form_name === formName);
-                const nextVersion = sameNameForms.length + 1;
+                const nextVersion = data.data || [];
 
                 document.getElementById("version").value = nextVersion;
                 document.getElementById("version_display").textContent = nextVersion;
@@ -242,7 +238,7 @@
         </div>
         <div>
             <label for="form_name">Nom du formulaire :</label>
-            <input type="text" id="form_name" name="form_name" onblur="calculateNextVersion(this.value)" required>
+            <input type="text" id="form_name" name="form_name" onblur="getNextVersion(this.value)" required>
         </div>
 
         <div>

@@ -99,6 +99,7 @@ async fn rocket() -> _ {
                 routes::backend::list_samples_from_samplesheet,
                 routes::backend::parse_launcher_endpoint,
                 routes::backend::edit_form_groups,
+                routes::backend::get_nextversion,
             ],
         )
         .manage(pool)

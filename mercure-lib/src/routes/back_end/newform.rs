@@ -1,14 +1,36 @@
+use std::ops::Deref;
+
 use crate::utils::parse_launcher;
 use rocket::State;
 use rocket::serde::json::Json;
 use rocket::{get, post};
 use serde_json::Value;
+use sqlx::Row;
 use sqlx::SqlitePool;
 
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
 use crate::models::HgFormDef;
+
+#[get("/nextversion?<formname>")]
+pub async fn get_nextversion(
+    formname: String,
+    pool: &State<SqlitePool>,
+) -> Json<ApiResponse<Value>> {
+    Json(ApiResponse::success(
+        match sqlx::query("SELECT COUNT(*) AS count FROM Formdef WHERE form_name = ?")
+            .bind(&formname)
+            .fetch_one(pool.deref())
+            .await
+            .map(|r| r.try_get::<i64, &str>("count"))
+            .flatten()
+        {
+            Ok(count) => Value::from(count + 1),
+            Err(_) => Value::from(1),
+        },
+    ))
+}
 
 #[get("/parselauncher?<pipeline>&<launcher>")]
 pub async fn parse_launcher_endpoint(

@@ -144,7 +144,7 @@
                     document.getElementById("form_name").value = formDefinition.form_name;
                     document.getElementById("form_name_display").textContent = formDefinition.form_name;
                     // Calculer la nouvelle version automatiquement
-                    await calculateNextVersion(formDefinition.form_name);
+                    await getNextVersion(formDefinition.form_name);
                 }
 
                 // PIPELINE - sélectionner le pipeline existant si disponible
@@ -190,18 +190,14 @@
     </script>
 
     <script>
-        async function calculateNextVersion(formName) {
+        async function getNextVersion(formName) {
             try {
-                const response = await fetch("/mercure/api/forms/all");
+                const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
                 if (!response.ok) {
                     throw new Error("Erreur lors de la récupération des formulaires.");
                 }
                 const data = await response.json();
-                const forms = data.data || [];
-
-                // Compter les formulaires avec le même nom
-                const sameNameForms = forms.filter(f => f.form_name === formName);
-                const nextVersion = sameNameForms.length + 1;
+                const nextVersion = data.data || [];
 
                 document.getElementById("version").value = nextVersion;
                 document.getElementById("version_display").textContent = nextVersion;
