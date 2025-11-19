@@ -19,7 +19,17 @@ pub struct RTJobInfo {
     pub done_jobs_count: Option<i64>,
 }
 
-/// Fonction asynchrone qui renvoie un flux de JobInfo
+/// Fonction asynchrone qui renvoie un flux de JobInfo en temps réel
+///
+/// Cette fonction surveille un fichier de log spécifique pour un job et un numéro de tentative donnés.
+///
+/// Pour que la lecture en temps réel fonctionne correctement,
+/// le fichier de log doit être écrit ligne par ligne avec un flush après chaque écriture (`stdbuf -oL snakemake`).
+///
+/// Les informations renvoyées comprennent:
+/// - current_step_string: la dernière étape en cours. C'est le script launcher qui doit écrire une ligne "## STEP <nom_de_l_etape>" dans stdout.
+/// - current_progress: le pourcentage de progression dans l'étape actuelle. Issu de snakemake, format "X of Y steps (Z%) done".
+/// - pending_jobs_count, running_jobs_count, done_jobs_count: le nombre de jobs SLURM en attente, en cours d'exécution et terminés respectivement.
 pub async fn watch_log(
     job_id: i64,
     attempt_number: i64,
@@ -30,10 +40,10 @@ pub async fn watch_log(
         let log_pattern = format!(r"^\d+-job-{}-{}\.log$", job_id, attempt_number);
         let re_logfile = Regex::new(&log_pattern).unwrap();
 
-        let mut entries = rocket::tokio::fs::read_dir(&logs_folder).await?;
+        let mut entries = std::fs::read_dir(&logs_folder)?;
         let mut log_path = None;
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
+        while let Some(entry) = entries.next() {
+            let path = entry?.path();
             if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
                 if re_logfile.is_match(name) {
                     log_path = Some(path);

@@ -55,11 +55,10 @@
         <strong>SampleSheet :</strong>
         <span id="samplesheet-links">
             {% if run.sample_sheet_adn_path %}
-            <a href="{{ run.sample_sheet_adn_path }}" download>Télécharger ADN</a>
+            <a href="{{ run.sample_sheet_adn_path }}" download>Télécharger la SampleSheet ADN</a>
             {% endif %}
             {% if run.sample_sheet_arn_path %}
-            {% if run.sample_sheet_adn_path %} | {% endif %}
-            <a href="{{ run.sample_sheet_arn_path }}" download>Télécharger ARN</a>
+            <a href="{{ run.sample_sheet_arn_path }}" download>Télécharger la SampleSheet ARN</a>
             {% endif %}
             {% if not run.sample_sheet_adn_path and not run.sample_sheet_arn_path %}
             <em>Aucune SampleSheet disponible</em>
@@ -85,8 +84,8 @@
     </div>
 
     <script>
-        const runId = {{ run_id }};
-        const attemptNumber = {{ attempt_number }};
+        const runId = {{ run.run_id }};
+        const attemptNumber = {{ attempt.attempt_number }};
 
         function setProgress(percent) {
             const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -111,26 +110,20 @@
             }
         }
 
-        async function startEventSource() {
+        function startEventSource() {
             try {
-                const esUrl = `/mercure/watch/${runId}/${attemptNumber}`;
+                const esUrl = `/mercure/api/watch/${runId}/${attemptNumber}`;
                 const es = new EventSource(esUrl);
-                es.addEventListener('update', ev => {
-                    try { const data = JSON.parse(ev.data); updateJobInfo(data); } catch (e) { console.error(e); }
+                es.addEventListener('message', ev => {
+                    try { const data = JSON.parse(ev.data); console.log(ev.data); updateJobInfo(data); } catch (e) { console.error(e); }
                 });
-                es.addEventListener('error', ev => { console.warn('EventSource error', ev); });
+                es.addEventListener('error', ev => { console.warn('EventSource errrrror', ev); });
             } catch (e) {
                 console.error('Impossible d\'ouvrir EventSource', e);
             }
         }
 
-        (async () => {
-            // Les variables run_name, run_id et attempt_number sont fournies par le template Jinja2.
-            document.getElementById('run-name').textContent = {{ run.run_name | tojson }
-        };
-        document.getElementById('attempt-number').textContent = attemptNumber;
-        await startEventSource();
-}) ();
+        startEventSource();
     </script>
 </body>
 

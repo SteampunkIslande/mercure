@@ -100,6 +100,8 @@ async fn rocket() -> _ {
                 routes::backend::parse_launcher_endpoint,
                 routes::backend::edit_form_groups,
                 routes::backend::get_nextversion,
+                // Route renvoyant un EventStream
+                routes::backend::watch,
             ],
         )
         .manage(pool)

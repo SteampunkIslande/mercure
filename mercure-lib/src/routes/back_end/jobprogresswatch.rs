@@ -14,6 +14,11 @@ pub async fn watch(job_id: i64, attempt_number: i64) -> EventStream![] {
 
     let stream = watch_log(job_id, attempt_number, logs_folder).await;
 
+    eprintln!(
+        "Starting EventStream for job_id={} attempt_number={}",
+        job_id, attempt_number
+    );
+
     EventStream! {
         for await info in stream {
             match info {
@@ -21,7 +26,7 @@ pub async fn watch(job_id: i64, attempt_number: i64) -> EventStream![] {
                     yield Event::json(&json!(job_info)).event("update");
                 }
                 Err(e) => {
-                    yield Event::data(format!("Erreur: {e}")).event("error");
+                    break;
                 }
             }
         }
