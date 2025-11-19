@@ -205,6 +205,7 @@ async fn start_analysis(
         r#"#!/bin/bash
 
 export PATH=/usr/bin:$PATH
+source /etc/profile
 {}
 {}
 "#,
