@@ -1,50 +1,26 @@
 use crate::pipeline_exec::watch_log;
-use rocket::{Shutdown, get};
+use crate::routes::ApiResponse;
+use rocket::get;
 
-use rocket::response::stream::{Event, EventStream};
-use rocket::serde::json::json;
+use rocket::serde::json::Json;
+use serde_json::{Value, to_value};
 
 use std::path::PathBuf;
 
 #[get("/watch/<job_id>/<attempt_number>")]
-pub async fn watch(job_id: i64, attempt_number: i64, mut end: Shutdown) -> EventStream![] {
+pub async fn watch(job_id: i64, attempt_number: i64) -> Json<ApiResponse<Value>> {
     let config = crate::config::get_mercure_config();
 
     let logs_folder = PathBuf::from(&config.logs_dir);
 
-    let stream = watch_log(job_id, attempt_number, logs_folder).await;
-
-    eprintln!(
-        "Starting EventStream for job_id={} attempt_number={}",
-        job_id, attempt_number
-    );
-
-    EventStream! {
-        use rocket::futures::StreamExt;
-        use tokio::pin;
-        pin!(stream);
-        loop {
-            tokio::select! {
-                info = stream.next() => {
-                    match info {
-                        Some(Ok(job_info)) => {
-                            yield Event::json(&json!(job_info)).event("update");
-                        }
-                        Some(Err(e)) => {
-                            eprintln!("Error while watching log for job_id={} attempt_number={}: {}", job_id, attempt_number, e);
-                            break;
-                        }
-                        None => {
-                            eprintln!("End of log stream for job_id={} attempt_number={}", job_id, attempt_number);
-                            break;
-                        }
-                    }
-                }
-                _ = &mut end => {
-                    eprintln!("Client déconnecté pour job_id={} attempt_number={}", job_id, attempt_number);
-                    break;
-                }
-            }
-        }
+    match watch_log(job_id, attempt_number, logs_folder).await {
+        Ok(vars) => match to_value(&vars) {
+            Ok(json_vars) => Json(ApiResponse::success(json_vars)),
+            Err(e) => Json(ApiResponse::error(&format!(
+                "Erreur de sérialisation: {}",
+                e
+            ))),
+        },
+        Err(e) => Json(ApiResponse::error(&format!("Erreur: {}", e))),
     }
 }

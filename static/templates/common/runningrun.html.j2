@@ -5,6 +5,8 @@
     <meta charset="utf-8" />
     <title>Run en cours - {{ run.run_name }}</title>
     <link rel="stylesheet" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <style>
         .progress {
             background: #e9ecef;
@@ -21,32 +23,13 @@
             white-space: nowrap;
             line-height: 24px;
         }
-
-        .field {
-            margin: 10px 0;
-        }
-
-        .banner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-        }
-
-        .btn {
-            padding: 6px 10px;
-            border-radius: 4px;
-            background: #eee;
-            text-decoration: none;
-            color: #000;
-        }
     </style>
 </head>
 
 <body>
     <div class="banner">
         <h1 id="run-name">{{ run.run_name }}</h1>
-        <a id="back-to-runs" class="btn" href="/mercure/show/runs">Retour</a>
+        <a id="back-to-runs" class="btn" href="/mercure/show/runs">Retour à la liste des runs</a>
     </div>
 
     <div class="field"><strong>Tentative :</strong> <span id="attempt-number">{{ attempt.attempt_number }}</span></div>
@@ -87,6 +70,8 @@
         const runId = {{ run.run_id }};
         const attemptNumber = {{ attempt.attempt_number }};
 
+        let intervalId = null;
+
         function setProgress(percent) {
             const p = Math.max(0, Math.min(100, Number(percent) || 0));
             const bar = document.getElementById('progress-bar');
@@ -110,20 +95,33 @@
             }
         }
 
-        function startEventSource() {
-            try {
-                const esUrl = `/mercure/api/watch/${runId}/${attemptNumber}`;
-                const es = new EventSource(esUrl);
-                es.addEventListener('update', ev => {
-                    try { const data = JSON.parse(ev.data); console.log(ev.data); updateJobInfo(data); } catch (e) { console.error(e); }
+        function pollJobInfo() {
+            const url = `/mercure/api/watch/${runId}/${attemptNumber}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success && data.data) {
+                        updateJobInfo(data.data);
+                    } else {
+                        updateJobInfo(null);
+                    }
+                })
+                .catch(err => {
+                    console.warn('Erreur lors de la récupération des infos job', err);
+                    updateJobInfo(null);
                 });
-                es.addEventListener('error', ev => { console.warn('EventSource errrrror', ev); });
-            } catch (e) {
-                console.error('Impossible d\'ouvrir EventSource', e);
-            }
         }
 
-        startEventSource();
+        window.addEventListener('beforeunload', () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        });
+
+        intervalId = setInterval(pollJobInfo, 3000);
+        pollJobInfo();
+
+
     </script>
 </body>
 
