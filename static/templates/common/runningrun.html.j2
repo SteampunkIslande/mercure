@@ -114,7 +114,7 @@
             try {
                 const esUrl = `/mercure/api/watch/${runId}/${attemptNumber}`;
                 const es = new EventSource(esUrl);
-                es.addEventListener('message', ev => {
+                es.addEventListener('update', ev => {
                     try { const data = JSON.parse(ev.data); console.log(ev.data); updateJobInfo(data); } catch (e) { console.error(e); }
                 });
                 es.addEventListener('error', ev => { console.warn('EventSource errrrror', ev); });

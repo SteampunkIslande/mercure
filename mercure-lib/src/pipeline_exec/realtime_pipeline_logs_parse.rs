@@ -10,7 +10,7 @@ use rocket::tokio::{
 use serde::Serialize;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct RTJobInfo {
     pub current_step_string: Option<String>,
     pub current_progress: Option<i64>,
