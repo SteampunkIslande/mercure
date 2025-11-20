@@ -72,7 +72,7 @@
                         updatePaginationControls();
                     }
                 } else {
-                    document.getElementById("error-message").textContent = json.message || "Erreur inconnue";
+                    showMessage("error", json.message || "Erreur inconnue");
                 }
             } catch {
                 showMessage("error", "Erreur de chargement des données.");
