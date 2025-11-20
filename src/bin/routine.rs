@@ -187,8 +187,9 @@ async fn start_analysis(
         .iter()
         .map(|(k, v)| format!(r#"export {k}="{v}""#))
         .chain([
-            format!(r#"export HG_RAWDIR="{}""#, run_dir.display()),
-            format!(r#"export HG_ANALYSIS_DIR="{}""#, analysis_dir.display()),
+            format!(r#"export RAW_DIR="{}""#, run_dir.display()),
+            format!(r#"export ANALYSIS_DIR="{}""#, analysis_dir.display()),
+            format!(r#"export RUN_NAME="{}""#, &run.run_name),
         ])
         .collect::<Vec<_>>()
         .join("\n");
