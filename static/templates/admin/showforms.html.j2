@@ -99,7 +99,7 @@
                         console.log("No tbody found, appending to table directly");
                         container = table;
                     }
-                    forms.data.with_group.forEach(form => {
+                    forms.data.with_group.sort((a, b) => b.version - a.version).forEach(form => {
                         const formBox = document.createElement('tr');
                         formBox.innerHTML = `
                             <td class="content-column">${form.form_name} (version ${form.version})</td>
@@ -124,7 +124,7 @@
                             console.log("No tbody found, appending to table directly");
                             container_no_group = table_no_group;
                         }
-                        forms.data.without_group.forEach(form => {
+                        forms.data.without_group.sort((a, b) => b.version - a.version).forEach(form => {
                             const formBoxNoGroup = document.createElement('tr');
                             formBoxNoGroup.innerHTML = `
                                 <td class="content-column">${form.form_name} (version ${form.version})</td>
