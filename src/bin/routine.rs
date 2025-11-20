@@ -52,6 +52,8 @@ enum RoutineError {
     ModelError(#[from] mercure::models::ModelError),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
@@ -432,26 +434,26 @@ async fn main() -> Result<(), RoutineError> {
     let routine_handle =
         tokio::spawn(async move { run_routine_loop(routine_pool, shutdown_rx).await });
 
-    // Attendre le signal Ctrl+C
-    let mut stream = tokio::signal::unix::signal(SignalKind::terminate())?;
+    // Attendre le signal SIGTERM
+    // Attendre aussi le signal SIGINT (Ctrl+C) pour permettre un arrêt propre lors du développement local
+    let mut stream_sigterm = tokio::signal::unix::signal(SignalKind::terminate())?;
+    let mut stream_sigint = tokio::signal::unix::signal(SignalKind::interrupt())?;
 
-    match stream.recv().await {
-        Some(_) => {
-            info!("Shutdown signal received, envoi du signal d'arrêt...");
-            // Envoyer le signal d'arrêt à la routine
-            let _ = shutdown_tx.send(true);
-
-            // Attendre que la routine se termine proprement
-            if let Err(e) = routine_handle.await {
-                error!("Erreur lors de l'arrêt de la routine: {}", e);
+    loop {
+        tokio::select! {
+            _ = stream_sigterm.recv() => {
+                info!("Signal SIGTERM reçu, arrêt de la routine...");
+                let _ = shutdown_tx.send(true);
+                break;
             }
-
-            info!("Fermeture de la connexion à la base de données...");
-            pool.close().await;
-            info!("Connexion à la base de données fermée. Sortie.");
+            _ = stream_sigint.recv() => {
+                info!("Signal SIGINT reçu, arrêt de la routine...");
+                let _ = shutdown_tx.send(true);
+                break;
+            }
         }
-        None => {}
     }
+    routine_handle.await??;
     info!("Routine arrêtée.");
     Ok(())
 }
