@@ -76,6 +76,13 @@ async fn run_routine_loop(
                         "Erreur lors du traitement de la tentive {} du run {}: {e}",
                         attempt.attempt_number, attempt.run_id
                     );
+                    // Attention, seul point dans la routine qui peut l'interrompre en cas d'erreur
+                    // Cas extrêmement spécifiques et improbables:
+                    // - Obtenir le run à partir de l'ID contenu dans attempt échoue
+                    // - La transition d'état est invalide (normalement impossible ici)
+                    // - Impossible de mettre à jour la table Runs
+                    // - Impossible de mettre à jour la table Attempts
+                    // A part ces cas particuliers, les erreurs sont loggées mais la routine continue
                     analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool)
                         .await?;
                 }
