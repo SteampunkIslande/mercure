@@ -70,7 +70,7 @@ fn create_run_row(
     ])
 }
 
-/// List runs regarding specific user
+/// List runs regarding specific user. Returned vec is sorted by run date, most recent first. This behavior cannot be changed.
 ///
 /// # Arguments
 ///

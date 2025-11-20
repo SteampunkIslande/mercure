@@ -10,6 +10,7 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
 
     <script src="/static/scripts/show_message.js"></script>
+    <script src="/static/scripts/json_table.js"></script>
 </head>
 
 <body>
@@ -48,6 +49,91 @@
                 }
             }
         }
+
+        function openTab(evt, group_id) {
+            // Declare all variables
+            var i, tabcontent, tablinks;
+
+            // Get all elements with class="tabcontent" and hide them
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            // Get all elements with class="tablinks" and remove the class "active"
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            document.getElementById(`forms-container-${group_id}`).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        const userGroups = {{ user_groups | tojson }};
+
+        async function loadGroupForms() {
+            if (userGroups.length > 0) {
+                for (let group of userGroups) {
+                    try {
+                        const response = await fetch(`/mercure/api/forms/groups/${group.id}`);
+                        const forms = await response.json();
+                        // Always append to tbody if present, otherwise to table
+                        let table = document.getElementById(`forms-container-${group.id}`);
+                        let container = table.querySelector('tbody');
+                        if (!container) {
+                            console.log("No tbody found, appending to table directly");
+                            container = table;
+                        }
+                        forms.data.with_group.forEach(form => {
+                            if (form.enabled) {
+                                const formBox = document.createElement('tr');
+                                formBox.innerHTML = `
+                           <td class="content-column">${form.form_name} (version ${form.version})</td>
+                           <td class="numeric-column">
+                               <a href="/mercure/runs/submit/${form.formid}" class="inline-table centered">Lancer un run</a>
+                           </td>
+                        `;
+                                container.appendChild(formBox);
+                            }
+                        });
+                    } catch (error) {
+                        showMessage("error", `Error fetching forms ${error}`);
+                    }
+                }
+            }
+            else {
+                console.log("User has no groups!");
+                document.getElementById("no-user-group").style.display = "block";
+            }
+        }
+
+
+        async function lastRuns() {
+            try {
+                // Permet d'afficher les cinq derniers runs de l'utilisateur (trié par date)
+                const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);
+                const json = await response.json();
+                if (json.success) {
+                    if (json.data.table.length > 0) {
+                        generateJsonTable(json.data, "latest-runs-table");
+                    } else {
+                        document.getElementById("latest-runs-table").innerHTML = `<p>Aucune donnée à afficher.</p>`;
+                    }
+                } else {
+                    showMessage("error", json.message || "Erreur inconnue");
+                }
+            } catch (e) {
+                showMessage(`error", "Erreur: ${e}`);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            await loadGroupForms();
+            await lastRuns();
+        });
+
     </script>
     <div class="dropdown">
         <button onclick="navigateTo(`/mercure/show/runs`)" class="dropbtn"><span
@@ -65,9 +151,7 @@
     </div>
     {% endif %}
 
-    <div>
-        <span style="display:block;"><br></span>
-    </div>
+    <h1>Mes formulaires</h1>
 
     <div>
         <div class="tab">
@@ -89,69 +173,15 @@
         </table>
         {% endfor %}
 
-        <script>
-            function openTab(evt, group_id) {
-                // Declare all variables
-                var i, tabcontent, tablinks;
-
-                // Get all elements with class="tabcontent" and hide them
-                tabcontent = document.getElementsByClassName("tabcontent");
-                for (i = 0; i < tabcontent.length; i++) {
-                    tabcontent[i].style.display = "none";
-                }
-
-                // Get all elements with class="tablinks" and remove the class "active"
-                tablinks = document.getElementsByClassName("tablinks");
-                for (i = 0; i < tablinks.length; i++) {
-                    tablinks[i].className = tablinks[i].className.replace(" active", "");
-                }
-
-                // Show the current tab, and add an "active" class to the button that opened the tab
-                document.getElementById(`forms-container-${group_id}`).style.display = "block";
-                evt.currentTarget.className += " active";
-            } 
-        </script>
-
-        <script>
-            const userGroups = {{ user_groups | tojson }};
-
-            if (userGroups) {
-                async function loadGroupForms() {
-                    for (let group of userGroups) {
-                        try {
-                            const response = await fetch(`/mercure/api/forms/groups/${group.id}`);
-                            const forms = await response.json();
-                            // Always append to tbody if present, otherwise to table
-                            let table = document.getElementById(`forms-container-${group.id}`);
-                            let container = table.querySelector('tbody');
-                            if (!container) {
-                                console.log("No tbody found, appending to table directly");
-                                container = table;
-                            }
-                            forms.data.with_group.forEach(form => {
-                                if (form.enabled) {
-                                    const formBox = document.createElement('tr');
-                                    formBox.innerHTML = `
-                           <td class="content-column">${form.form_name} (version ${form.version})</td>
-                           <td class="numeric-column">
-                               <a href="/mercure/runs/submit/${form.formid}" class="inline-table centered">Lancer un run</a>
-                           </td>
-                        `;
-                                    container.appendChild(formBox);
-                                }
-                            });
-                        } catch (error) {
-                            showMessage("error", `Error fetching forms ${error}`);
-                        }
-                    }
-                }
-                document.addEventListener('DOMContentLoaded', async function () {
-                    await loadGroupForms();
-                });
-
-            }
-        </script>
     </div>
+    <p id="no-user-group" style="display:none;">
+        Vous n'appartenez à aucun groupe. Veuillez contacter votre administrateur système
+    </p>
+
+    <h1>Mes cinq derniers runs</h1>
+    <div id="latest-runs-table">
+    </div>
+
 </body>
 
 </html>
