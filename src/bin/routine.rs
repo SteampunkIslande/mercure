@@ -7,6 +7,8 @@ use mercure_lib::models::analysis;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
+use tokio;
+use tokio::signal::unix::SignalKind;
 
 // Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
 fn init_logger() {
@@ -95,7 +97,7 @@ async fn run_routine_loop(
 
         // Point de contrôle 2: Attendre avec possibilité d'interruption
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(300)) => {},
+            _ = tokio::time::sleep(Duration::from_secs(60)) => {},
             _ = shutdown_rx.changed() => {
                 if *shutdown_rx.borrow() { break; }
             }
@@ -172,7 +174,7 @@ async fn start_analysis(
     }
 
     let script_path = format!(
-        "{jobs_dir}/TODO/jobs-{run_id}-{attempt_number}",
+        "{jobs_dir}/TODO/job-{run_id}-{attempt_number}.sh",
         jobs_dir = config.jobs_dir,
         run_id = attempt.run_id,
         attempt_number = attempt.attempt_number
@@ -187,16 +189,17 @@ async fn start_analysis(
     let exported_vars = attempt
         .user_defined_vars
         .iter()
-        .map(|(k, v)| format!("export {k}={v}"))
+        .map(|(k, v)| format!(r#"export {k}="{v}""#))
         .chain([
-            format!("export HG_RAWDIR={}", run_dir.display()),
-            format!("export HG_ANALYSIS_DIR={}", analysis_dir.display()),
+            format!(r#"export HG_RAWDIR="{}""#, run_dir.display()),
+            format!(r#"export HG_ANALYSIS_DIR="{}""#, analysis_dir.display()),
         ])
         .collect::<Vec<_>>()
         .join("\n");
 
     let mut script_file = std::fs::OpenOptions::new()
         .mode(0o775)
+        .write(true)
         .create(true)
         .open(&script_path)?;
 
@@ -346,7 +349,9 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
             .map_err(RoutineError::from)?;
         info!(
             "Dossier trouvé pour la tentative {} du run {}: {}. Passage à l'état Running.",
-            attempt.attempt_number, attempt.run_id, supposed_run_dir
+            attempt.attempt_number,
+            attempt.run_id,
+            run_dir.display()
         );
         Ok(())
     }
@@ -411,11 +416,11 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
 #[tokio::main]
 async fn main() -> Result<(), RoutineError> {
     use sqlx::sqlite::SqlitePool;
-    use tokio::signal;
 
     init_logger();
     info!("Connecting to database...");
-    let pool = SqlitePool::connect("sqlite://mercure.db").await?;
+    let config = get_mercure_config();
+    let pool = SqlitePool::connect(&config.mercure_db).await?;
 
     // Canal pour communiquer le signal d'arrêt
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -428,8 +433,10 @@ async fn main() -> Result<(), RoutineError> {
         tokio::spawn(async move { run_routine_loop(routine_pool, shutdown_rx).await });
 
     // Attendre le signal Ctrl+C
-    match signal::ctrl_c().await {
-        Ok(()) => {
+    let mut stream = tokio::signal::unix::signal(SignalKind::terminate())?;
+
+    match stream.recv().await {
+        Some(_) => {
             info!("Shutdown signal received, envoi du signal d'arrêt...");
             // Envoyer le signal d'arrêt à la routine
             let _ = shutdown_tx.send(true);
@@ -443,13 +450,8 @@ async fn main() -> Result<(), RoutineError> {
             pool.close().await;
             info!("Connexion à la base de données fermée. Sortie.");
         }
-        Err(err) => {
-            error!("Erreur lors de l'écoute du signal Ctrl+C: {}", err);
-            return Err(RoutineError::SqlxError(sqlx::Error::Io(
-                std::io::Error::new(std::io::ErrorKind::Other, format!("Signal error: {}", err)),
-            )));
-        }
+        None => {}
     }
-
+    info!("Routine arrêtée.");
     Ok(())
 }
