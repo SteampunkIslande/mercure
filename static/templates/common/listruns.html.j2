@@ -55,11 +55,14 @@
 
         async function loadRuns(page, size = pageSize) {
             try {
-                const response = await fetch(`/mercure/api/listruns?page=${page}&page_size=${size}`);
+                let params = new URLSearchParams(document.location.search);
+                let status = params.get("status");
+                const status_param = status ? `&status=${status}` : "";
+                const response = await fetch(`/mercure/api/listruns?page=${page}&page_size=${size}${status_param}`);
                 const json = await response.json();
                 if (json.success) {
                     document.getElementById("banner-title").textContent = json.data.title || "Liste des runs";
-                    if (json.data.table) {
+                    if (json.data.table.length > 0) {
                         generateJsonTable(json.data, "runs-table");
                     } else {
                         document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";

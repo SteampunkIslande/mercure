@@ -70,12 +70,33 @@ fn create_run_row(
     ])
 }
 
+/// List runs regarding specific user
+///
+/// # Arguments
+///
+/// - `pool` (`&SqlitePool`) - The sqlite database connection
+/// - `user` (`Option<&User>`) - The user to list runs of. `None` means no filter will be applied regarding user. Use for admin users.
+/// - `page_size` (`Option<i64>`) - How many runs should be returned per page (default: 20)
+/// - `page` (`Option<i64>`) - Page to show, starting at 1 (default: 1)
+/// - `status` (`Option<String>`) - An optional string value to filter run status on. Final filter will be `LIKE '{status}%', meaning it will filter by this prefix`
+///
+/// # Returns
+///
+/// - `Result<(Vec<serde_json::Value>, i64), sqlx::Error>` - A `Vec<serde_json::Value>` (empty means that the query returned nothing).
+///
+/// # Errors
+///
+/// This function should not return any error, if it did, it would be from a sql syntax error or if the database is not accessible.
 async fn list_runs(
     pool: &SqlitePool,
     user: Option<&User>,
     page_size: Option<i64>,
     page: Option<i64>,
+    status: Option<String>,
 ) -> Result<(Vec<serde_json::Value>, i64), sqlx::Error> {
+    // Here, if status is empty, this will match everything since status is a string type field and `LIKE %` will match any string!
+    let status = status.unwrap_or_default();
+
     let (count_query, base_query) = match user {
         Some(u) => {
             let count_query = format!(
@@ -87,8 +108,9 @@ async fn list_runs(
                     FROM Formdef f
                     INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
                     INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                    WHERE gu.user_id = {}
+                    WHERE gu.user_id = {} 
                 )
+                AND r.status LIKE '{status}%'
                 "#,
                 u.id
             );
@@ -103,8 +125,9 @@ async fn list_runs(
                     FROM Formdef f
                     INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
                     INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                    WHERE gu.user_id = {}
+                    WHERE gu.user_id = {} 
                 )
+                AND r.status LIKE '{status}%'
                 ORDER BY r.run_date DESC
                 LIMIT ? OFFSET ?
                 "#,
@@ -114,16 +137,20 @@ async fn list_runs(
             (count_query, base_query)
         }
         None => {
-            let count_query = "SELECT COUNT(r.run_id) as total FROM Runs r".to_string();
+            let count_query = format!(
+                "SELECT COUNT(r.run_id) as total FROM Runs r WHERE r.status LIKE '{status}%'"
+            );
 
-            let base_query = r#"
+            let base_query = format!(
+                r#"
                 SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
                 FROM Runs r
                 INNER JOIN Users u ON r.user_id = u.id
+                WHERE r.status LIKE '{status}%'
                 ORDER BY r.run_date DESC
                 LIMIT ? OFFSET ?
             "#
-            .to_string();
+            );
 
             (count_query, base_query)
         }
@@ -164,12 +191,13 @@ async fn list_runs(
     Ok((runs_data, total_count))
 }
 
-#[get("/listruns?<page>&<page_size>")]
+#[get("/listruns?<page>&<page_size>&<status>")]
 pub async fn list_runs_get(
     pool: &State<SqlitePool>,
     authenticated: Authenticated,
     page: Option<i64>,
     page_size: Option<i64>,
+    status: Option<String>,
 ) -> Json<ApiResponse<Value>> {
     match list_runs(
         pool,
@@ -180,29 +208,32 @@ pub async fn list_runs_get(
         },
         page_size,
         page,
+        status,
     )
     .await
     {
         Ok((runs_list, total_count)) => {
-            if runs_list.is_empty() {
-                return Json(ApiResponse::error("Aucun run trouvé.".to_string()));
-            } else {
-                let page_size_val = page_size.unwrap_or(5);
-                let current_page = page.unwrap_or(1);
-                let total_pages = (total_count + page_size_val - 1) / page_size_val;
+            let page_size_val = page_size.unwrap_or(5);
+            let current_page = page.unwrap_or(1);
+            let total_pages = (total_count + page_size_val - 1) / page_size_val;
 
-                return Json(ApiResponse::success(json!({
-                        "title": "Liste des runs de vos groupes",
-                        "header": create_header(),
-                        "table": runs_list,
-                        "pagination": {
-                            "current_page": current_page,
-                            "total_pages": total_pages,
-                            "page_size": page_size_val,
-                            "total_count": total_count
-                        }
-                })));
-            }
+            let title = if authenticated.user.is_admin {
+                "Liste des runs (tous les groupes)"
+            } else {
+                "Liste des runs de vos groupes"
+            };
+
+            return Json(ApiResponse::success(json!({
+                    "title": title,
+                    "header": create_header(),
+                    "table": runs_list,
+                    "pagination": {
+                        "current_page": current_page,
+                        "total_pages": total_pages,
+                        "page_size": page_size_val,
+                        "total_count": total_count
+                    }
+            })));
         }
         Err(_e) => {
             return Json(ApiResponse::error(

@@ -8,7 +8,46 @@
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+
+    <script src="/static/scripts/json_table.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
+    <script>
+
+        async function loadRuns(status, emptyMsg = "Aucune donnée à afficher.") {
+            try {
+                // Permet d'afficher les dix premiers runs avec le statut `status`
+                const response = await fetch(`/mercure/api/listruns?page=1&page_size=10&status=${encodeURIComponent(status)}`);
+                const json = await response.json();
+                if (json.success) {
+                    if (json.data.table.length > 0) {
+                        generateJsonTable(json.data, `${status.toLowerCase()}-runs-table`);
+                    } else {
+                        document.getElementById(`${status.toLowerCase()}-runs-table`).innerHTML = `<p>${emptyMsg}</p>`;
+                    }
+
+                    if (json.data.pagination) {
+                        const totalPages = json.data.pagination.total_pages;
+                        if (totalPages > 1) {
+                            const overflow_elem = document.getElementById(`${status.toLowerCase()}-runs-overflow`);
+                            overflow_elem.style.display = "block";
+                        }
+                    }
+                } else {
+                    showMessage("error", json.message || "Erreur inconnue");
+                }
+            } catch (e) {
+                showMessage(`error", "Erreur: ${e}`);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", async function () {
+            await loadRuns("Running", "Aucun run en cours");
+            await loadRuns("Failure", "Aucun run en échec");
+        });
+
+    </script>
 </head>
+
 
 <body>
     <div class="banner">
@@ -42,6 +81,7 @@
             }
         }
     </script>
+
     <div class="dropdown">
         <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
                 class="material-icons icon-align">account_circle</span> Gestion des utilisateurs</button>
@@ -62,7 +102,21 @@
         <button onclick="navigateTo(`/mercure/home`)" class="dropbtn"><span
                 class="material-icons icon-align">home</span></button>
     </div>
-    </div>
+
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+
+    <h1>Runs en cours</h1>
+
+    <div id="running-runs-table"></div>
+    <p id="running-runs-overflow" style="display:none">Plus de 10 runs en cours, <a
+            href="/mercure/show/runs?status=Running">cliquez ici</a> pour les voir</p>
+
+    <h1>Runs en échec</h1>
+
+    <div id="failure-runs-table"></div>
+    <p id="failure-runs-overflow" style="display:none">Plus de 10 runs en échec, <a
+            href="/mercure/show/runs?status=Failure">cliquez ici</a> pour les voir</p>
+
 </body>
 
 </html>
