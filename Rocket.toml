@@ -1,4 +1,4 @@
-[debug]
+[default]
 address = "127.0.0.1"
 secret_key = "hLtkhUgxdZJffXn6+YjJL7E3z0OwPAnx92NUZy8mpCQ="
 log_level = "normal"
@@ -8,10 +8,11 @@ workers = 12
 ident = "Mercure"
 ip_header = "X-Real-IP"
 keep_alive = 5
-cli_colors = true
 ctrlc = true
 
-mercure_db = "sqlite://mercure.db"
+
+[debug]
+mercure_db = "sqlite:///home/charles/mercure/mercure.db"
 
 template_dir = "/home/charles/mercure/static/templates"
 static_dir = "/home/charles/mercure/static"
@@ -23,3 +24,20 @@ jobs_dir = "/home/charles/mercure-arena/OPT/JOBS"
 
 sequencers_dir = "/home/charles/mercure-arena/data/raw/sequenceurs"
 analysis_dir = "/home/charles/mercure-arena/data/analysis"
+
+cli_colors = true
+
+[release]
+address = "10.169.192.26"
+mercure_db = "sqlite:///OPT/hermes/mercure.db"
+
+template_dir = "/OPT/hermes/static/templates"
+static_dir = "/OPT/hermes/static"
+upload_dir = "/OPT/hermes/uploads"
+logs_dir = "/OPT/JOBS/LOGS"
+
+pipeline_dir = "/OPT/pipelines"
+jobs_dir = "/OPT/JOBS"
+
+sequencers_dir = "/data/raw/sequenceurs"
+analysis_dir = "/data/analysis"
