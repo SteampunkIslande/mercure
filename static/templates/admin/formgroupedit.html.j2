@@ -6,6 +6,7 @@
     <title>Édition des groupes du formulaire</title>
     <link rel="stylesheet" href="/static/styles/default.css" />
     <link rel="stylesheet" href="/static/icon-font/material-icons.css" />
+    <script src="/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -70,10 +71,8 @@
                 if (!data.success) throw new Error(data.message);
                 window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(data.data || 'Groupes modifiés')}`;
             } catch (error) {
-                const errorDiv = document.getElementById('error-message');
-                errorDiv.textContent = error;
-                errorDiv.style.display = 'block';
-                setTimeout(() => { errorDiv.style.display = 'none'; }, 8000);
+                console.error("Erreur:", error);
+                showMessage("error", `Erreur lors de la modification des groupes : ${error.message}`, true);
             }
         }
     </script>

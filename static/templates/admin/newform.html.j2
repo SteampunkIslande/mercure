@@ -10,6 +10,7 @@
     <title>{{ title }}</title>
     <script src="/static/scripts/newform_addgroup.js"></script>
     <script src="/static/scripts/userdefvars_edit.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 
     <script>
 
@@ -104,9 +105,6 @@
             userVarCounter = 0;
         }
 
-    </script>
-
-    <script>
         async function getNextVersion(formName) {
             try {
                 const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
@@ -233,12 +231,7 @@
                 window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
             } catch (error) {
                 console.error("Erreur:", error);
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = error;
-                errorDiv.style.display = "block";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 8000);
+                showMessage("error", `Erreur lors de la création du formulaire : ${error.message}`, true);
             }
         }
     </script>

@@ -10,6 +10,7 @@
     <title>{{ title }}</title>
     <script src="/static/scripts/newform_addgroup.js"></script>
     <script src="/static/scripts/userdefvars_edit.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
 
     <script>
 
@@ -177,13 +178,8 @@
                 }
 
             } catch (error) {
-                console.error("Erreur:", error);
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = error;
-                errorDiv.style.display = "block";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 8000);
+                console.error("Erreur lors de la récupération du formulaire :", error);
+                showMessage("error", `Erreur lors de la récupération du formulaire : ${error.message}`, true);
             }
         }
 
@@ -316,12 +312,7 @@
                 window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
             } catch (error) {
                 console.error("Erreur:", error);
-                const errorDiv = document.getElementById("error-message");
-                errorDiv.textContent = error;
-                errorDiv.style.display = "block";
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 8000);
+                showMessage("error", `Erreur lors de la création du formulaire : ${error.message}`, true);
             }
         }
     </script>
