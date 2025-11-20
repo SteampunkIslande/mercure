@@ -51,12 +51,12 @@
     </script>
     <div class="dropdown">
         <button onclick="navigateTo(`/mercure/show/runs`)" class="dropbtn"><span
-                class="material-icons icon-align">science</span> Voir mes runs</button>
+                class="material-icons icon-align">science</span> Voir tous mes runs</button>
     </div>
     {% if is_admin %}
     <div class="dropdown" style="float:right;">
         <button onclick="navigateTo(`/mercure/admin/dashboard`)" class="dropbtn"><span
-                class="material-icons icon-align">settings</span></button>
+                class="material-icons icon-align">settings</span>Administration</button>
     </div>
     {% else %}
     <div class="dropdown" style="float:right;">
@@ -145,24 +145,10 @@
                         }
                     }
                 }
-                document.addEventListener('DOMContentLoaded', () => {
-                    loadGroupForms();
+                document.addEventListener('DOMContentLoaded', async function () {
+                    await loadGroupForms();
                 });
 
-                async function toggleFormActive(e, formId) {
-                    let toggle = e.target.checked ? "enable" : "disable";
-                    try {
-                        const response = await fetch(`/mercure/api/${toggle}/${formId}`);
-                        const data = await response.json();
-                        if (data.success) {
-                            showMessage('info', data.data);
-                        } else {
-                            showMessage('error', data.message);
-                        }
-                    } catch (error) {
-                        showMessage('error', error);
-                    }
-                }
             }
         </script>
     </div>
