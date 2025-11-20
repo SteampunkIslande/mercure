@@ -66,12 +66,6 @@ async fn run_routine_loop(
     use std::time::Duration;
 
     loop {
-        // Point de contrôle 1: Vérifier le signal d'arrêt au début de chaque itération
-        if *shutdown_rx.borrow() {
-            info!("Signal d'arrêt reçu, arrêt de la routine...");
-            break;
-        }
-
         // Recherche et traitement des runs en attente
         let pending_attempts = find_pending_runs(&pool).await;
         for attempt in pending_attempts {
@@ -101,7 +95,7 @@ async fn run_routine_loop(
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(60)) => {},
             _ = shutdown_rx.changed() => {
-                if *shutdown_rx.borrow() { break; }
+                if *shutdown_rx.borrow() { eprintln!("Signal d'arrêt reçu, arrêt de la routine...");break; }
             }
         }
     }
@@ -444,16 +438,17 @@ async fn main() -> Result<(), RoutineError> {
             _ = stream_sigterm.recv() => {
                 info!("Signal SIGTERM reçu, arrêt de la routine...");
                 let _ = shutdown_tx.send(true);
+                routine_handle.await??;
                 break;
             }
             _ = stream_sigint.recv() => {
                 info!("Signal SIGINT reçu, arrêt de la routine...");
                 let _ = shutdown_tx.send(true);
+                routine_handle.await??;
                 break;
             }
         }
     }
-    routine_handle.await??;
     info!("Routine arrêtée.");
     Ok(())
 }
