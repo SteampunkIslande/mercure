@@ -129,7 +129,6 @@
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
             const formName = document.getElementById("form_name").value;
-            const version = document.getElementById("version").value;
 
             const selectedGroups = Array.from(
                 document.querySelectorAll('input[name="selected_groups"]:checked')
@@ -162,6 +161,45 @@
                 }
             });
 
+            // Vérification des variables requises non définies
+            let missingVars = [];
+            try {
+                // On récupère la liste des UDV requises pour le launcher
+                const response = await fetch(`/mercure/api/parselauncher?pipeline=${encodeURIComponent(pipelineName)}&launcher=${encodeURIComponent(launcherName)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    let requiredVars = data.data || [];
+                    Object.keys(requiredVars).forEach((varName) => {
+                        if (!userVars[varName]) {
+                            missingVars.push(varName);
+                        }
+                    });
+                }
+            } catch (e) {
+                // Ignore l'erreur ici, on continue
+            }
+
+            if (missingVars.length > 0) {
+                const msg = "Attention : les variables suivantes n'ont pas été définies :\n\n" +
+                    missingVars.map(v => `- \`${v}\``).join("\n") +
+                    "\n\nVoulez-vous continuer la création du formulaire ?";
+                if (!window.confirm(msg)) {
+                    return;
+                }
+            }
+
+            // Obtenir la version la plus récente juste avant la soumission
+            let version = 1;
+            try {
+                const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    version = data.data || 1;
+                }
+            } catch (e) {
+                // Ignore l'erreur ici, on continue
+            }
+
             if (Object.keys(userVars).length === 0) {
                 userVars = null;
             }
@@ -173,7 +211,7 @@
                 groups: selectedGroups,
                 user_defined_vars: userVars,
                 enabled: true,
-                version: parseInt(version) || -1
+                version: parseInt(version) || 1
             };
 
             try {
