@@ -153,6 +153,28 @@
         });
     </script>
 </head>
+<script>
+    function onStatusFilterChange() {
+        const select = document.getElementById("status-filter");
+        const status = select.value;
+        const params = new URLSearchParams(window.location.search);
+        if (status) {
+            params.set("status", status);
+        } else {
+            params.delete("status");
+        }
+        window.location.search = params.toString();
+    }
+
+    // Initialiser la valeur du filtre selon l'URL
+    document.addEventListener("DOMContentLoaded", function () {
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get("status");
+        if (status) {
+            document.getElementById("status-filter").value = status;
+        }
+    });
+</script>
 
 <body>
     <div class="banner">
@@ -170,6 +192,17 @@
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
     <section>
+        <div>
+            <label for="status-filter">Filtrer par statut :</label>
+            <select id="status-filter" onchange="onStatusFilterChange()">
+                <option value="">Tous</option>
+                <option value="Success">Succès</option>
+                <option value="Failure">Echec</option>
+                <option value="Pending">En attente</option>
+                <option value="Running">Analyses en cours</option>
+                <option value="Idle">A valider</option>
+            </select>
+        </div>
         <div id="runs-table"></div>
     </section>
 
