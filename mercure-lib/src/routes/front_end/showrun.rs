@@ -163,3 +163,8 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
 pub async fn list_runs() -> Template {
     Template::render("common/listruns", context! {})
 }
+
+#[get("/search/run")]
+pub async fn search_run() -> Template {
+    Template::render("common/searchrun", context! {})
+}

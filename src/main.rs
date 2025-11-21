@@ -52,6 +52,8 @@ async fn rocket() -> _ {
                 routes::frontend::show_run_get,
                 // Affichage de la liste des runs
                 routes::frontend::list_runs,
+                // Recherche avancée de runs
+                routes::frontend::search_run,
             ],
         )
         .mount(
@@ -102,6 +104,8 @@ async fn rocket() -> _ {
                 routes::backend::get_nextversion,
                 // Route renvoyant un EventStream
                 routes::backend::watch,
+                // Route pour rechercher des runs
+                routes::backend::search_run_get,
             ],
         )
         .manage(pool)

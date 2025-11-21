@@ -242,3 +242,137 @@ pub async fn list_runs_get(
         }
     }
 }
+
+#[get("/searchrun?<page>&<page_size>&<status>&<date_from>&<date_to>&<run_name_search>")]
+pub async fn search_run_get(
+    pool: &State<SqlitePool>,
+    authenticated: Authenticated,
+    page: Option<i64>,
+    page_size: Option<i64>,
+    status: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    run_name_search: Option<String>,
+) -> Json<ApiResponse<Value>> {
+    let user = if !authenticated.user.is_admin {
+        Some(&authenticated.user)
+    } else {
+        None
+    };
+
+    let page_size_val = page_size.unwrap_or(5);
+    let page_val = page.unwrap_or(1);
+
+    // Construction dynamique de la requête SQL
+    let mut query = String::from(
+        "SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username \
+         FROM Runs r \
+         INNER JOIN Users u ON r.user_id = u.id",
+    );
+    let mut where_clauses = Vec::new();
+
+    if let Some(u) = user {
+        where_clauses.push(format!(
+            "r.form_id IN (SELECT f.form_id FROM Formdef f \
+                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id \
+                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id \
+                WHERE gu.user_id = {})",
+            u.id
+        ));
+    }
+
+    if let Some(ref s) = status {
+        where_clauses.push(format!("r.status LIKE '{}%'", s));
+    }
+
+    if let Some(ref df) = date_from {
+        where_clauses.push(format!("r.run_date >= '{}'", df));
+    }
+    if let Some(ref dt) = date_to {
+        where_clauses.push(format!("r.run_date <= '{}'", dt));
+    }
+    if let Some(ref name) = run_name_search {
+        where_clauses.push(format!("r.run_name LIKE '%{}%'", name.replace('\'', "''")));
+    }
+
+    if !where_clauses.is_empty() {
+        query.push_str(" WHERE ");
+        query.push_str(&where_clauses.join(" AND "));
+    }
+    query.push_str(" ORDER BY r.run_date DESC LIMIT ? OFFSET ?");
+
+    // Compte total pour la pagination
+    let mut count_query = String::from("SELECT COUNT(r.run_id) as total FROM Runs r");
+    if !where_clauses.is_empty() {
+        count_query.push_str(" WHERE ");
+        count_query.push_str(&where_clauses.join(" AND "));
+    }
+
+    // Récupérer le nombre total de résultats
+    let total_count: i64 = match sqlx::query(&count_query)
+        .fetch_one(pool as &SqlitePool)
+        .await
+        .and_then(|row| row.try_get("total"))
+    {
+        Ok(count) => count,
+        Err(_) => {
+            return Json(ApiResponse::error(
+                "Erreur lors du comptage des runs.".to_string(),
+            ));
+        }
+    };
+
+    // Récupérer les résultats paginés
+    let runs_data = match sqlx::query(&query)
+        .bind(page_size_val)
+        .bind((page_val - 1) * page_size_val)
+        .fetch_all(pool as &SqlitePool)
+        .await
+    {
+        Ok(rows) => rows
+            .iter()
+            .filter_map(|row| {
+                let run_id: i64 = row.try_get("run_id").ok()?;
+                let run_name: String = row.try_get("run_name").ok()?;
+                let username: String = row.try_get("username").ok()?;
+                let run_date: String = row.try_get("run_date").ok()?;
+                let attempt_count: i64 = row.try_get("attempt_count").ok()?;
+                let status_str: String = row.try_get("status").ok()?;
+                let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
+
+                Some(create_run_row(
+                    run_id,
+                    &run_name,
+                    &username,
+                    &run_date,
+                    status,
+                    attempt_count,
+                ))
+            })
+            .collect::<Vec<_>>(),
+        Err(_) => {
+            return Json(ApiResponse::error(
+                "Erreur lors de la récupération des runs.".to_string(),
+            ));
+        }
+    };
+
+    let total_pages = (total_count + page_size_val - 1) / page_size_val;
+    let title = if authenticated.user.is_admin {
+        "Résultats de la recherche (tous les groupes)"
+    } else {
+        "Résultats de la recherche de vos groupes"
+    };
+
+    Json(ApiResponse::success(json!({
+        "title": title,
+        "header": create_header(),
+        "table": runs_data,
+        "pagination": {
+            "current_page": page_val,
+            "total_pages": total_pages,
+            "page_size": page_size_val,
+            "total_count": total_count
+        }
+    })))
+}

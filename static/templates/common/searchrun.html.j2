@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Recherche avancée de runs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/show_message.js"></script>
+    <script src="/static/scripts/json_table.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Recherche avancée de runs</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">
+                    <span class="material-icons icon-align">logout</span>Déconnexion
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
+    <form id="searchrun-form" style="margin: 2em auto; max-width: 500px;">
+        <div>
+            <label for="run_name_search">Nom du run :</label>
+            <input type="text" id="run_name_search" name="run_name_search" placeholder="Nom du run">
+        </div>
+        <div>
+            <label for="date_from">Date de début :</label>
+            <input type="date" id="date_from" name="date_from">
+        </div>
+        <div>
+            <label for="date_to">Date de fin :</label>
+            <input type="date" id="date_to" name="date_to">
+        </div>
+        <div>
+            <label for="status">Statut :</label>
+            <select id="status" name="status">
+                <option value="">Tous</option>
+                <option value="Success">Succès</option>
+                <option value="Failure">Echec</option>
+                <option value="Pending">En attente</option>
+                <option value="Running">Analyses en cours</option>
+                <option value="Idle">A valider</option>
+            </select>
+        </div>
+        <div>
+            <label for="page_size">Résultats par page :</label>
+            <input type="number" id="page_size" name="page_size" min="1" max="100" value="5">
+        </div>
+
+        <div style="margin-top: 1em; text-align: left;">
+            <button type="submit" class="btn primary">Rechercher</button>
+        </div>
+    </form>
+
+
+    <div style="text-align: center; margin-top: 1em;">
+        <a class="btn btn-secondary" href="/mercure/show/runs">Retour à la liste</a>
+    </div>
+
+    <div id="search-results" style="margin: 2em auto;"></div>
+
+    <script>
+        document.getElementById('searchrun-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const run_name_search = document.getElementById('run_name_search').value;
+            const date_from = document.getElementById('date_from').value;
+            const date_to = document.getElementById('date_to').value;
+            const status = document.getElementById('status').value;
+            const page_size = document.getElementById('page_size').value;
+            const page = 1;
+
+            let params = new URLSearchParams();
+            params.append('page', page);
+            params.append('page_size', page_size);
+            if (status) params.append('status', status);
+            if (date_from) params.append('date_from', date_from);
+            if (date_to) params.append('date_to', date_to);
+            if (run_name_search) params.append('run_name_search', run_name_search);
+
+            try {
+                const response = await fetch(`/mercure/api/searchrun?${params.toString()}`);
+                const json = await response.json();
+                const resultsDiv = document.getElementById('search-results');
+                if (json.success && json.data && json.data.table && json.data.table.length > 0) {
+                    // Utilise la même fonction de génération de table que listruns
+                    generateJsonTable(json.data, "search-results");
+                } else {
+                    resultsDiv.innerHTML = "<p>Aucun résultat trouvé.</p>";
+                }
+            } catch (e) {
+                showMessage("error", "Erreur lors de la recherche : " + e);
+            }
+        });
+    </script>
+</body>
+
+</html>
