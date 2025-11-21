@@ -40,9 +40,17 @@
         {% endif %}
     </div>
 
+    <div style="border: 1px solid #ccc; border-top: none; padding: 10px;">
+        <div id="search-forms" style="display: flex; gap: 0.5em; align-items: center;">
+            <input type="text" name="q" placeholder="Rechercher un formulaire..."
+                style="padding: 0.5em; width: 250px; border-radius: 4px; border: 1px solid #bbb;"
+                oninput="filterForms()">
+        </div>
+    </div>
+
     {% for group in user_groups %}
-    <table id="forms-container-{{ group.id }}" class="tabcontent" {% if loop.first %} style="display: block;" {% endif
-        %}>
+    <table id="forms-container-{{ group.id }}" class="tabcontent" style="{% if loop.first %}display: block; {% endif
+            %}overflow-y:auto;height:400px;">
         <tr>
             <th class="content-column">Nom du formulaire</th>
             <th class="numeric-column padding-x centered">Actif ?</th>
@@ -52,7 +60,7 @@
     </table>
     {% endfor %}
     {% if is_admin %}
-    <table id="forms-container-no-group" class="tabcontent" style="display: none;">
+    <table id="forms-container-no-group" class="tabcontent" style="display: none; overflow-y:auto;height:400px;">
         <tr>
             <th class="content-column">Nom du formulaire</th>
             <th class="numeric-column padding-x centered">Actif ?</th>
@@ -82,10 +90,8 @@
             // Show the current tab, and add an "active" class to the button that opened the tab
             document.getElementById(`forms-container-${group_id}`).style.display = "block";
             evt.currentTarget.className += " active";
-        } 
-    </script>
+        }
 
-    <script>
         const userGroups = {{ user_groups | tojson }};
         async function loadGroupForms() {
             for (let [index, group] of userGroups.entries()) {
@@ -201,6 +207,39 @@
                 }
             } catch (error) {
                 showMessage('error', error);
+            }
+        }
+
+        function filterForms() {
+            const queryString = document.querySelector('#search-forms input[name="q"]').value;
+            const lowerQuery = queryString.toLowerCase();
+            userGroups.forEach(group => {
+                const table = document.getElementById(`forms-container-${group.id}`);
+                const rows = table.getElementsByTagName('tr');
+                for (let i = 1; i < rows.length; i++) { // Skip header row
+                    const formNameCell = rows[i].getElementsByTagName('td')[0];
+                    if (formNameCell) {
+                        const formName = formNameCell.textContent || formNameCell.innerText;
+                        if (formName.toLowerCase().indexOf(lowerQuery) > -1) {
+                            rows[i].style.display = "";
+                        } else {
+                            rows[i].style.display = "none";
+                        }
+                    }
+                }
+            });
+            const table = document.getElementById(`forms-container-no-group`);
+            const rows = table.getElementsByTagName('tr');
+            for (let i = 1; i < rows.length; i++) { // Skip header row
+                const formNameCell = rows[i].getElementsByTagName('td')[0];
+                if (formNameCell) {
+                    const formName = formNameCell.textContent || formNameCell.innerText;
+                    if (formName.toLowerCase().indexOf(lowerQuery) > -1) {
+                        rows[i].style.display = "";
+                    } else {
+                        rows[i].style.display = "none";
+                    }
+                }
             }
         }
 
