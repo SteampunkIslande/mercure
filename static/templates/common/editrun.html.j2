@@ -285,6 +285,22 @@
                     createFormattedList(sample_names, container, "Echantillons ARN détectés");
                 }
             }
+
+            const select = document.getElementById('run_sequencer');
+            const options = select.querySelectorAll('option');
+            for (const option of options) {
+                const seq = option.getAttribute('value');
+                try {
+                    const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seq)}`);
+                    if (resp.ok) {
+                        const data = await resp.text();
+                        option.textContent = data;
+                    }
+                } catch (e) {
+                    // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
+                }
+            }
+
         });
 
         async function saveForm(event) {

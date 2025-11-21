@@ -104,6 +104,24 @@
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
 
+        // Remplacement dynamique des noms de séquenceurs par leur pretty_name
+        document.addEventListener('DOMContentLoaded', async function () {
+            const select = document.getElementById('run_sequencer');
+            const options = select.querySelectorAll('option');
+            for (const option of options) {
+                const seq = option.getAttribute('value');
+                try {
+                    const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seq)}`);
+                    if (resp.ok) {
+                        const data = await resp.text();
+                        option.textContent = data;
+                    }
+                } catch (e) {
+                    // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
+                }
+            }
+        });
+
         // Generate user-defined fields
         const container = document.getElementById('user-defined-vars');
         for (const [key, value] of Object.entries(userDefinedVars)) {

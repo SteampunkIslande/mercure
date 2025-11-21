@@ -144,6 +144,17 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS SequencerPrettyName (
+            sequencer_name TEXT PRIMARY KEY,
+            sequencer_pretty_name TEXT NOT NULL
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 
