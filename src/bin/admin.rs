@@ -23,26 +23,38 @@ enum Commands {
     /// Créer un nouvel utilisateur
     CreateUser {
         /// Adrese email
-        #[arg(short = 'm', long = "mail")]
+        #[arg(short = 'u', long = "mail")]
         usermail: String,
         /// Nom d'utilisateur
-        #[arg(short, long)]
+        #[arg(short = 'n', long = "name")]
         username: String,
         /// Mot de passe
-        #[arg(short, long)]
+        #[arg(short = 'p', long = "password")]
         password: String,
         /// Définir comme administrateur
-        #[arg(short, long)]
+        #[arg(short = 'a', long = "admin")]
         admin: bool,
     },
     /// Réinitialiser le mot de passe d'un utilisateur
     ResetPassword {
         /// Nom d'utilisateur
-        #[arg(short, long)]
+        #[arg(short = 'u', long = "mail")]
         usermail: String,
         /// Nouveau mot de passe
-        #[arg(short, long)]
+        #[arg(short = 'p', long = "password")]
         password: String,
+    },
+    /// Rendre un utilisateur admin
+    UpgradeUser {
+        /// Adresse email
+        #[arg(short = 'u', long = "mail")]
+        usermail: String,
+    },
+    /// Supprimer ses droits d'administrateur à un utilisateur
+    DowngradeUser {
+        /// Adresse email
+        #[arg(short = 'u', long = "mail")]
+        usermail: String,
     },
 }
 
@@ -127,6 +139,62 @@ async fn main() {
 
                     println!(
                         "Mot de passe mis à jour avec succès pour l'utilisateur {}",
+                        usermail
+                    );
+                }
+                Ok(None) => {
+                    eprintln!("Utilisateur non trouvé : {}", usermail);
+                    process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Erreur lors de la recherche de l'utilisateur : {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::UpgradeUser { usermail } => {
+            match User::find_by_usermail(&usermail, &pool).await {
+                Ok(Some(user)) => {
+                    // Mettre à jour le mot de passe
+                    if let Err(e) = sqlx::query("UPDATE Users SET is_admin = 1 WHERE id = ?")
+                        .bind(user.id)
+                        .execute(&pool)
+                        .await
+                    {
+                        eprintln!("Erreur lors de la mise à jour du mot de passe : {}", e);
+                        process::exit(1);
+                    }
+
+                    println!(
+                        "L'utilisateur {} est administrateur. Félicitations!",
+                        usermail
+                    );
+                }
+                Ok(None) => {
+                    eprintln!("Utilisateur non trouvé : {}", usermail);
+                    process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Erreur lors de la recherche de l'utilisateur : {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        Commands::DowngradeUser { usermail } => {
+            match User::find_by_usermail(&usermail, &pool).await {
+                Ok(Some(user)) => {
+                    // Mettre à jour le mot de passe
+                    if let Err(e) = sqlx::query("UPDATE Users SET is_admin = 0 WHERE id = ?")
+                        .bind(user.id)
+                        .execute(&pool)
+                        .await
+                    {
+                        eprintln!("Erreur lors de la mise à jour du mot de passe : {}", e);
+                        process::exit(1);
+                    }
+
+                    println!(
+                        "L'utilisateur {} n'est plus administrateur. Shame!",
                         usermail
                     );
                 }
