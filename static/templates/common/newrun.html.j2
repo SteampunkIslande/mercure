@@ -106,6 +106,9 @@
 
         // Remplacement dynamique des noms de séquenceurs par leur pretty_name
         document.addEventListener('DOMContentLoaded', async function () {
+
+            await init_udv_fields();
+
             const select = document.getElementById('run_sequencer');
             const options = select.querySelectorAll('option');
             for (const option of options) {
@@ -122,44 +125,47 @@
             }
         });
 
-        // Generate user-defined fields
-        const container = document.getElementById('user-defined-vars');
-        for (const [key, value] of Object.entries(userDefinedVars)) {
-            if (typeof value === 'object' && value.Constant) {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.id = 'udv_' + key;
-                hidden.value = value.Constant;
-                container.appendChild(hidden);
-            } else if (typeof value === 'object' && value.FromValuesList) {
-                const div = document.createElement('div');
-                const label = document.createElement('label');
-                label.for = 'udv_' + key;
-                label.textContent = key + ':';
-                div.appendChild(label);
-                div.appendChild(document.createTextNode(' '));
-                const select = document.createElement('select');
-                select.id = 'udv_' + key;
-                value.FromValuesList.allowed.forEach(val => {
-                    const option = document.createElement('option');
-                    option.value = val;
-                    option.textContent = val;
-                    select.appendChild(option);
-                });
-                div.appendChild(select);
-                container.appendChild(div);
-            } else if (value === 'RunDefined') {
-                const div = document.createElement('div');
-                const label = document.createElement('label');
-                label.for = 'udv_' + key;
-                label.textContent = key + ':';
-                div.appendChild(label);
-                div.appendChild(document.createTextNode(' '));
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.id = 'udv_' + key;
-                div.appendChild(input);
-                container.appendChild(div);
+        async function init_udv_fields() {
+
+            // Generate user-defined fields
+            const container = document.getElementById('user-defined-vars');
+            for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+                if (typeof value === 'object' && value.Constant) {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.id = 'udv_' + key;
+                    hidden.value = value.Constant;
+                    container.appendChild(hidden);
+                } else if (typeof value === 'object' && value.FromValuesList) {
+                    const div = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.for = 'udv_' + key;
+                    label.textContent = key + ':';
+                    div.appendChild(label);
+                    div.appendChild(document.createTextNode(' '));
+                    const select = document.createElement('select');
+                    select.id = 'udv_' + key;
+                    value.FromValuesList.allowed.forEach(val => {
+                        const option = document.createElement('option');
+                        option.value = val;
+                        option.textContent = val;
+                        select.appendChild(option);
+                    });
+                    div.appendChild(select);
+                    container.appendChild(div);
+                } else if (value === 'RunDefined') {
+                    const div = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.for = 'udv_' + key;
+                    label.textContent = key + ':';
+                    div.appendChild(label);
+                    div.appendChild(document.createTextNode(' '));
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = 'udv_' + key;
+                    div.appendChild(input);
+                    container.appendChild(div);
+                }
             }
         }
 

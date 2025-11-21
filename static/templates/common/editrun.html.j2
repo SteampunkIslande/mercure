@@ -104,54 +104,58 @@
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
 
-        // Generate user-defined fields
-        const container = document.getElementById('user-defined-vars');
-        for (const [key, value] of Object.entries(userDefinedVars)) {
-            if (typeof value === 'object' && value.Constant) {
-                const hidden = document.createElement('input');
-                hidden.type = 'hidden';
-                hidden.id = 'udv_' + key;
-                hidden.value = value.Constant;
-                container.appendChild(hidden);
-            } else if (typeof value === 'object' && value.FromValuesList) {
-                const div = document.createElement('div');
-                const label = document.createElement('label');
-                label.for = 'udv_' + key;
-                label.textContent = key + ':';
-                div.appendChild(label);
-                div.appendChild(document.createTextNode(' '));
-                const select = document.createElement('select');
-                select.id = 'udv_' + key;
-                value.FromValuesList.allowed.forEach(val => {
-                    const option = document.createElement('option');
-                    option.value = val;
-                    option.textContent = val;
-                    select.appendChild(option);
-                });
-                div.appendChild(select);
-                container.appendChild(div);
-            } else if (value === 'RunDefined') {
-                const div = document.createElement('div');
-                const label = document.createElement('label');
-                label.for = 'udv_' + key;
-                label.textContent = key + ':';
-                div.appendChild(label);
-                div.appendChild(document.createTextNode(' '));
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.id = 'udv_' + key;
-                div.appendChild(input);
-                container.appendChild(div);
-            }
-        }
+        async function init_udv_fields() {
 
-        // Populate user-defined variables with current values
-        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
+            // Generate user-defined fields
+            const container = document.getElementById('user-defined-vars');
+            for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+                if (typeof value === 'object' && value.Constant) {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.id = 'udv_' + key;
+                    hidden.value = value.Constant;
+                    container.appendChild(hidden);
+                } else if (typeof value === 'object' && value.FromValuesList) {
+                    const div = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.for = 'udv_' + key;
+                    label.textContent = key + ':';
+                    div.appendChild(label);
+                    div.appendChild(document.createTextNode(' '));
+                    const select = document.createElement('select');
+                    select.id = 'udv_' + key;
+                    value.FromValuesList.allowed.forEach(val => {
+                        const option = document.createElement('option');
+                        option.value = val;
+                        option.textContent = val;
+                        select.appendChild(option);
+                    });
+                    div.appendChild(select);
+                    container.appendChild(div);
+                } else if (value === 'RunDefined') {
+                    const div = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.for = 'udv_' + key;
+                    label.textContent = key + ':';
+                    div.appendChild(label);
+                    div.appendChild(document.createTextNode(' '));
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = 'udv_' + key;
+                    div.appendChild(input);
+                    container.appendChild(div);
+                }
+            }
+
+            // Populate user-defined variables with current values
+            const currentUserDefinedVars = {{ run.user_defined_vars | tojson
+        }};
         for (const [key, value] of Object.entries(currentUserDefinedVars)) {
             const element = document.getElementById('udv_' + key);
             if (element) {
                 element.value = value;
             }
+        }
         }
 
         // Function to upload file
@@ -263,27 +267,35 @@
 
         // On page load: if a samplesheet path is already present, fetch and display sample names
         document.addEventListener('DOMContentLoaded', async function () {
-            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
-            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
-            if (adnPath) {
-                const { file_name, sample_names, message } = await checkSampleSheet(adnPath);
-                document.getElementById('sample_sheet_adn_path').value = file_name;
-                document.getElementById('sample_sheet_adn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_adn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, "Echantillons ADN détectés");
+
+            await init_udv_fields();
+
+            try {
+
+                const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
+                const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
+                if (adnPath) {
+                    const { file_name, sample_names, message } = await checkSampleSheet(adnPath);
+                    document.getElementById('sample_sheet_adn_path').value = file_name;
+                    document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_adn_list');
+                        container.innerHTML = "";
+                        createFormattedList(sample_names, container, "Echantillons ADN détectés");
+                    }
                 }
-            }
-            if (arnPath) {
-                const { file_name, sample_names, message } = await checkSampleSheet(arnPath);
-                document.getElementById('sample_sheet_arn_path').value = file_name;
-                document.getElementById('sample_sheet_arn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_arn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, "Echantillons ARN détectés");
+                if (arnPath) {
+                    const { file_name, sample_names, message } = await checkSampleSheet(arnPath);
+                    document.getElementById('sample_sheet_arn_path').value = file_name;
+                    document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_arn_list');
+                        container.innerHTML = "";
+                        createFormattedList(sample_names, container, "Echantillons ARN détectés");
+                    }
                 }
+            } catch (e) {
+                showMessage("error", e);
             }
 
             const select = document.getElementById('run_sequencer');
