@@ -11,12 +11,6 @@ function createFormattedList(itemList, container, title) {
     container.innerHTML = "";
   }
 
-  // Apply some basic styling to the container
-  container.style.padding = "10px";
-  container.style.border = "1px solid #ccc";
-  container.style.borderRadius = "5px";
-  container.style.backgroundColor = "#f9f9f9";
-
   // Create a heading for the list
   const heading = document.createElement("h3");
   heading.textContent = title;
