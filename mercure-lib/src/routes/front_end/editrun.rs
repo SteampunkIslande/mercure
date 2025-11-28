@@ -11,12 +11,11 @@ use rocket_dyn_templates::{Template, context};
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::models::Group;
-use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
 
-#[get("/show/run/<run_id>")]
-pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
+#[get("/editrun/<run_id>")]
+pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
     let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => run,
         Err(e) => {
@@ -99,7 +98,7 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 };
 
                 Template::render(
-                    "common/idlerun",
+                    "common/editrun",
                     context! {
                         run: &run,
                         user: auth.user,
@@ -109,50 +108,22 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                     },
                 )
             }
-            RunStatus::Pending => Template::render("common/pendingrun", context! {}),
-            RunStatus::Running => {
-                let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
-                    Ok(run) => run,
-                    Err(e) => {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title: "Erreur de la base de données",
-                                h2: format!("Impossible d'obtenir le run {}", run_id),
-                                message: e.to_string()
-                            },
-                        );
-                    }
-                };
-                let attempt: HgAttempt = match HgAttempt::get_attempt_from_number(
-                    run.attempt_count as i64,
-                    run_id,
-                    pool,
-                )
-                .await
-                {
-                    Ok(at) => at,
-                    Err(e) => {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title: "Erreur de la base de données",
-                                h2: format!("Impossible d'obtenir la tentative {} pour le run {}",run.attempt_count,run_id),
-                                message: e.to_string()
-                            },
-                        );
-                    }
+            status => {
+                let status_str = match status {
+                    RunStatus::Running => "Run en cours",
+                    RunStatus::Success => "Run terminé",
+                    RunStatus::Failure(_) => "Run échoué",
+                    _ => "Run non éditable",
                 };
                 Template::render(
-                    "common/runningrun",
+                    "common/error",
                     context! {
-                        run,
-                        attempt
+                        title: status_str,
+                        h2: format!("Impossible d'éditer un {}.", status_str.to_lowercase()),
+                        message: "Seuls les runs à l'état 'A valider' peuvent être édités."
                     },
                 )
             }
-            RunStatus::Success => Template::render("common/successrun", context! {}),
-            RunStatus::Failure(_) => Template::render("common/failurerun", context! {}),
         }
     } else {
         Template::render(
@@ -160,18 +131,8 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
             context! {
                 title: "Accès refusé",
                 h2: "Accès refusé",
-                message: "Vous n'avez pas les permissions nécessaires pour voir ce run"
+                message: "Vous n'avez pas les permissions nécessaires pour éditer ce run"
             },
         )
     }
-}
-
-#[get("/show/runs")]
-pub async fn list_runs() -> Template {
-    Template::render("common/listruns", context! {})
-}
-
-#[get("/search/run")]
-pub async fn search_run() -> Template {
-    Template::render("common/searchrun", context! {})
 }

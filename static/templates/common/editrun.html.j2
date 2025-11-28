@@ -31,8 +31,6 @@
     <h2>Edition du run</h2>
 
     <form id="editrun-form">
-        <style>
-        </style>
 
         <input type="hidden" id="run_id" value="{{ run_id }}">
 
@@ -93,16 +91,18 @@
         <h3>Variables définies par l'utilisateur</h3>
         <div id="user-defined-vars"></div>
 
-        <button id="save-changes" type="submit" class="btn">Editer</button>
-        <button type="button" id="validate-btn" class="btn" style="margin-left: 10px;">Valider</button>
+        <button id="save-changes" type="submit" class="btn">Enregistrer les modifications</button>
         <div style="text-align: center; margin-top: 20px;">
-            <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+            <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/run/{{ run_id }}">Retour</a>
         </div>
     </form>
 
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+
+        // Gestion du bouton Retour avec alerte si modifications non enregistrées
+        let formInitialState = null;
 
         async function init_udv_fields() {
 
@@ -318,6 +318,8 @@
                 }
             }
 
+            formInitialState = getFormState();
+
         });
 
         async function saveForm(event) {
@@ -370,32 +372,40 @@
             await saveForm(event);
         });
 
-        // Handle validate button click
-        document.getElementById('validate-btn').addEventListener('click', async function () {
-            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
-                try {
-                    await saveForm(new Event('submit')); // Save changes before validating
-                    const response = await fetch('/mercure/api/validate/' + document.getElementById('run_id').value, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                        showMessage("success", "Run validé avec succès !");
-                        setTimeout(() => {
-                            window.location.href = "/mercure/show/run/" + document.getElementById('run_id').value;
-                        }, 1000);
-                    } else {
-                        showMessage("error", data.message);
-                    }
-                } catch (error) {
-                    showMessage("error", "Erreur lors de la validation: " + error);
+        function getFormState() {
+            const state = {};
+            state.run_date = document.getElementById('run_date').value;
+            state.run_sequencer = document.getElementById('run_sequencer').value;
+            state.run_flowcellid = document.getElementById('run_flowcellid').value;
+            state.sample_sheet_adn_path = document.getElementById('sample_sheet_adn_path').value;
+            state.sample_sheet_arn_path = document.getElementById('sample_sheet_arn_path').value;
+            state.metadata_path = document.getElementById('metadata_path').value;
+            // Variables utilisateur
+            state.user_defined_vars = {};
+            const udvElements = document.querySelectorAll('[id^="udv_"]');
+            udvElements.forEach(el => {
+                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+                    const key = el.id.replace('udv_', '');
+                    state.user_defined_vars[key] = el.value;
+                }
+            });
+            return JSON.stringify(state);
+        }
+
+        document.getElementById('back-to-runs').addEventListener('click', function (e) {
+            const currentState = getFormState();
+
+            if (currentState !== formInitialState) {
+                const confirmLeave = confirm("Des modifications non enregistrées ont été détectées. Voulez-vous enregistrer avant de quitter ?");
+                if (confirmLeave) {
+                    // On enregistre puis on redirige
+                    document.getElementById('editrun-form').requestSubmit();
+                } else {
+                    e.preventDefault();
                 }
             }
+            // sinon, navigation normale
         });
-
     </script>
 </body>
 

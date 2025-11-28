@@ -1,5 +1,6 @@
 mod admin;
 mod editgroups;
+mod editrun;
 mod editusers;
 mod formedit;
 mod generics;
@@ -10,6 +11,7 @@ mod submitrun;
 
 pub use admin::*;
 pub use editgroups::*;
+pub use editrun::*;
 pub use editusers::*;
 pub use formedit::*;
 pub use generics::*;

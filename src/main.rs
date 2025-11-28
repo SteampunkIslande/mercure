@@ -54,6 +54,8 @@ async fn rocket() -> _ {
                 routes::frontend::list_runs,
                 // Recherche avancée de runs
                 routes::frontend::search_run,
+                // Edition d'un run
+                routes::frontend::edit_run_get
             ],
         )
         .mount(

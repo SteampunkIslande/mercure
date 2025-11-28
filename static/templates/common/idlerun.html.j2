@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run en attente</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/json_list.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Run en attente - {{ user.username }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">
+                    <span class="material-icons icon-align">logout</span>Déconnexion
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
+    <h2>Détails du run</h2>
+
+    <div>
+        <label>Nom du run :</label>
+        <span style="font-weight: bold;">{{ run.run_name }}</span>
+    </div>
+    <div>
+        <label>Date du run :</label>
+        <span>{{ run.run_date }}</span>
+    </div>
+    <div>
+        <label>Séquenceur :</label>
+        <span>{{ run.run_sequencer }}</span>
+    </div>
+    <div>
+        <label>Flowcell ID :</label>
+        <span>{{ run.run_flowcellid }}</span>
+    </div>
+
+    <div class="tab">
+        <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>
+        <button id="tab-arn" class="tablinks" onclick="openTab(event,'arn')">ARN</button>
+        <button id="tab-metadata" class="tablinks" onclick="openTab(event,'metadata')">Metadata</button>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
+        <label>Sample sheet ADN :</label>
+        <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
+        <div id="sample_sheet_adn_check"></div>
+        <div id="sample_sheet_adn_list" class="sample-list"></div>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
+        <label>Sample sheet ARN :</label>
+        <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
+        <div id="sample_sheet_arn_check"></div>
+        <div id="sample_sheet_arn_list" class="sample-list"></div>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
+        <label>Metadata :</label>
+        <span>{{ run.metadata_path }}</span>
+    </div>
+
+    <h3>Variables définies par l'utilisateur</h3>
+    <div id="user-defined-vars"></div>
+
+    <div style="margin-top: 30px; text-align: center;">
+        <button id="validate-btn" class="btn">Valider</button>
+        <a href="/mercure/editrun/{{ run_id }}" class="btn" style="margin-left: 10px;">Editer</a>
+        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs" style="margin-left: 10px;">Retour</a>
+    </div>
+
+    <script>
+        // Tabs
+        function openTab(evt, tabName) {
+            evt.preventDefault();
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById("tabcontent-" + tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        // Affichage des variables utilisateur (readonly)
+        const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
+        const container = document.getElementById('user-defined-vars');
+        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+            const div = document.createElement('div');
+            const label = document.createElement('label');
+            label.textContent = key + " :";
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(' '));
+            const span = document.createElement('span');
+            span.textContent = currentUserDefinedVars[key] || '';
+            div.appendChild(span);
+            container.appendChild(div);
+        }
+
+        // Affichage des samples détectés (comme editrun)
+        async function checkSampleSheet(filename) {
+            const formData = new FormData();
+            formData.append('file_name', filename);
+            const response = await fetch('/mercure/api/samplesheet/check', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            try {
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            }
+            catch (e) {
+                return { file_name: filename, sample_names: [], message: "Erreur lors de la vérification de la samplesheet: " + e.message };
+            }
+        }
+
+        function createFormattedList(sample_names, container, title) {
+            if (!sample_names || sample_names.length === 0) return;
+            const titleElem = document.createElement('strong');
+            titleElem.textContent = title + " :";
+            container.appendChild(titleElem);
+            const ul = document.createElement('ul');
+            for (const name of sample_names) {
+                const li = document.createElement('li');
+                li.textContent = name;
+                ul.appendChild(li);
+            }
+            container.appendChild(ul);
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            // ADN
+            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
+            if (adnPath) {
+                const { file_name, sample_names, message } = await checkSampleSheet(adnPath);
+                document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_adn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, "Echantillons ADN détectés");
+                }
+            }
+            else {
+                document.getElementById('sample_sheet_adn_check').innerHTML = "Aucune sample sheet ADN fournie.";
+            }
+            // ARN
+            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
+            if (arnPath) {
+                const { file_name, sample_names, message } = await checkSampleSheet(arnPath);
+                document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_arn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, "Echantillons ARN détectés");
+                }
+            }
+        });
+
+        // Bouton valider (même logique que editrun)
+        document.getElementById('validate-btn').addEventListener('click', async function () {
+            const runId = "{{ run_id }}";
+            if (!runId) {
+                showMessage("error", "ID du run introuvable dans l'URL.");
+                return;
+            }
+            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
+                try {
+                    const response = await fetch('/mercure/api/validate/' + runId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showMessage("success", "Run validé avec succès !");
+                        setTimeout(() => {
+                            window.location.href = "/mercure/show/run/" + runId;
+                        }, 1000);
+                    } else {
+                        showMessage("error", data.message);
+                    }
+                } catch (error) {
+                    showMessage("error", "Erreur lors de la validation: " + error);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
