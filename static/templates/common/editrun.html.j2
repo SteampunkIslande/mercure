@@ -187,10 +187,15 @@
             });
 
             const result = await response.json();
-            if (result.success) {
-                return result.data;
-            } else {
-                throw new Error(result.message);
+            try {
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            }
+            catch (e) {
+                return { file_name: filename, sample_names: [], message: "Erreur lors de la vérification de la samplesheet: " + e.message };
             }
         }
 
