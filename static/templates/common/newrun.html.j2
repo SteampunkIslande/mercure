@@ -92,9 +92,9 @@
         <h3>Variables définies par l'utilisateur</h3>
         <div id="user-defined-vars"></div>
 
-        <button type="submit" class="btn primary">Soumettre</button>
         <div style="text-align: center; margin-top: 20px;">
             <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+            <a class="btn btn-primary" onclick="submitForm()">Soumettre</a>
         </div>
     </form>
 
@@ -278,8 +278,7 @@
             }
         });
 
-        document.getElementById('newrun-form').addEventListener('submit', async function (event) {
-            event.preventDefault();
+        async function submitForm() {
 
             // Collect user_defined_vars
             const userDefinedVars = {};
@@ -324,7 +323,7 @@
             } catch (error) {
                 showMessage("error", `Erreur: ${error.message}`);
             }
-        });
+        };
 
 
     </script>

@@ -40,76 +40,75 @@
         <div class="form-group">
             <label for="new_password_confirm">Confirmation du mot de passe</label>
             <input type="password" id="new_password_confirm" name="new_password_confirm" required>
+
+            <div style="text-align: center; margin-top: 20px;">
+                {% if auth_user.is_admin %}
+                <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
+                {% else %}
+                <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+                {% endif %}
+                <a class="btn btn-primary" onclick="submitForm()">Modifier le mot de passe</a>
+            </div>
         </div>
-        <button class="btn btn-primary" onclick="submitForm()">Modifier le mot de passe</button>
+        <script>
+            function submitForm() {
+                {% if not auth_user.is_admin %}
+                const old_password = document.getElementById('old_password').value;
+                {% else %}
+                const old_password = null;
+                {% endif %}
 
-        <div style="text-align: center; margin-top: 20px;">
-            {% if auth_user.is_admin %}
-            <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
-            {% else %}
-            <a class="btn btn-secondary" href="/mercure/home">Retour</a>
-            {% endif %}
-        </div>
-    </div>
-    <script>
-        function submitForm() {
-            {% if not auth_user.is_admin %}
-            const old_password = document.getElementById('old_password').value;
-            {% else %}
-            const old_password = null;
-            {% endif %}
+                const new_password = document.getElementById('new_password').value;
+                const new_password_confirm = document.getElementById('new_password_confirm').value;
 
-            const new_password = document.getElementById('new_password').value;
-            const new_password_confirm = document.getElementById('new_password_confirm').value;
-
-            if (new_password != new_password_confirm) {
-                showMessage('error', 'Les deux mots de passe ne correspondent pas');
-                return;
-            }
-
-            if (old_password == "") {
-                showMessage('error', 'Veuillez entrer votre mot de passe actuel');
-                return;
-            }
-
-            if (new_password == "") {
-                showMessage('error', 'Veuillez entrer un nouveau mot de passe');
-                return;
-            }
-
-            if (new_password_confirm == "") {
-                showMessage('error', 'Veuillez confirmer votre nouveau mot de passe');
-                return;
-            }
-
-            const user_id = document.getElementById('user_id').value;
-
-            fetch('/mercure/api/passedit', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    old_password: old_password,
-                    new_password: new_password,
-                    user_id: parseInt(user_id)
-                })
-            }).then((response) => { return response.json() }).then((res_json) => {
-                if (res_json.success) {
-                    alert(res_json.data);
-                    {% if auth_user.is_admin %}
-                    window.location.href = "/mercure/admin/editusers/"
-                    {% else %}
-                    window.location.href = "/mercure/home"
-                    {% endif %}
-                } else {
-                    showMessage('error', res_json.message);
+                if (new_password != new_password_confirm) {
+                    showMessage('error', 'Les deux mots de passe ne correspondent pas');
+                    return;
                 }
-            }).catch((e) => {
-                showMessage('error', e);
-            })
-        }
-    </script>
+
+                if (old_password == "") {
+                    showMessage('error', 'Veuillez entrer votre mot de passe actuel');
+                    return;
+                }
+
+                if (new_password == "") {
+                    showMessage('error', 'Veuillez entrer un nouveau mot de passe');
+                    return;
+                }
+
+                if (new_password_confirm == "") {
+                    showMessage('error', 'Veuillez confirmer votre nouveau mot de passe');
+                    return;
+                }
+
+                const user_id = document.getElementById('user_id').value;
+
+                fetch('/mercure/api/passedit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        old_password: old_password,
+                        new_password: new_password,
+                        user_id: parseInt(user_id)
+                    })
+                }).then((response) => { return response.json() }).then((res_json) => {
+                    if (res_json.success) {
+                        alert(res_json.data);
+                        {% if auth_user.is_admin %}
+                        window.location.href = "/mercure/admin/editusers/"
+                        {% else %}
+                        window.location.href = "/mercure/home"
+                        {% endif %}
+                    } else {
+                        showMessage('error', res_json.message);
+                    }
+                }).catch((e) => {
+                    showMessage('error', e);
+                })
+            }
+        </script>
 </body>
 
 </html>

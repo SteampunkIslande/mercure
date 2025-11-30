@@ -58,20 +58,15 @@
         </div>
 
         <div style="margin-top: 1em; text-align: left;">
-            <button type="submit" class="btn primary">Rechercher</button>
+            <a class="btn btn-secondary" href="/mercure/show/runs">Retour à la liste</a>
+            <a id="searchrun-button" class="btn primary">Rechercher</a>
         </div>
     </form>
-
-
-    <div style="text-align: center; margin-top: 1em;">
-        <a class="btn btn-secondary" href="/mercure/show/runs">Retour à la liste</a>
-    </div>
 
     <div id="search-results" style="margin: 2em auto;"></div>
 
     <script>
-        document.getElementById('searchrun-form').addEventListener('submit', async function (event) {
-            event.preventDefault();
+        document.getElementById('searchrun-button').addEventListener('click', async function () {
             const run_name_search = document.getElementById('run_name_search').value;
             const date_from = document.getElementById('date_from').value;
             const date_to = document.getElementById('date_to').value;

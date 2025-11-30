@@ -45,13 +45,13 @@
             </div>
             <div class="error-msg" id="error-message" style="display: none;"></div>
             <div class="success-msg" id="success-message" style="display: none;"></div>
-            <button id="createUserButton" class="btn btn-primary">Créer l'utilisateur</button>
             <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+            <a id="create-user-button" class="btn btn-primary">Créer l'utilisateur</a>
         </form>
     </div>
 
     <script>
-        document.getElementById('createUserButton').addEventListener('click', async (e) => {
+        document.getElementById('create-user-button').addEventListener('click', async (e) => {
             e.preventDefault();
             const usermail = document.getElementById('usermail').value;
             const username = document.getElementById('username').value;
