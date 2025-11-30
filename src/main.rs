@@ -109,7 +109,9 @@ async fn rocket() -> _ {
                 // Route pour rechercher des runs
                 routes::backend::search_run_get,
                 // Route pour traduire les noms des séquenceurs
-                routes::backend::prettify_seqname
+                routes::backend::prettify_seqname,
+                // Route pour toutes les redirections
+                routes::backend::redirect_post,
             ],
         )
         .manage(pool)

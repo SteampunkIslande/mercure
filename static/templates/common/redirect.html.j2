@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+</head>
+
+<body>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <p>Vous allez être redirigé dans <strong id="countdown">{{ seconds }}</strong> secondes, <a
+            href="{{ target_url | safe }}">cliquez ici</a> pour accéder à la page directement.</p>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            const target = "{{ target_url | safe }}";
+            // Parse seconds (template may render a number or a string)
+            let secs = parseInt("{{ seconds }}", 10);
+            if (isNaN(secs) || secs < 0) secs = 5;
+
+            const el = document.getElementById('countdown');
+
+            // Fonction asynchrone qui décrémente et met à jour l'affichage chaque seconde
+            async function countdown() {
+                // Affiche la valeur initiale
+                el.textContent = secs;
+                while (secs > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    secs -= 1;
+                    el.textContent = secs;
+                }
+                window.location = target;
+            }
+
+            // Démarrer le compte à rebours
+            await countdown();
+        });
+    </script>
+</body>
+
+</html>

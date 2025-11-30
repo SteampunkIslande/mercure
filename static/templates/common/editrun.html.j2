@@ -359,7 +359,10 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    showMessage("info", data.data.message);
+                    window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}" +
+                        "&title=" + encodeURIComponent("Run modifié avec succès") +
+                        "&message=" + encodeURIComponent(data.message) +
+                        "&seconds=5";
                 } else {
                     showMessage("error", data.message);
                 }
