@@ -102,8 +102,6 @@
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
 
-        // Gestion du bouton Retour avec alerte si modifications non enregistrées
-        let formInitialState = null;
 
         async function init_udv_fields() {
 
@@ -319,8 +317,6 @@
                 }
             }
 
-            formInitialState = getFormState();
-
         });
 
         async function saveForm() {
@@ -357,10 +353,13 @@
                     body: JSON.stringify(formData)
                 });
                 const data = await response.json();
+                if (response.status !== 200) {
+                    throw new Error(data.message || 'Erreur lors de la sauvegarde du run.');
+                }
                 if (data.success) {
                     window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}" +
-                        "&title=" + encodeURIComponent("Run modifié avec succès") +
-                        "&message=" + encodeURIComponent(data.message) +
+                        "&title=" + encodeURIComponent("Succès") +
+                        "&message=" + encodeURIComponent(data.data.message) +
                         "&seconds=5";
                 } else {
                     showMessage("error", data.message);
@@ -370,26 +369,6 @@
             }
         }
 
-
-        function getFormState() {
-            const state = {};
-            state.run_date = document.getElementById('run_date').value;
-            state.run_sequencer = document.getElementById('run_sequencer').value;
-            state.run_flowcellid = document.getElementById('run_flowcellid').value;
-            state.sample_sheet_adn_path = document.getElementById('sample_sheet_adn_path').value;
-            state.sample_sheet_arn_path = document.getElementById('sample_sheet_arn_path').value;
-            state.metadata_path = document.getElementById('metadata_path').value;
-            // Variables utilisateur
-            state.user_defined_vars = {};
-            const udvElements = document.querySelectorAll('[id^="udv_"]');
-            udvElements.forEach(el => {
-                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-                    const key = el.id.replace('udv_', '');
-                    state.user_defined_vars[key] = el.value;
-                }
-            });
-            return JSON.stringify(state);
-        }
 
     </script>
 </body>
