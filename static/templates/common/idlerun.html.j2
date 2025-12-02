@@ -40,7 +40,7 @@
     </div>
     <div>
         <label><strong>Séquenceur:</strong></label>
-        <span>{{ run.run_sequencer }}</span>
+        <span id="seq-name">{{ run.run_sequencer }}</span>
     </div>
     <div>
         <label><strong>Flowcell ID:</strong></label>
@@ -208,6 +208,7 @@
             } else {
                 container.appendChild(div);
             }
+
         }
 
         if (hasAdvancedVars) {
@@ -225,6 +226,21 @@
                 }
             });
         }
+
+        // Correction de l'affichage du séquenceur
+        const seqnameDiv = document.getElementById('seq-name');
+        const seqname = seqnameDiv.textContent;
+        try {
+            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
+            if (resp.ok) {
+                const data = await resp.text();
+                seqnameDiv.textContent = data;
+            }
+        } catch (e) {
+            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
+        }
+
+
         });
 
         // Bouton valider (même logique que editrun)
