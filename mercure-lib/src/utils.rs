@@ -188,6 +188,22 @@ pub fn parse_launcher(launcher_content: &str) -> Result<HashMap<String, String>,
     Ok(vars)
 }
 
+/// Convertit le nom d'un fichier local en un nom servi par la route statique
+/// # Arguments
+/// * `filename` - Le chemin complet du fichier local (sur le serveur)
+/// * `base_path` - Le chemin de base à retirer (le nom du répertoire de téléchargement sur le serveur, servi statiquement)
+/// * `prefix` - Le préfixe (en chemin absolu) utilisé dans la route statique (ex: "/uploads")
+pub fn filename_to_static_served_name(
+    filename: &str,
+    base_path: &str,
+    prefix: &str,
+) -> Option<String> {
+    let path = std::path::Path::new(filename).canonicalize().ok()?;
+    path.strip_prefix(base_path)
+        .ok()
+        .map(|rel_path| format!("{}/{}", prefix, rel_path.to_string_lossy()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

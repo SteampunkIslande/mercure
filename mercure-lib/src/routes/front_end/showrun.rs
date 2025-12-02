@@ -14,6 +14,7 @@ use crate::models::Group;
 use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
+use crate::utils::filename_to_static_served_name;
 
 #[get("/show/run/<run_id>")]
 pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -97,6 +98,23 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                     Ok(json_str) => json_str,
                     Err(_) => "{}".to_string(),
                 };
+                let samplesheet_adn_static_name = filename_to_static_served_name(
+                    &run.sample_sheet_adn_path,
+                    &config.upload_dir,
+                    "/uploads",
+                );
+
+                let samplesheet_arn_static_name = filename_to_static_served_name(
+                    &run.sample_sheet_arn_path,
+                    &config.upload_dir,
+                    "/uploads",
+                );
+
+                let metadata_static_name = filename_to_static_served_name(
+                    &run.metadata_path,
+                    &config.upload_dir,
+                    "/uploads",
+                );
 
                 Template::render(
                     "common/idlerun",
@@ -105,7 +123,10 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         user: auth.user,
                         run_id: run.run_id,
                         sequenceurs_list: sequenceurs_list,
-                        user_defined_vars_json: user_defined_vars_json
+                        user_defined_vars_json: user_defined_vars_json,
+                        samplesheet_adn_static_name: samplesheet_adn_static_name,
+                        samplesheet_arn_static_name: samplesheet_arn_static_name,
+                        metadata_static_name: metadata_static_name,
                     },
                 )
             }
