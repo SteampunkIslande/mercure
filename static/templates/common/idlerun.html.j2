@@ -160,20 +160,6 @@
             }
         }
 
-        function createFormattedList(sample_names, container, title) {
-            if (!sample_names || sample_names.length === 0) return;
-            const titleElem = document.createElement('strong');
-            titleElem.textContent = title + " :";
-            container.appendChild(titleElem);
-            const ul = document.createElement('ul');
-            for (const name of sample_names) {
-                const li = document.createElement('li');
-                li.textContent = name;
-                ul.appendChild(li);
-            }
-            container.appendChild(ul);
-        }
-
         document.addEventListener('DOMContentLoaded', async function () {
             // ADN
             const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
