@@ -31,19 +31,19 @@
     <h2>Détails du run</h2>
 
     <div>
-        <label>Nom du run :</label>
-        <span style="font-weight: bold;">{{ run.run_name }}</span>
+        <label><strong>Nom du run:</strong></label>
+        <span>{{ run.run_name }}</span>
     </div>
     <div>
-        <label>Date du run :</label>
+        <label><strong>Date du run:</strong></label>
         <span>{{ run.run_date }}</span>
     </div>
     <div>
-        <label>Séquenceur :</label>
+        <label><strong>Séquenceur:</strong></label>
         <span>{{ run.run_sequencer }}</span>
     </div>
     <div>
-        <label>Flowcell ID :</label>
+        <label><strong>Flowcell ID:</strong></label>
         <span>{{ run.run_flowcellid }}</span>
     </div>
 
@@ -54,7 +54,7 @@
     </div>
 
     <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
-        <label>Sample sheet ADN :</label>
+        <label>Sample sheet ADN:</label>
         {% if samplesheet_adn_static_name %}
         <a href="{{ samplesheet_adn_static_name | safe }}" class="btn btn-primary" download>
             <span class="material-icons" style="vertical-align:middle;">download</span>
@@ -69,7 +69,7 @@
     </div>
 
     <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
-        <label>Sample sheet ARN :</label>
+        <label>Sample sheet ARN:</label>
         {% if samplesheet_arn_static_name %}
         <a href="{{ samplesheet_arn_static_name | safe }}" class="download-link" download>
             <span class="material-icons" style="vertical-align:middle;">download</span>
@@ -85,7 +85,7 @@
 
     <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
 
-        <label>Metadata :</label>
+        <label>Metadata:</label>
         {% if metadata_static_name %}
         <a href="{{ metadata_static_name | safe }}" class="download-link" download>
             <span class="material-icons" style="vertical-align:middle;">download</span>
@@ -195,7 +195,7 @@
 
             const div = document.createElement('div');
             const label = document.createElement('label');
-            label.textContent = key + " :";
+            label.innerHTML = `<strong>${key}</strong>: `;
             div.appendChild(label);
             div.appendChild(document.createTextNode(' '));
             const span = document.createElement('span');
