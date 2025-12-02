@@ -65,7 +65,7 @@
         {% endif %}
         <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
         <div id="sample_sheet_adn_check"></div>
-        <div id="sample_sheet_adn_list" class="sample-list"></div>
+        <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;height:400px"></div>
     </div>
 
     <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
@@ -80,7 +80,7 @@
         {% endif %}
         <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
         <div id="sample_sheet_arn_check"></div>
-        <div id="sample_sheet_arn_list" class="sample-list"></div>
+        <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;height:400px"></div>
     </div>
 
     <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
@@ -153,7 +153,7 @@
                 }
             }
             catch (e) {
-                return { file_name: filename, sample_names: [], message: "Erreur lors de la vérification de la samplesheet: " + e.message };
+                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + e.message };
             }
         }
 
@@ -161,12 +161,12 @@
             // ADN
             const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
             if (adnPath) {
-                const { file_name, sample_names, message } = await checkSampleSheet(adnPath);
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
                 document.getElementById('sample_sheet_adn_check').innerHTML = message;
                 if (sample_names) {
                     const container = document.getElementById('sample_sheet_adn_list');
                     container.innerHTML = "";
-                    createFormattedList(sample_names, container, "Echantillons ADN détectés");
+                    createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
                 }
             }
             else {
@@ -175,12 +175,12 @@
             // ARN
             const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
             if (arnPath) {
-                const { file_name, sample_names, message } = await checkSampleSheet(arnPath);
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
                 document.getElementById('sample_sheet_arn_check').innerHTML = message;
                 if (sample_names) {
                     const container = document.getElementById('sample_sheet_arn_list');
                     container.innerHTML = "";
-                    createFormattedList(sample_names, container, "Echantillons ARN détectés");
+                    createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
                 }
             }
             // Affichage des variables utilisateur (readonly)

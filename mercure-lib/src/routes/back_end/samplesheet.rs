@@ -1,6 +1,7 @@
 use rocket::form::{Form, FromForm};
 use rocket::serde::json::Json;
 use serde_json::{Value, json};
+use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -65,6 +66,8 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
 
                     "sample_names":sample_names,
 
+                    "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
+
                     "file_name":form.file_name
                 })))
             } else {
@@ -79,6 +82,8 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
 
                         "sample_names":sample_names,
 
+                        "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
+
                         "file_name":form.file_name
                     }))),
                     Err(_) => Json(ApiResponse::success(json!(
@@ -88,6 +93,8 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
                         "check":"fixable",
 
                         "sample_names":sample_names,
+
+                        "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
 
                         "file_name":form.file_name
                     }))),
@@ -101,6 +108,8 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
             "check":"invalid",
 
             "sample_names":[],
+
+            "unique_sample_count": 0,
 
             "file_name":form.file_name
         }))),
