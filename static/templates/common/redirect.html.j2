@@ -12,8 +12,8 @@
 <body>
     <h1>{{ title }}</h1>
     <p>{{ message }}</p>
-    <p>Vous allez être redirigé dans <strong id="countdown">{{ seconds }}</strong> secondes, <a
-            href="{{ target_url | safe }}">cliquez ici</a> pour accéder à la page directement.</p>
+    <p>Vous allez être redirigé dans <strong id="countdown">{{ seconds }}</strong> secondes. Si vous n'êtes pas
+        redirigé, <a href="{{ target_url | safe }}">cliquez ici</a>.</p>
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
             const target = "{{ target_url | safe }}";
