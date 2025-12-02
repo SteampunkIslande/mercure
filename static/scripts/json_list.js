@@ -17,6 +17,20 @@ function createFormattedList(itemList, container, title) {
   heading.style.marginBottom = "10px";
   container.appendChild(heading);
 
+  // Create search input
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.placeholder = "Rechercher un échantillon...";
+  searchInput.style.width = "calc(100% - 8px)";
+  searchInput.style.padding = "8px";
+  searchInput.style.marginLeft = "4px";
+  searchInput.style.marginRight = "4px";
+  searchInput.style.marginBottom = "10px";
+  searchInput.style.boxSizing = "border-box";
+  searchInput.style.border = "1px solid #ccc";
+  searchInput.style.borderRadius = "4px";
+  container.appendChild(searchInput);
+
   // Create an unordered list element
   const ul = document.createElement("ul");
 
@@ -35,4 +49,19 @@ function createFormattedList(itemList, container, title) {
 
   // Append the styled list to the container
   container.appendChild(ul);
+
+  // Add search functionality
+  searchInput.addEventListener("keyup", function () {
+    const filter = searchInput.value.toLowerCase();
+    const listItems = ul.getElementsByTagName("li");
+
+    for (let i = 0; i < listItems.length; i++) {
+      const txtValue = listItems[i].textContent || listItems[i].innerText;
+      if (txtValue.toLowerCase().indexOf(filter) > -1) {
+        listItems[i].style.display = "";
+      } else {
+        listItems[i].style.display = "none";
+      }
+    }
+  });
 }
