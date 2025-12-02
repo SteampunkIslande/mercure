@@ -100,6 +100,18 @@
     <h3>Variables définies par l'utilisateur</h3>
     <div id="user-defined-vars"></div>
 
+    <div id="advanced-vars-container" style="display:none;">
+        <h4 style="margin-top: 15px; color: #666;">Paramètres avancés (constantes du pipeline)</h4>
+        <div id="user-defined-vars-advanced"></div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <button id="toggle-advanced-btn" class="btn btn-secondary"
+            style="font-size: 0.8em; padding: 5px 10px; display: none;">
+            Afficher les paramètres avancés
+        </button>
+    </div>
+
     <div style="margin-top: 30px; text-align: center;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
         <a href="/mercure/editrun/{{ run_id }}" class="btn btn-primary">Editer</a>
@@ -123,21 +135,6 @@
             evt.currentTarget.className += " active";
         }
 
-        // Affichage des variables utilisateur (readonly)
-        const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
-        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
-        const container = document.getElementById('user-defined-vars');
-        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
-            const div = document.createElement('div');
-            const label = document.createElement('label');
-            label.textContent = key + " :";
-            div.appendChild(label);
-            div.appendChild(document.createTextNode(' '));
-            const span = document.createElement('span');
-            span.textContent = currentUserDefinedVars[key] || '';
-            div.appendChild(span);
-            container.appendChild(div);
-        }
 
         // Affichage des samples détectés (comme editrun)
         async function checkSampleSheet(filename) {
@@ -186,6 +183,48 @@
                     createFormattedList(sample_names, container, "Echantillons ARN détectés");
                 }
             }
+            // Affichage des variables utilisateur (readonly)
+            const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
+        const container = document.getElementById('user-defined-vars');
+        const advancedContainer = document.getElementById('user-defined-vars-advanced');
+        let hasAdvancedVars = false;
+
+        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+            const isConstant = value && typeof value === 'object' && 'Constant' in value;
+
+            const div = document.createElement('div');
+            const label = document.createElement('label');
+            label.textContent = key + " :";
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(' '));
+            const span = document.createElement('span');
+            span.textContent = currentUserDefinedVars[key] || '';
+            div.appendChild(span);
+
+            if (isConstant) {
+                advancedContainer.appendChild(div);
+                hasAdvancedVars = true;
+            } else {
+                container.appendChild(div);
+            }
+        }
+
+        if (hasAdvancedVars) {
+            const toggleBtn = document.getElementById('toggle-advanced-btn');
+            const advancedDiv = document.getElementById('advanced-vars-container');
+            toggleBtn.style.display = 'inline-block';
+
+            toggleBtn.addEventListener('click', function () {
+                if (advancedDiv.style.display === 'none') {
+                    advancedDiv.style.display = 'block';
+                    toggleBtn.textContent = 'Masquer les paramètres avancés';
+                } else {
+                    advancedDiv.style.display = 'none';
+                    toggleBtn.textContent = 'Afficher les paramètres avancés';
+                }
+            });
+        }
         });
 
         // Bouton valider (même logique que editrun)
