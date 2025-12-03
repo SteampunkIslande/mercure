@@ -16,8 +16,13 @@ use crate::models::HgRun;
 use crate::models::RunStatus;
 use crate::utils::filename_to_static_served_name;
 
-#[get("/show/run/<run_id>")]
-pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
+#[get("/show/run/<run_id>?<attempt_number>")]
+pub async fn show_run_get(
+    auth: Authenticated,
+    pool: &State<SqlitePool>,
+    run_id: i64,
+    attempt_number: Option<i64>,
+) -> Template {
     let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => run,
         Err(e) => {
@@ -68,112 +73,122 @@ pub async fn show_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
     };
 
     if can_see_run {
-        match run.status {
-            RunStatus::Idle => {
-                // Get sequencers list for edit form
-                let config = get_mercure_config();
-                let sequenceurs_folder = config.sequencers_dir;
+        // Récupérer l'historique des tentatives pour la navigation
+        let history = HgAttempt::list_attempts_for_run(run_id, pool)
+            .await
+            .unwrap_or_default();
 
-                let sequenceurs_list = read_dir(&sequenceurs_folder)
-                    .ok()
-                    .map(|entries| {
-                        entries
-                            .filter_map(|entry| {
-                                entry.ok().and_then(|e| {
-                                    if e.file_type().ok()?.is_dir() {
-                                        e.file_name().to_str().map(|s| s.to_string())
-                                    } else {
-                                        None
-                                    }
-                                })
+        // MODE ÉDITION : Si le run est Idle ET qu'on ne demande pas une tentative spécifique
+        if run.status == RunStatus::Idle && attempt_number.is_none() {
+            // Get sequencers list for edit form
+            let config = get_mercure_config();
+            let sequenceurs_folder = config.sequencers_dir;
+
+            let sequenceurs_list = read_dir(&sequenceurs_folder)
+                .ok()
+                .map(|entries| {
+                    entries
+                        .filter_map(|entry| {
+                            entry.ok().and_then(|e| {
+                                if e.file_type().ok()?.is_dir() {
+                                    e.file_name().to_str().map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
                             })
-                            .collect::<Vec<String>>()
-                    })
-                    .unwrap_or_default();
+                        })
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
 
-                // Serialize user_defined_vars for JavaScript
-                let user_defined_vars_json = match serde_json::to_string(
-                    &run.form.user_defined_vars.clone().unwrap_or_default(),
-                ) {
-                    Ok(json_str) => json_str,
-                    Err(_) => "{}".to_string(),
-                };
-                let samplesheet_adn_static_name = filename_to_static_served_name(
-                    &run.sample_sheet_adn_path,
-                    &config.upload_dir,
-                    "/uploads",
-                );
+            // Serialize user_defined_vars for JavaScript
+            let user_defined_vars_json = match serde_json::to_string(
+                &run.form.user_defined_vars.clone().unwrap_or_default(),
+            ) {
+                Ok(json_str) => json_str,
+                Err(_) => "{}".to_string(),
+            };
+            let samplesheet_adn_static_name = filename_to_static_served_name(
+                &run.sample_sheet_adn_path,
+                &config.upload_dir,
+                "/uploads",
+            );
 
-                let samplesheet_arn_static_name = filename_to_static_served_name(
-                    &run.sample_sheet_arn_path,
-                    &config.upload_dir,
-                    "/uploads",
-                );
+            let samplesheet_arn_static_name = filename_to_static_served_name(
+                &run.sample_sheet_arn_path,
+                &config.upload_dir,
+                "/uploads",
+            );
 
-                let metadata_static_name = filename_to_static_served_name(
-                    &run.metadata_path,
-                    &config.upload_dir,
-                    "/uploads",
-                );
+            let metadata_static_name =
+                filename_to_static_served_name(&run.metadata_path, &config.upload_dir, "/uploads");
 
-                Template::render(
-                    "common/idlerun",
-                    context! {
-                        run: &run,
-                        user: auth.user,
-                        run_id: run.run_id,
-                        sequenceurs_list: sequenceurs_list,
-                        user_defined_vars_json: user_defined_vars_json,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
-                    },
-                )
-            }
-            RunStatus::Pending => Template::render("common/pendingrun", context! {}),
-            RunStatus::Running => {
-                let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
-                    Ok(run) => run,
-                    Err(e) => {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title: "Erreur de la base de données",
-                                h2: format!("Impossible d'obtenir le run {}", run_id),
-                                message: e.to_string()
-                            },
-                        );
-                    }
-                };
-                let attempt: HgAttempt = match HgAttempt::get_attempt_from_number(
-                    run.attempt_count as i64,
-                    run_id,
-                    pool,
-                )
-                .await
-                {
-                    Ok(at) => at,
-                    Err(e) => {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title: "Erreur de la base de données",
-                                h2: format!("Impossible d'obtenir la tentative {} pour le run {}",run.attempt_count,run_id),
-                                message: e.to_string()
-                            },
-                        );
-                    }
-                };
-                Template::render(
+            Template::render(
+                "common/idlerun",
+                context! {
+                    run: &run,
+                    user: auth.user,
+                    run_id: run.run_id,
+                    sequenceurs_list: sequenceurs_list,
+                    user_defined_vars_json: user_defined_vars_json,
+                    samplesheet_adn_static_name: samplesheet_adn_static_name,
+                    samplesheet_arn_static_name: samplesheet_arn_static_name,
+                    metadata_static_name: metadata_static_name,
+                    history: history, // Ajout de l'historique
+                },
+            )
+        } else {
+            // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
+            let target_attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
+
+            // On cherche la tentative dans l'historique déjà chargé
+            let attempt = match HgAttempt::get_attempt_from_number(
+                target_attempt_number,
+                run_id,
+                &pool,
+            )
+            .await
+            {
+                Ok(a) => a,
+                Err(e) => {
+                    return Template::render(
+                        "common/error",
+                        context! {
+                            title: "Tentative introuvable",
+                            h2: format!("Impossible d'obtenir la tentative {} pour le run {}", target_attempt_number, run_id),
+                            message: e.to_string()
+                        },
+                    );
+                }
+            };
+
+            // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
+            match attempt.status {
+                RunStatus::Pending => Template::render(
+                    "common/pendingrun",
+                    context! { run: &run, attempt: &attempt, history: &history },
+                ),
+                RunStatus::Running => Template::render(
                     "common/runningrun",
+                    context! { run: &run, attempt: &attempt, history: &history },
+                ),
+                RunStatus::Success => Template::render(
+                    "common/successrun",
+                    context! { run: &run, attempt: &attempt, history: &history },
+                ),
+                RunStatus::Failure(_) => Template::render(
+                    "common/failurerun",
+                    context! { run: &run, attempt: &attempt, history: &history },
+                ),
+                RunStatus::Idle => Template::render(
+                    "common/error",
                     context! {
-                        run,
-                        attempt
+                        title: "Erreur logique",
+                        h2: "Erreur logique",
+                        message: "Une erreur logique est intervenue, veuillez contacter votre administrateur système"
                     },
-                )
+                ),
             }
-            RunStatus::Success => Template::render("common/successrun", context! {}),
-            RunStatus::Failure(_) => Template::render("common/failurerun", context! {}),
         }
     } else {
         Template::render(
