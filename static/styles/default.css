@@ -177,6 +177,10 @@ label {
   overflow: hidden;
   border: 1px solid #ccc;
   background-color: #f1f1f1;
+  margin-top: 1em;
+  margin-bottom: 0;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Style the buttons that are used to open the tab content */
@@ -471,4 +475,22 @@ table td:hover a {
 .tabcontent {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* Styles pour les formulaires verticaux */
+
+.form-vertical label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.form-vertical input,
+.form-vertical select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }

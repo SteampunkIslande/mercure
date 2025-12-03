@@ -30,16 +30,15 @@
 
     <h2>Edition du run</h2>
 
-    <form id="editrun-form">
+    <div>
+        <label for="run_name">Nom du run:</label>
+        <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
+        <input type="hidden" id="run_name" value="{{ run.run_name }}">
+    </div>
+
+    <form id="editrun-form" class="form-vertical" style="margin: 1em auto;">
 
         <input type="hidden" id="run_id" value="{{ run_id }}">
-
-        <div>
-            <label for="run_name">Nom du run:</label>
-            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
-            <input type="hidden" id="run_name" value="{{ run.run_name }}">
-        </div>
-
         <div>
             <label for="run_date">Date du run:</label>
             <input type="date" id="run_date" value="{{ run.run_date }}" required>
