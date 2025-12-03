@@ -10,6 +10,45 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/show_message.js"></script>
     <script src="/static/scripts/json_table.js"></script>
+    <style>
+        .pagination-btn {
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: background-color 0.2s ease;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+
+        .pagination-btn:disabled {
+            background-color: #d6d8db;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .pagination-input {
+            width: 45px;
+            padding: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .pagination-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+    </style>
 </head>
 
 <body>
@@ -65,14 +104,42 @@
 
     <div id="search-results" style="margin: 2em auto;"></div>
 
+    <div id="pagination-controls"
+        style="margin: 10px 0; text-align: center; display: none; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem;">
+        <button id="first-page-btn" class="pagination-btn" onclick="firstPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">first_page</span>
+        </button>
+
+        <button id="prev-page-btn" class="pagination-btn" onclick="previousPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+        </button>
+
+        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem;">
+            <span>Page</span>
+            <input id="page-input" type="number" min="1" class="pagination-input" onchange="onPageInputChange()"
+                onkeypress="if(event.key==='Enter') onPageInputChange()">
+            <span id="page-info">/ 1</span>
+        </div>
+
+        <button id="next-page-btn" class="pagination-btn" onclick="nextPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+        </button>
+
+        <button id="last-page-btn" class="pagination-btn" onclick="lastPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">last_page</span>
+        </button>
+    </div>
+
     <script>
-        document.getElementById('searchrun-button').addEventListener('click', async function () {
+        let currentPage = 1;
+        let totalPages = 1;
+
+        async function searchRuns(page) {
             const run_name_search = document.getElementById('run_name_search').value;
             const date_from = document.getElementById('date_from').value;
             const date_to = document.getElementById('date_to').value;
             const status = document.getElementById('status').value;
             const page_size = document.getElementById('page_size').value;
-            const page = 1;
 
             let params = new URLSearchParams();
             params.append('page', page);
@@ -86,15 +153,85 @@
                 const response = await fetch(`/mercure/api/searchrun?${params.toString()}`);
                 const json = await response.json();
                 const resultsDiv = document.getElementById('search-results');
-                if (json.success && json.data && json.data.table && json.data.table.length > 0) {
-                    // Utilise la même fonction de génération de table que listruns
-                    generateJsonTable(json.data, "search-results");
+                const paginationDiv = document.getElementById('pagination-controls');
+
+                if (json.success) {
+                    if (json.data && json.data.table && json.data.table.length > 0) {
+                        generateJsonTable(json.data, "search-results");
+                        paginationDiv.style.display = 'flex';
+                    } else {
+                        resultsDiv.innerHTML = "<p>Aucun résultat trouvé.</p>";
+                        paginationDiv.style.display = 'none';
+                    }
+
+                    if (json.data.pagination) {
+                        currentPage = json.data.pagination.current_page;
+                        totalPages = json.data.pagination.total_pages;
+                        updatePaginationControls();
+                    }
                 } else {
-                    resultsDiv.innerHTML = "<p>Aucun résultat trouvé.</p>";
+                    resultsDiv.innerHTML = "<p>Erreur: " + (json.message || "Inconnue") + "</p>";
+                    paginationDiv.style.display = 'none';
                 }
             } catch (e) {
                 showMessage("error", "Erreur lors de la recherche : " + e);
             }
+        }
+
+        function updatePaginationControls() {
+            const firstBtn = document.getElementById("first-page-btn");
+            const prevBtn = document.getElementById("prev-page-btn");
+            const nextBtn = document.getElementById("next-page-btn");
+            const lastBtn = document.getElementById("last-page-btn");
+            const pageInput = document.getElementById("page-input");
+            const pageInfo = document.getElementById("page-info");
+
+            firstBtn.disabled = currentPage <= 1;
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+            lastBtn.disabled = currentPage >= totalPages;
+            pageInput.value = currentPage;
+            pageInfo.textContent = `/ ${totalPages}`;
+        }
+
+        async function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                await searchRuns(page);
+            }
+        }
+
+        async function previousPage() {
+            if (currentPage > 1) {
+                await goToPage(currentPage - 1);
+            }
+        }
+
+        async function nextPage() {
+            if (currentPage < totalPages) {
+                await goToPage(currentPage + 1);
+            }
+        }
+
+        async function firstPage() {
+            await goToPage(1);
+        }
+
+        async function lastPage() {
+            await goToPage(totalPages);
+        }
+
+        async function onPageInputChange() {
+            const pageInput = document.getElementById("page-input");
+            const page = parseInt(pageInput.value);
+            if (page >= 1 && page <= totalPages) {
+                await goToPage(page);
+            } else {
+                pageInput.value = currentPage;
+            }
+        }
+
+        document.getElementById('searchrun-button').addEventListener('click', function () {
+            searchRuns(1);
         });
     </script>
 </body>
