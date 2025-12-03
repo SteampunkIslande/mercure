@@ -24,7 +24,7 @@ digraph Machines {
         t_formval -> Pending;
 
         Pending -> t_runterm [arrowhead=none];
-        t_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        t_runterm [shape=box, label="run terminé ou lancé manuellement", style=rounded, fillcolor=white];
         t_runterm -> Running;
 
         Running -> t_success [arrowhead=none];
@@ -61,7 +61,7 @@ digraph Machines {
         a1_Failure [label="Failure", shape=doublecircle, color=red];
 
         a1_Pending -> ta1_runterm [arrowhead=none];
-        ta1_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        ta1_runterm [shape=box, label="run terminé ou lancé manuellement", style=rounded, fillcolor=white];
         ta1_runterm -> a1_Running;
 
         a1_Pending -> ta1_notfound [arrowhead=none];
@@ -90,7 +90,7 @@ digraph Machines {
         a2_Failure [label="Failure", shape=doublecircle, color=red];
 
         a2_Pending -> ta2_runterm [arrowhead=none];
-        ta2_runterm [shape=box, label="run terminé", style=rounded, fillcolor=white];
+        ta2_runterm [shape=box, label="run terminé ou lancé manuellement", style=rounded, fillcolor=white];
         ta2_runterm -> a2_Running;
 
         a2_Pending -> ta2_notfound [arrowhead=none];
