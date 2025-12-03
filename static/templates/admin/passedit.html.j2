@@ -25,7 +25,7 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-    <div class="container">
+    <div class="form-vertical" style="margin: 1em auto;">
         <input type="hidden" name="user_id" id="user_id" value="{{ edited_user.id }}">
         {% if not auth_user.is_admin %}
         <div class="form-group">
@@ -41,7 +41,7 @@
             <label for="new_password_confirm">Confirmation du mot de passe</label>
             <input type="password" id="new_password_confirm" name="new_password_confirm" required>
 
-            <div style="text-align: center; margin-top: 20px;">
+            <div style="text-align: left; margin-top: 20px;">
                 {% if auth_user.is_admin %}
                 <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
                 {% else %}

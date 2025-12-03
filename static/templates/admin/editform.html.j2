@@ -183,9 +183,8 @@
             }
         }
 
-    </script>
 
-    <script>
+
         async function getNextVersion(formName) {
             try {
                 const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
@@ -378,7 +377,7 @@
     </form>
 
     <!-- Centered submit button at the bottom of the page -->
-    <div style="text-align: center; margin-top: 20px;">
+    <div style="text-align: left; margin-top: 20px;">
         <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
         <a onclick="submitForm()" class="btn btn-primary">Créer une nouvelle version</a>
     </div>
