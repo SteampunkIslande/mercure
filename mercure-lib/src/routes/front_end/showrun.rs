@@ -23,6 +23,8 @@ pub async fn show_run_get(
     run_id: i64,
     attempt_number: Option<i64>,
 ) -> Template {
+    // Get sequencers list for edit form
+    let config = get_mercure_config();
     let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => run,
         Err(e) => {
@@ -78,10 +80,17 @@ pub async fn show_run_get(
             .await
             .unwrap_or_default();
 
+        // Serialize user_defined_vars for JavaScript
+        let user_defined_vars_json =
+            match serde_json::to_string(&run.form.user_defined_vars.clone().unwrap_or_default()) {
+                Ok(json_str) => json_str,
+                Err(e) => format!("{{\"Error\": \"{}\"}}", e),
+            };
+
         // MODE ÉDITION : Si le run est Idle ET qu'on ne demande pas une tentative spécifique
-        if run.status == RunStatus::Idle && attempt_number.is_none() {
-            // Get sequencers list for edit form
-            let config = get_mercure_config();
+        if run.status == RunStatus::Idle
+            && (attempt_number.unwrap_or(run.attempt_count as i64) == run.attempt_count as i64)
+        {
             let sequenceurs_folder = config.sequencers_dir;
 
             let sequenceurs_list = read_dir(&sequenceurs_folder)
@@ -101,13 +110,6 @@ pub async fn show_run_get(
                 })
                 .unwrap_or_default();
 
-            // Serialize user_defined_vars for JavaScript
-            let user_defined_vars_json = match serde_json::to_string(
-                &run.form.user_defined_vars.clone().unwrap_or_default(),
-            ) {
-                Ok(json_str) => json_str,
-                Err(_) => "{}".to_string(),
-            };
             let samplesheet_adn_static_name = filename_to_static_served_name(
                 &run.sample_sheet_adn_path,
                 &config.upload_dir,
@@ -130,7 +132,7 @@ pub async fn show_run_get(
                     user: auth.user,
                     run_id: run.run_id,
                     sequenceurs_list: sequenceurs_list,
-                    user_defined_vars_json: user_defined_vars_json,
+                    user_defined_vars_json: &user_defined_vars_json,
                     samplesheet_adn_static_name: samplesheet_adn_static_name,
                     samplesheet_arn_static_name: samplesheet_arn_static_name,
                     metadata_static_name: metadata_static_name,
@@ -141,7 +143,7 @@ pub async fn show_run_get(
             // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
             let target_attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
 
-            // On cherche la tentative dans l'historique déjà chargé
+            // On cherche la tentative demandée
             let attempt = match HgAttempt::get_attempt_from_number(
                 target_attempt_number,
                 run_id,
@@ -162,30 +164,81 @@ pub async fn show_run_get(
                 }
             };
 
+            let samplesheet_adn_static_name = filename_to_static_served_name(
+                &attempt.sample_sheet_adn_path,
+                &config.upload_dir,
+                "/uploads",
+            );
+
+            let samplesheet_arn_static_name = filename_to_static_served_name(
+                &attempt.sample_sheet_arn_path,
+                &config.upload_dir,
+                "/uploads",
+            );
+
+            let metadata_static_name = filename_to_static_served_name(
+                &attempt.metadata_path,
+                &config.upload_dir,
+                "/uploads",
+            );
+
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {
                 RunStatus::Pending => Template::render(
                     "common/pendingrun",
-                    context! { run: &run, attempt: &attempt, history: &history },
+                    context! {
+                        run: &run,
+                        attempt: &attempt,
+                        history: &history,
+                        samplesheet_adn_static_name: samplesheet_adn_static_name,
+                        samplesheet_arn_static_name: samplesheet_arn_static_name,
+                        metadata_static_name: metadata_static_name,
+                        user_defined_vars_json: &user_defined_vars_json,
+                    },
                 ),
                 RunStatus::Running => Template::render(
                     "common/runningrun",
-                    context! { run: &run, attempt: &attempt, history: &history },
+                    context! {
+                        run: &run,
+                        attempt: &attempt,
+                        history: &history,
+                        samplesheet_adn_static_name: samplesheet_adn_static_name,
+                        samplesheet_arn_static_name: samplesheet_arn_static_name,
+                        metadata_static_name: metadata_static_name,
+                        user_defined_vars_json: &user_defined_vars_json,
+                    },
                 ),
                 RunStatus::Success => Template::render(
                     "common/successrun",
-                    context! { run: &run, attempt: &attempt, history: &history },
+                    context! {
+                        run: &run,
+                        attempt: &attempt,
+                        history: &history,
+                        samplesheet_adn_static_name: samplesheet_adn_static_name,
+                        samplesheet_arn_static_name: samplesheet_arn_static_name,
+                        metadata_static_name: metadata_static_name,
+                        user_defined_vars_json: &user_defined_vars_json,
+                    },
                 ),
-                RunStatus::Failure(_) => Template::render(
+                RunStatus::Failure(ref fail_reason) => Template::render(
                     "common/failurerun",
-                    context! { run: &run, attempt: &attempt, history: &history },
+                    context! {
+                        run: &run,
+                        attempt: &attempt,
+                        history: &history,
+                        samplesheet_adn_static_name: samplesheet_adn_static_name,
+                        samplesheet_arn_static_name: samplesheet_arn_static_name,
+                        metadata_static_name: metadata_static_name,
+                        fail_reason: fail_reason,
+                        user_defined_vars_json: &user_defined_vars_json,
+                    },
                 ),
                 RunStatus::Idle => Template::render(
                     "common/error",
                     context! {
                         title: "Erreur logique",
                         h2: "Erreur logique",
-                        message: "Une erreur logique est intervenue, veuillez contacter votre administrateur système"
+                        message: "Une erreur logique est survenue, veuillez contacter votre administrateur système.\nUne tentative ne peut pas être en état 'A valider'"
                     },
                 ),
             }
