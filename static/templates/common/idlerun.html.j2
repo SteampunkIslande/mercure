@@ -28,24 +28,51 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-    <h2>Détails du run</h2>
 
-    <div>
-        <label><strong>Nom du run:</strong></label>
-        <span>{{ run.run_name }}</span>
+
+    <div id="run-details" style="display: flex;">
+        <div id="basic-info" style="flex: 1;">
+            <h2>Détails du run</h2>
+            <div>
+                <label><strong>Nom du run:</strong></label>
+                <span>{{ run.run_name }}</span>
+            </div>
+            <div>
+                <label><strong>Date du run:</strong></label>
+                <span>{{ run.run_date }}</span>
+            </div>
+            <div>
+                <label><strong>Séquenceur:</strong></label>
+                <span id="seq-name">{{ run.run_sequencer }}</span>
+            </div>
+            <div>
+                <label><strong>Flowcell ID:</strong></label>
+                <span>{{ run.run_flowcellid }}</span>
+            </div>
+        </div>
+
+        <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
+            <h2>Tentatives</h3>
+                <div class="attempt-list">
+                    {% for att in history %}
+                    <div>
+                        {% if att.attempt_number == run.attempt_count %}
+                        <strong>Dernière tentative (en cours)</strong>
+                        {% else %}
+                        <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">Tentative
+                            {{ att.attempt_number }}: <span>{{
+                                {"Pending":"En
+                                attente","Success":"Succès"}[att.status] }}</span></a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if history|length == 0 %}
+                    <div>Ceci est la première tentative pour ce run.</div>
+                    {% endif %}
+                </div>
+        </div>
     </div>
-    <div>
-        <label><strong>Date du run:</strong></label>
-        <span>{{ run.run_date }}</span>
-    </div>
-    <div>
-        <label><strong>Séquenceur:</strong></label>
-        <span id="seq-name">{{ run.run_sequencer }}</span>
-    </div>
-    <div>
-        <label><strong>Flowcell ID:</strong></label>
-        <span>{{ run.run_flowcellid }}</span>
-    </div>
+
 
     <div class="tab">
         <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>

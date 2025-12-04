@@ -72,6 +72,16 @@ p {
   font-weight: bold;
 }
 
+.attempt-list {
+  border: 1px solid #ccc;
+  overflow: auto;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
 .warning-msg {
   border: 1.5px solid #eca406;
   background-color: #fdf8ea;
@@ -215,7 +225,8 @@ label {
 
 .tablinks {
   display: inline-block;
-  margin-right: 10px; /* Optional: adds space between buttons */
+  margin-right: 10px;
+  /* Optional: adds space between buttons */
   border: none;
   cursor: pointer;
 }
