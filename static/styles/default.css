@@ -134,6 +134,10 @@ p {
   font-weight: bold;
 }
 
+.banner-text span {
+  font-size: 1rem;
+}
+
 .btn-primary {
   display: inline-block;
   padding: 10px 20px;
@@ -215,7 +219,8 @@ label {
 
 .tablinks {
   display: inline-block;
-  margin-right: 10px; /* Optional: adds space between buttons */
+  margin-right: 10px;
+  /* Optional: adds space between buttons */
   border: none;
   cursor: pointer;
 }
