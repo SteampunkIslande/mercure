@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>Run en cours - {{ run.run_name }}</title>
+    <title>Run en cours d'analyse - {{ run.run_name }}</title>
     <link rel="stylesheet" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
@@ -28,25 +28,39 @@
 
 <body>
     <div class="banner">
-        <h1 id="run-name">{{ run.run_name }}</h1>
-        <a id="back-to-runs" class="btn" href="/mercure/show/runs">Retour à la liste des runs</a>
+        <div class="banner-content">
+            <span class="banner-text">Run en cours d'analyse<br><span> {{ run.run_name }}</span></span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">
+                    <span class="material-icons icon-align">logout</span>Déconnexion
+                </a>
+            </div>
+        </div>
     </div>
 
-    <div class="field"><strong>Tentative :</strong> <span id="attempt-number">{{ attempt.attempt_number }}</span></div>
+    <div style="border:1px solid #ccc; padding:10px; margin-top:20px;margin-bottom:10px; background-color:#f9f9f9;">
 
-    <div class="field">
-        <strong>SampleSheet :</strong>
-        <span id="samplesheet-links">
-            {% if run.sample_sheet_adn_path %}
-            <a href="{{ run.sample_sheet_adn_path }}" download>Télécharger la SampleSheet ADN</a>
-            {% endif %}
-            {% if run.sample_sheet_arn_path %}
-            <a href="{{ run.sample_sheet_arn_path }}" download>Télécharger la SampleSheet ARN</a>
-            {% endif %}
-            {% if not run.sample_sheet_adn_path and not run.sample_sheet_arn_path %}
-            <em>Aucune SampleSheet disponible</em>
-            {% endif %}
-        </span>
+        <label><strong>Sample sheet ADN:</strong></label>
+        {% if samplesheet_adn_static_name %}
+        <a href="{{ samplesheet_adn_static_name | safe }}" download>Télécharger la samplesheet ADN</a>
+        {% else %}
+        <span>Aucune sample sheet ADN fournie.</span>
+        {% endif %}
+        <br>
+        <label><strong>Sample sheet ARN:</strong></label>
+        {% if samplesheet_arn_static_name %}
+        <a href="{{ samplesheet_arn_static_name | safe }}" download>Télécharger la samplesheet ARN</a>
+        {% else %}
+        <span>Aucune sample sheet ARN fournie.</span>
+        {% endif %}
+        <br>
+        <label><strong>Fichier metadata:</strong></label>
+        {% if metadata_static_name %}
+        <a href="{{ metadata_static_name | safe }}" download>Télécharger le fichier metadata</a>
+        {% else %}
+        <span>Aucun fichier metadata fourni.</span>
+        {% endif %}
+        <br>
     </div>
 
     <div class="field">
@@ -64,6 +78,66 @@
 
     <div class="field" id="slurm-state">
         <strong>État des jobs SLURM :</strong> <span id="slurm-info"><em>Information non disponible</em></span>
+    </div>
+
+
+    <div id="run-details" style="display: flex;">
+        <div id="basic-info" style="flex: 1;">
+            <h2>Détails du run</h2>
+            <div>
+                <label><strong>Nom du run:</strong></label>
+                <span>{{ run.run_name }}</span>
+            </div>
+            <div>
+                <label><strong>Date du run:</strong></label>
+                <span>{{ run.run_date }}</span>
+            </div>
+            <div>
+                <label><strong>Séquenceur:</strong></label>
+                <span id="seq-name">{{ run.run_sequencer }}</span>
+            </div>
+            <div>
+                <label><strong>Flowcell ID:</strong></label>
+                <span>{{ run.run_flowcellid }}</span>
+            </div>
+        </div>
+
+        <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
+            <h2>Tentatives</h3>
+                <div class="attempt-list">
+                    {% for att in history %}
+                    <div>
+                        {% if att.attempt_number == run.attempt_count %}
+                        <strong>Dernière tentative (en cours)</strong>
+                        {% else %}
+                        <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">Tentative
+                            {{ att.attempt_number }}: <span>{{
+                                {"Pending":"En
+                                attente","Success":"Succès"}[att.status] }}</span></a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+        </div>
+    </div>
+
+    <h3>Variables définies par l'utilisateur</h3>
+    <div id="user-defined-vars"></div>
+
+    <div id="advanced-vars-container" style="display:none;">
+        <h4 style="margin-top: 15px; color: #666;">Paramètres avancés (constantes du pipeline)</h4>
+        <div id="user-defined-vars-advanced"></div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <button id="toggle-advanced-btn" class="btn btn-secondary"
+            style="font-size: 0.8em; padding: 5px 10px; display: none;">
+            Afficher les paramètres avancés
+        </button>
+    </div>
+
+    <div style="margin-top: 30px; text-align: left;">
+        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
     </div>
 
     <script>
@@ -85,7 +159,7 @@
             if (info && info.current_step_string) stepEl.textContent = info.current_step_string;
             else stepEl.innerHTML = '<em>Non renseignée</em>';
 
-            if (info && typeof info.current_progress === 'number') setProgress(info.current_progress);
+            if (info) setProgress(info.current_progress);
 
             const slurmInfoEl = document.getElementById('slurm-info');
             if (info && (info.pending_jobs_count || info.running_jobs_count || info.done_jobs_count)) {
@@ -118,8 +192,69 @@
             }
         });
 
-        intervalId = setInterval(pollJobInfo, 3000);
+        intervalId = setInterval(pollJobInfo, 30000);
         pollJobInfo();
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Affichage des variables utilisateur (readonly)
+            const userDefinedVars = {{ user_defined_vars_json | safe
+        }};
+        const currentUserDefinedVars = {{ attempt.user_defined_vars | tojson }};
+        const container = document.getElementById('user-defined-vars');
+        const advancedContainer = document.getElementById('user-defined-vars-advanced');
+        let hasAdvancedVars = false;
+
+        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+            const isConstant = value && typeof value === 'object' && 'Constant' in value;
+
+            const div = document.createElement('div');
+            const label = document.createElement('label');
+            label.innerHTML = `<strong>${key}</strong>: `;
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(' '));
+            const span = document.createElement('span');
+            span.textContent = currentUserDefinedVars[key] || '';
+            div.appendChild(span);
+
+            if (isConstant) {
+                advancedContainer.appendChild(div);
+                hasAdvancedVars = true;
+            } else {
+                container.appendChild(div);
+            }
+
+        }
+
+        if (hasAdvancedVars) {
+            const toggleBtn = document.getElementById('toggle-advanced-btn');
+            const advancedDiv = document.getElementById('advanced-vars-container');
+            toggleBtn.style.display = 'inline-block';
+
+            toggleBtn.addEventListener('click', function () {
+                if (advancedDiv.style.display === 'none') {
+                    advancedDiv.style.display = 'block';
+                    toggleBtn.textContent = 'Masquer les paramètres avancés';
+                } else {
+                    advancedDiv.style.display = 'none';
+                    toggleBtn.textContent = 'Afficher les paramètres avancés';
+                }
+            });
+        }
+
+        // Correction de l'affichage du séquenceur
+        const seqnameDiv = document.getElementById('seq-name');
+        const seqname = seqnameDiv.textContent;
+        try {
+            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
+            if (resp.ok) {
+                const data = await resp.text();
+                seqnameDiv.textContent = data;
+            }
+        } catch (e) {
+            console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
+            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
+        }
+        });
 
 
     </script>

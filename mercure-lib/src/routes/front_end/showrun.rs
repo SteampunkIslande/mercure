@@ -194,6 +194,7 @@ pub async fn show_run_get(
                         samplesheet_arn_static_name: samplesheet_arn_static_name,
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
+                        user: auth.user,
                     },
                 ),
                 RunStatus::Running => Template::render(
@@ -206,6 +207,7 @@ pub async fn show_run_get(
                         samplesheet_arn_static_name: samplesheet_arn_static_name,
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
+                        user: auth.user,
                     },
                 ),
                 RunStatus::Success => Template::render(
@@ -218,6 +220,7 @@ pub async fn show_run_get(
                         samplesheet_arn_static_name: samplesheet_arn_static_name,
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
+                        user: auth.user,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
@@ -231,6 +234,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         fail_reason: fail_reason,
                         user_defined_vars_json: &user_defined_vars_json,
+                        user: auth.user,
                     },
                 ),
                 RunStatus::Idle => Template::render(
