@@ -141,15 +141,11 @@ pub async fn show_run_get(
             )
         } else {
             // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
-            let target_attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
+            let attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
 
             // On cherche la tentative demandée
-            let attempt = match HgAttempt::get_attempt_from_number(
-                target_attempt_number,
-                run_id,
-                &pool,
-            )
-            .await
+            let attempt = match HgAttempt::get_attempt_from_number(attempt_number, run_id, &pool)
+                .await
             {
                 Ok(a) => a,
                 Err(e) => {
@@ -157,7 +153,7 @@ pub async fn show_run_get(
                         "common/error",
                         context! {
                             title: "Tentative introuvable",
-                            h2: format!("Impossible d'obtenir la tentative {} pour le run {}", target_attempt_number, run_id),
+                            h2: format!("Impossible d'obtenir la tentative {} pour le run {}", attempt_number, run_id),
                             message: e.to_string()
                         },
                     );
