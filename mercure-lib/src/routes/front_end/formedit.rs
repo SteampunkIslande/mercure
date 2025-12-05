@@ -1,4 +1,5 @@
 use crate::config::{MercureConfig, get_mercure_config};
+use crate::models::HgFormDef;
 use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
@@ -48,9 +49,12 @@ pub async fn edit_groups_get(
             .into_iter()
             .map(|g| g.id)
             .collect::<Vec<i64>>();
+        let form: HgFormDef = HgFormDef::get_formdef_from_id(pool, form_id)
+            .await
+            .unwrap_or_default();
         Template::render(
             "admin/formgroupedit",
-            context! {groups, form_id, form_groups},
+            context! {groups, form_id, form_groups, form},
         )
     }
 }

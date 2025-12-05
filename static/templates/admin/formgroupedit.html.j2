@@ -11,7 +11,8 @@
 
 <body>
     <div class="banner">
-        <span class="banner-text">Éditer les groupes d’un formulaire</span>
+        <span class="banner-text">Éditer les groupes du formulaire<br><span class="banner-text">{{ form.form_name
+                }}</span></span>
         <div class="logout-button">
             <a href="/mercure/logout" class="btn btn-danger"><span
                     class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -66,7 +67,10 @@
                 if (!response.ok) throw new Error('Erreur lors de la modification des groupes');
                 const data = await response.json();
                 if (!data.success) throw new Error(data.message);
-                window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(data.data || 'Groupes modifiés')}`;
+                window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
+                    "&title=" + encodeURIComponent("Succès") +
+                    "&message=" + encodeURIComponent(data.data || 'Groupes modifiés') +
+                    "&seconds=5";
             } catch (error) {
                 console.error("Erreur:", error);
                 showMessage("error", `Erreur lors de la modification des groupes : ${error.message}`, true);

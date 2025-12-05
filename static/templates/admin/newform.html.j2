@@ -227,8 +227,11 @@
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                const message = data.data || "Nouvelle version du formulaire créée avec succès";
-                window.location.href = `/mercure/success?origin=${document.URL}&message=${encodeURIComponent(message)}`;
+                const message = data.data || "Nouveau formulaire créé avec succès";
+                window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
+                    "&title=" + encodeURIComponent("Succès") +
+                    "&message=" + encodeURIComponent(message) +
+                    "&seconds=5";
             } catch (error) {
                 console.error("Erreur:", error);
                 showMessage("error", `Erreur lors de la création du formulaire : ${error.message}`, true);

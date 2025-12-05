@@ -44,7 +44,6 @@ async fn rocket() -> _ {
                 // Simple GET pour se déconnecter, la seule route GET qui appartient au backend
                 routes::backend::logout_get,
                 // Routes pour le frontend: renvoie toujours du HTML
-                routes::frontend::success_page_get,
                 routes::frontend::home_get,
                 routes::frontend::password_edit_get,
                 routes::frontend::new_run_get,
