@@ -87,7 +87,7 @@ pub async fn show_run_get(
                 Err(e) => format!("{{\"Error\": \"{}\"}}", e),
             };
 
-        // MODE ÉDITION : Si le run est Idle ET qu'on ne demande pas une tentative spécifique
+        // MODE ÉDITION : Si le run est Idle ET qu'on demande (implicitement ou non) la dernière tentative
         if run.status == RunStatus::Idle
             && (attempt_number.unwrap_or(run.attempt_count as i64) == run.attempt_count as i64)
         {
