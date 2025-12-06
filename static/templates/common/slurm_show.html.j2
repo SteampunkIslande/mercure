@@ -186,9 +186,8 @@
         // Fonction pour charger les données depuis l'API
         async function loadData() {
             try {
-                // Récupérer tous les paramètres de l'URL actuelle
-                const currentUrl = new URL(window.location);
-                const urlParams = new URLSearchParams(currentUrl.search);
+
+                const urlParams = new URLSearchParams("/");
 
                 // S'assurer que le format est défini sur JSON
                 urlParams.set('format', 'json');
