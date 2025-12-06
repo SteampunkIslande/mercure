@@ -1,0 +1,391 @@
+<div>
+    <link rel="stylesheet" type="text/css" href="/static/styles/default-squeue.css">
+    <div class="container">
+
+        <div id="error-container"></div>
+
+        <div class="controls-bar">
+            <div class="field-selector">
+                <label for="field-preset">Sélection de champs :</label>
+                <select id="field-preset" onchange="applyFieldPreset()">
+                    <option value="">Tous les champs</option>
+                    <!-- Les options seront ajoutées dynamiquement depuis field_presets.json -->
+                </select>
+            </div>
+            <div class="refresh-controls">
+                <button id="refresh-btn" onclick="refreshData()">🔄 Actualiser</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">Chargement des données</div>
+
+            <table id="squeue-table" style="display: none;">
+                <thead>
+                    <tr id="headers-row">
+                        <!-- Headers will be dynamically generated -->
+                    </tr>
+                    <tr class="filters-row" id="filters-row">
+                        <!-- Search inputs will be dynamically generated -->
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Data rows will be dynamically generated -->
+                </tbody>
+            </table>
+
+            <div id="no-results" class="no-results" style="display: none;">
+                Aucun job ne correspond aux critères de recherche.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration et variables globales
+        let jobsData = {};
+        let filteredData = {};
+        let columnNames = [];
+        let visibleColumns = []; // Colonnes actuellement visibles
+        let allColumns = []; // Toutes les colonnes disponibles
+        let fieldPresets = {}; // Presets de champs chargés depuis le JSON
+
+        // Fonction pour afficher les erreurs
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        // Fonction pour cacher le loading et afficher le tableau
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('squeue-table').style.display = 'table';
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('squeue-table').style.display = 'none';
+        }
+
+        // Fonction pour obtenir une classe CSS pour l'état
+        function getStatusClass(state) {
+            const stateUpper = state.toUpperCase();
+            switch (stateUpper) {
+                case 'RUNNING':
+                case 'R':
+                    return 'status-running';
+                case 'PENDING':
+                case 'PD':
+                    return 'status-pending';
+                case 'FAILED':
+                case 'F':
+                    return 'status-failed';
+                case 'CANCELLED':
+                case 'CA':
+                    return 'status-cancelled';
+                case 'COMPLETED':
+                case 'CD':
+                    return 'status-completed';
+                case 'TIMEOUT':
+                case 'TO':
+                    return 'status-timeout';
+                case 'SUSPENDED':
+                case 'S':
+                    return 'status-suspended';
+                case 'CONFIGURING':
+                case 'CF':
+                    return 'status-configuring';
+                default:
+                    return '';
+            }
+        }
+
+        // Fonction pour obtenir une classe CSS pour le QOS
+        function getQosClass(qos) {
+            const qosLower = qos.toLowerCase();
+            switch (qosLower) {
+                case 'urgent':
+                    return 'qos-urgent';
+                case 'routine':
+                    return 'qos-routine';
+                case 'recherche':
+                    return 'qos-recherche';
+                case 'dev':
+                    return 'qos-dev';
+                default:
+                    return '';
+            }
+        }
+
+        // Fonction pour formater une valeur de cellule
+        function formatCellValue(columnName, value) {
+            if (columnName === 'STATE') {
+                const statusClass = getStatusClass(value);
+                return `<span class="status-badge ${statusClass}">${value}</span>`;
+            } else if (columnName === 'QOS') {
+                const qosClass = getQosClass(value);
+                return `<span class="qos-badge ${qosClass}">${value}</span>`;
+            }
+            return value;
+        }
+
+        // Fonction pour charger les presets de champs depuis le JSON
+        async function loadFieldPresets() {
+            try {
+                const response = await fetch('/squeue/static/field_presets.json');
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                fieldPresets = await response.json();
+                populatePresetSelect();
+            } catch (error) {
+                console.error('Erreur lors du chargement des presets:', error);
+                // Utiliser un preset par défaut si le fichier ne peut pas être chargé
+                fieldPresets = {
+                    "__default__": {
+                        "name": "Surveillance administrateur",
+                        "fields": [
+                            "JOBID",
+                            "STATE",
+                            "QOS",
+                            "TIME",
+                            "CPUS",
+                            "MIN_MEMORY",
+                            "COMMENT",
+                            "ACCOUNT",
+                            "NODELIST",
+                            "TRES_PER_NODE"
+                        ]
+                    }
+                };
+                populatePresetSelect();
+            }
+        }
+
+        // Fonction pour remplir la liste déroulante des presets
+        function populatePresetSelect() {
+            const selectElement = document.getElementById('field-preset');
+
+            // Garder l'option "Tous les champs"
+            selectElement.innerHTML = '<option value="">Tous les champs</option>';
+
+            // Ajouter les presets depuis le JSON
+            Object.keys(fieldPresets).forEach(presetKey => {
+                const preset = fieldPresets[presetKey];
+                const option = document.createElement('option');
+                option.value = presetKey;
+                option.textContent = preset.name || presetKey.replace('_', ' ');
+                selectElement.appendChild(option);
+            });
+
+            // Sélectionner le preset __default__ s'il existe
+            if (fieldPresets['__default__']) {
+                selectElement.value = '__default__';
+            }
+        }
+
+        // Fonction pour charger les données depuis l'API
+        async function loadData() {
+            try {
+                // Récupérer tous les paramètres de l'URL actuelle
+                const currentUrl = new URL(window.location);
+                const urlParams = new URLSearchParams(currentUrl.search);
+
+                // S'assurer que le format est défini sur JSON
+                urlParams.set('format', 'json');
+
+                // Construire l'URL de l'endpoint avec tous les paramètres
+                const apiUrl = `/squeue?${urlParams.toString()}`;
+
+                // Afficher un message de chargement
+                showLoading();
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+
+                const data = await response.json();
+                jobsData = data;
+                filteredData = { ...data };
+
+                // Extraire les noms de colonnes du premier job
+                const firstJobId = Object.keys(data)[0];
+                if (firstJobId) {
+                    allColumns = Object.keys(data[firstJobId]);
+                    columnNames = [...allColumns]; // Par défaut, toutes les colonnes sont visibles
+                    visibleColumns = [...allColumns];
+                    generateTable();
+                    hideLoading();
+                } else {
+                    showNoResults();
+                    hideLoading();
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des données:', error);
+                showError(`Erreur lors du chargement des données: ${error.message}`);
+                hideLoading();
+            }
+        }
+
+        // Fonction pour générer les en-têtes et filtres du tableau
+        function generateTable() {
+            const headersRow = document.getElementById('headers-row');
+            const filtersRow = document.getElementById('filters-row');
+
+            // Générer les en-têtes avec les colonnes visibles
+            headersRow.innerHTML = visibleColumns.map(col => `<th>${col}</th>`).join('');
+
+            // Générer les filtres avec les colonnes visibles
+            filtersRow.innerHTML = visibleColumns.map(col =>
+                `<th><input type="text" class="search-input" placeholder="Rechercher..." data-column="${col}" oninput="filterTable()"></th>`
+            ).join('');
+
+            // Générer le contenu du tableau
+            renderTableBody();
+        }
+
+        // Fonction pour rendre le corps du tableau
+        function renderTableBody() {
+            const tableBody = document.getElementById('table-body');
+            const noResults = document.getElementById('no-results');
+
+            const jobIds = Object.keys(filteredData);
+
+            if (jobIds.length === 0) {
+                showNoResults();
+                return;
+            }
+
+            hideNoResults();
+
+            tableBody.innerHTML = jobIds.map(jobId => {
+                const job = filteredData[jobId];
+                const cells = visibleColumns.map(col =>
+                    `<td>${formatCellValue(col, job[col] || '')}</td>`
+                ).join('');
+                return `<tr>${cells}</tr>`;
+            }).join('');
+        }
+
+        // Fonction pour afficher le message "aucun résultat"
+        function showNoResults() {
+            document.getElementById('no-results').style.display = 'block';
+            document.getElementById('table-body').innerHTML = '';
+        }
+
+        // Fonction pour cacher le message "aucun résultat"
+        function hideNoResults() {
+            document.getElementById('no-results').style.display = 'none';
+        }
+
+        // Fonction pour appliquer un preset de champs
+        function applyFieldPreset() {
+            const preset = document.getElementById('field-preset').value;
+
+            if (preset === '') {
+                // Afficher toutes les colonnes
+                visibleColumns = [...allColumns];
+            } else {
+                // Utiliser les champs du preset depuis le JSON
+                if (fieldPresets[preset] && fieldPresets[preset].fields) {
+                    visibleColumns = fieldPresets[preset].fields.filter(col => allColumns.includes(col));
+                } else if (fieldPresets[preset] && Array.isArray(fieldPresets[preset])) {
+                    // Fallback pour l'ancien schéma (array direct)
+                    visibleColumns = fieldPresets[preset].filter(col => allColumns.includes(col));
+                } else {
+                    // Fallback pour l'ancien système (split par virgule)
+                    visibleColumns = preset.split(',');
+                }
+            }
+
+            // Régénérer le tableau avec les nouvelles colonnes
+            generateTable();
+        }
+
+        // Fonction de filtrage du tableau
+        function filterTable() {
+            const filters = {};
+
+            // Récupérer tous les filtres actifs
+            document.querySelectorAll('.search-input').forEach(input => {
+                const column = input.dataset.column;
+                const value = input.value.toLowerCase().trim();
+                if (value) {
+                    filters[column] = value;
+                }
+            });
+
+            // Filtrer les données
+            filteredData = {};
+            Object.keys(jobsData).forEach(jobId => {
+                const job = jobsData[jobId];
+                let matchesAllFilters = true;
+
+                // Vérifier chaque filtre
+                Object.keys(filters).forEach(column => {
+                    const filterValue = filters[column];
+                    const cellValue = (job[column] || '').toLowerCase();
+
+                    if (!cellValue.includes(filterValue)) {
+                        matchesAllFilters = false;
+                    }
+                });
+
+                if (matchesAllFilters) {
+                    filteredData[jobId] = job;
+                }
+            });
+
+            // Re-rendre le tableau avec les données filtrées
+            renderTableBody();
+        }
+
+        // Fonction de rafraîchissement manuel
+        async function refreshData() {
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalText = refreshBtn.innerHTML;
+
+            // Désactiver le bouton et afficher un indicateur de chargement
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '⏳ Actualisation...';
+
+            try {
+                await loadData();
+                applyFieldPreset();
+                filterTable();
+            } catch (error) {
+                console.error('Erreur lors du rafraîchissement:', error);
+            } finally {
+                // Réactiver le bouton
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = originalText;
+            }
+        }
+
+        // Fonction de gestion des erreurs réseau
+        function handleNetworkError() {
+            showError('Impossible de se connecter au serveur. Vérifiez votre connexion réseau.');
+        }
+
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', async function () {
+            await loadFieldPresets();
+            await loadData();
+            applyFieldPreset();
+            filterTable();
+        });
+
+        // Gestion des erreurs globales
+        window.addEventListener('error', function (event) {
+            console.error('Erreur globale:', event.error);
+        });
+
+        // Gestion des erreurs de fetch
+        window.addEventListener('unhandledrejection', function (event) {
+            console.error('Promesse rejetée:', event.reason);
+            if (event.reason instanceof TypeError && event.reason.message.includes('fetch')) {
+                handleNetworkError();
+            }
+        });
+    </script>
+</div>

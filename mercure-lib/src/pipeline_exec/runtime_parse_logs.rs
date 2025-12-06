@@ -1,10 +1,14 @@
 use anyhow::Result;
 use regex::Regex;
-use rocket::tokio::process::Command;
 use serde::Serialize;
+use serde_json::Value;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::str::FromStr;
+
+use reqwest::get;
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct RTJobInfo {
@@ -83,14 +87,18 @@ pub async fn watch_log(
     }
 
     // Return SLURM statuses for current snakemake jobs (if any)
-    let (pending, running, done) = if let Some(ref slurm_id) = last_slurm_id {
-        match count_jobs_in_squeue(slurm_id).await {
-            Ok((p, r, d)) => (Some(p), Some(r), Some(d)),
-            _ => (None, None, None),
-        }
+    let status = if let Some(ref slurm_id) = last_slurm_id {
+        count_jobs_in_squeue(slurm_id).await
+    } else {
+        None
+    };
+
+    let (pending, running, done) = if let Some(s) = status {
+        (Some(s.0), Some(s.1), Some(s.2))
     } else {
         (None, None, None)
     };
+
     return Ok(RTJobInfo {
         current_step_string: last_step.clone(),
         current_progress: last_progress,
@@ -100,32 +108,40 @@ pub async fn watch_log(
     });
 }
 
-async fn count_jobs_in_squeue(slurm_id: &str) -> Result<(i64, i64, i64)> {
-    let output = Command::new("squeue")
-        .arg("--name")
-        .arg(slurm_id)
-        .arg("--noheader")
-        .arg("--format=%T")
-        .output()
-        .await?;
+async fn count_jobs_in_squeue(slurm_id: &str) -> Option<(i64, i64, i64)> {
+    let json_data = Value::from_str(
+        &get(format!("http://127.0.0.1:8080/squeue?jobname={}", slurm_id))
+            .await
+            .ok()?
+            .text()
+            .await
+            .ok()?,
+    )
+    .ok()?;
 
-    if !output.status.success() {
-        anyhow::bail!("squeue a échoué");
+    let mut status_count: HashMap<String, i64> = HashMap::new();
+
+    if json_data.is_object() {
+        status_count = json_data
+            .as_object()?
+            .iter()
+            .fold(status_count, |mut acc, (_, v)| {
+                acc.entry(
+                    v.get("STATE")
+                        .unwrap_or_default()
+                        .as_str()
+                        .unwrap_or_default()
+                        .into(),
+                )
+                .and_modify(|i| *i = *i + 1)
+                .or_insert(1);
+                acc
+            });
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut pending = 0;
-    let mut running = 0;
-    let mut done = 0;
-
-    for line in stdout.lines() {
-        match line.trim() {
-            "PENDING" => pending += 1,
-            "RUNNING" => running += 1,
-            "COMPLETED" => done += 1,
-            _ => {}
-        }
-    }
-
-    Ok((pending, running, done))
+    Some((
+        *status_count.get("PENDING").unwrap_or(&0),
+        *status_count.get("RUNNING").unwrap_or(&0),
+        *status_count.get("DONE").unwrap_or(&0),
+    ))
 }
