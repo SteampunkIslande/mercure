@@ -24,6 +24,8 @@ pub struct HgAttempt {
     pub sample_sheet_adn_path: String,
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
+    pub indir: Option<String>,
+    pub outdir: Option<String>,
 
     /// One of the only two editable fields
     pub status: RunStatus,
@@ -42,8 +44,8 @@ impl HgAttempt {
 
         sqlx::query(
             r#"
-            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, comment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir, status, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
             "#,
         )
         .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
@@ -56,6 +58,8 @@ impl HgAttempt {
         .bind(&run.sample_sheet_adn_path)
         .bind(&run.sample_sheet_arn_path)
         .bind(&run.metadata_path)
+        .bind(&run.indir)
+        .bind(&run.outdir)
         .bind(&run.status.to_string())
         .execute(pool)
         .await?;
@@ -101,6 +105,8 @@ impl HgAttempt {
             sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
             sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
             metadata_path: row.try_get("metadata_path")?,
+            indir: row.try_get("indir").ok(),
+            outdir: row.try_get("outdir").ok(),
             status,
             comment: row.try_get("comment")?,
         };
@@ -148,6 +154,8 @@ impl HgAttempt {
                     sample_sheet_adn_path: row.try_get("sample_sheet_adn_path").ok()?,
                     sample_sheet_arn_path: row.try_get("sample_sheet_arn_path").ok()?,
                     metadata_path: row.try_get("metadata_path").ok()?,
+                    indir: row.try_get("indir").ok(),
+                    outdir: row.try_get("outdir").ok(),
                     status,
                     comment: row.try_get("comment").ok()?,
                 })

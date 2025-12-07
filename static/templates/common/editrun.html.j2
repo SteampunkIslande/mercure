@@ -58,6 +58,12 @@
             <input type="text" id="run_flowcellid" value="{{ run.run_flowcellid }}" required>
         </div>
 
+        <!-- Section dynamique pour la sélection du dossier d'entrée selon indir_type -->
+        <div id="indir-selection-section">
+            <h3>Dossier d'entrée</h3>
+            <div id="indir-selection-content"></div>
+        </div>
+
         <div class="tab">
             <button id="tab-adn" class="tablinks active" onclick="openTab(event,`adn`)">ADN</button>
             <button id="tab-arn" class="tablinks" onclick="openTab(event,`arn`)">ARN</button>
@@ -100,6 +106,9 @@
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+        const indirType = {{ run.form.indir_type | tojson }};
+        const currentIndir = {{ run.indir | tojson }};
+        const currentOutdir = {{ run.outdir | tojson }};
 
 
         async function init_udv_fields() {
@@ -154,6 +163,131 @@
                 element.value = value;
             }
         }
+        }
+
+        async function init_indir_selection() {
+            const container = document.getElementById('indir-selection-content');
+
+            if (indirType === 'BCL_DIR') {
+                // Pour BCL_DIR, pas de changement - utilisation du séquenceur comme avant
+                container.innerHTML = '<p>Mode BCL - Dossier d\'entrée déterminé automatiquement à partir du séquenceur sélectionné.</p>';
+                // Ajouter champs cachés
+                const indirInput = document.createElement('input');
+                indirInput.type = 'hidden';
+                indirInput.id = 'indir';
+                indirInput.value = currentIndir || '';
+                container.appendChild(indirInput);
+
+                const outdirInput = document.createElement('input');
+                outdirInput.type = 'hidden';
+                outdirInput.id = 'outdir';
+                outdirInput.value = currentOutdir || '';
+                container.appendChild(outdirInput);
+
+            } else if (indirType === 'ANALYSIS_DIR') {
+                // Pour ANALYSIS_DIR, choix parmi les dossiers dans /data/analysis
+                container.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
+                const select = document.createElement('select');
+                select.id = 'analysis_indir';
+                select.required = true;
+
+                try {
+                    const response = await fetch('/mercure/api/directories/analysis');
+                    const result = await response.json();
+                    if (result.success) {
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = '';
+                        defaultOption.textContent = 'Sélectionner un dossier...';
+                        select.appendChild(defaultOption);
+
+                        result.data.forEach(dir => {
+                            const option = document.createElement('option');
+                            option.value = dir.path;
+                            option.textContent = dir.name;
+                            if (currentIndir === dir.path) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+                    } else {
+                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                    }
+                } catch (e) {
+                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                }
+
+                container.appendChild(select);
+
+                // Champs cachés pour indir et outdir
+                const indirInput = document.createElement('input');
+                indirInput.type = 'hidden';
+                indirInput.id = 'indir';
+                indirInput.value = currentIndir || '';
+                container.appendChild(indirInput);
+
+                const outdirInput = document.createElement('input');
+                outdirInput.type = 'hidden';
+                outdirInput.id = 'outdir';
+                outdirInput.value = currentOutdir || '';
+                container.appendChild(outdirInput);
+
+                // Mettre à jour indir quand l'utilisateur sélectionne
+                select.addEventListener('change', function () {
+                    indirInput.value = this.value;
+                });
+
+            } else if (indirType === 'ONT_DIR') {
+                // Pour ONT_DIR, choix parmi les dossiers dans /data/raw/sequenceur/GRIDION
+                container.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
+                const select = document.createElement('select');
+                select.id = 'ont_indir';
+                select.required = true;
+
+                try {
+                    const response = await fetch('/mercure/api/directories/ont');
+                    const result = await response.json();
+                    if (result.success) {
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = '';
+                        defaultOption.textContent = 'Sélectionner un dossier...';
+                        select.appendChild(defaultOption);
+
+                        result.data.forEach(dir => {
+                            const option = document.createElement('option');
+                            option.value = dir.path;
+                            option.textContent = dir.name;
+                            if (currentIndir === dir.path) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+                    } else {
+                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                    }
+                } catch (e) {
+                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                }
+
+                container.appendChild(select);
+
+                // Champs cachés pour indir et outdir
+                const indirInput = document.createElement('input');
+                indirInput.type = 'hidden';
+                indirInput.id = 'indir';
+                indirInput.value = currentIndir || '';
+                container.appendChild(indirInput);
+
+                const outdirInput = document.createElement('input');
+                outdirInput.type = 'hidden';
+                outdirInput.id = 'outdir';
+                outdirInput.value = currentOutdir || '';
+                container.appendChild(outdirInput);
+
+                // Mettre à jour indir quand l'utilisateur sélectionne
+                select.addEventListener('change', function () {
+                    indirInput.value = this.value;
+                });
+            }
         }
 
         // Function to upload file
@@ -272,6 +406,7 @@
         document.addEventListener('DOMContentLoaded', async function () {
 
             await init_udv_fields();
+            await init_indir_selection();
 
             try {
 
@@ -340,7 +475,9 @@
                 sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
 
-                user_defined_vars: userDefinedVars
+                user_defined_vars: userDefinedVars,
+                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
+                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
             };
 
             try {

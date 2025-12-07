@@ -62,6 +62,12 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
 
     Template::render(
         "common/newrun",
-        context! { form_id, user: auth.user, sequenceurs_list, user_defined_vars_json },
+        context! {
+            form_id,
+            user: auth.user,
+            sequenceurs_list,
+            user_defined_vars_json,
+            indir_type: form_def.indir_type
+        },
     )
 }

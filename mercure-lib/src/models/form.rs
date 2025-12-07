@@ -7,6 +7,14 @@ use crate::models::ModelError;
 
 use super::groups::Group;
 
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+pub enum IndirType {
+    #[default]
+    BclDir,
+    AnalysisDir,
+    OntDir,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct HgFormListItem {
     pub formid: i64,
@@ -38,6 +46,7 @@ pub struct HgFormDef {
     pub version: i32,
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
+    pub indir_type: IndirType,
 }
 
 /// This type helps admin users define a form
@@ -98,8 +107,8 @@ impl HgFormDef {
 
         let form_id: i64 = sqlx::query(
             r#"
-            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version, indir_type)
+            VALUES (?, ?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
         )
@@ -108,6 +117,11 @@ impl HgFormDef {
         .bind(&new_formdef.form_name)
         .bind(new_formdef.enabled)
         .bind(new_formdef.version)
+        .bind(match new_formdef.indir_type {
+            IndirType::BclDir => "BCL_DIR",
+            IndirType::AnalysisDir => "ANALYSIS_DIR",
+            IndirType::OntDir => "ONT_DIR",
+        })
         .fetch_one(pool)
         .await?
         .try_get(0usize)?;
@@ -318,6 +332,12 @@ impl HgFormDef {
         def.form_name = row.try_get("form_name")?;
         def.enabled = row.try_get("enabled")?;
         def.version = row.try_get("version")?;
+        def.indir_type = match row.try_get::<String, _>("indir_type")?.as_str() {
+            "ANALYSIS_DIR" => IndirType::AnalysisDir,
+            "ONT_DIR" => IndirType::OntDir,
+            "BCL_DIR" => IndirType::BclDir,
+            _ => IndirType::BclDir,
+        };
 
         def.groups = sqlx::query(
             r#"SELECT g.group_id,g.group_name FROM Groups g JOIN FormdefHasGroup fg ON g.group_id=fg.group_id WHERE fg.form_id = ? "#,
@@ -395,6 +415,7 @@ mod tests {
             version: 1,
             groups: vec![],
             user_defined_vars: Some(user_defined_vars),
+            indir_type: IndirType::BclDir,
         };
 
         let json = serde_json::to_string_pretty(&form_def).unwrap();

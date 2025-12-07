@@ -1,3 +1,4 @@
+mod directory_listing;
 mod editgroups;
 mod getform;
 mod jobprogresswatch;
@@ -16,6 +17,7 @@ mod samplesheet;
 mod submitrun;
 mod upload;
 
+pub use directory_listing::*;
 pub use editgroups::*;
 pub use getform::*;
 pub use jobprogresswatch::*;

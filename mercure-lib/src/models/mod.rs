@@ -1,5 +1,6 @@
 pub mod analysis;
 pub mod attempt;
+pub mod directory_utils;
 pub mod form;
 pub mod groups;
 pub mod hgrun;
@@ -7,6 +8,7 @@ pub mod user;
 
 pub use analysis::*;
 pub use attempt::*;
+pub use directory_utils::*;
 pub use form::*;
 pub use groups::*;
 pub use hgrun::*;

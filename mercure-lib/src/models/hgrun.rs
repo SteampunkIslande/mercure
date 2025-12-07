@@ -74,6 +74,8 @@ pub struct HgRunSubmission {
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
     pub user_defined_vars: HashMap<String, String>,
+    pub indir: Option<String>,
+    pub outdir: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -87,6 +89,8 @@ pub struct HgRunEdit {
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
     pub user_defined_vars: HashMap<String, String>,
+    pub indir: Option<String>,
+    pub outdir: Option<String>,
 }
 
 /// Created by users.
@@ -126,6 +130,10 @@ pub struct HgRun {
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
 
+    /// Input and output directories for the run, determined based on form's indir_type
+    pub indir: Option<String>,
+    pub outdir: Option<String>,
+
     /// Current status of the run. Reflects the status of the latest attempt.
     pub status: RunStatus,
 
@@ -151,8 +159,8 @@ impl HgRun {
 
         let run_id=sqlx::query(
             r#"
-            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, attempt_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, attempt_count, indir, outdir)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING run_id
             "#,
         )
@@ -169,6 +177,8 @@ impl HgRun {
         .bind("Idle")
         .bind(&user_defined_vars_json)
         .bind(0)
+        .bind(&run_form.indir)
+        .bind(&run_form.outdir)
         .fetch_one(pool)
         .await?.try_get("run_id")?;
 
@@ -197,9 +207,9 @@ impl HgRun {
         sqlx::query(
             r#"
             UPDATE Runs SET
-            (user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path)
+            (user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir)
             =
-            (?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?)
             WHERE run_id = ?
             "#,
         )
@@ -210,6 +220,8 @@ impl HgRun {
         .bind(&run_form.sample_sheet_adn_path)
         .bind(&run_form.sample_sheet_arn_path)
         .bind(&run_form.metadata_path)
+        .bind(&run_form.indir)
+        .bind(&run_form.outdir)
         .bind(run_form.run_id)
         .execute(pool).await?;
 
@@ -269,6 +281,8 @@ impl HgRun {
             sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
             sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
             metadata_path: row.try_get("metadata_path")?,
+            indir: row.try_get("indir").ok(),
+            outdir: row.try_get("outdir").ok(),
             status,
             attempt_count: row.try_get("attempt_count")?,
         };

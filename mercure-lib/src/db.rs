@@ -47,7 +47,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             launcher_name TEXT NOT NULL,
             form_name TEXT NOT NULL,
             enabled BOOLEAN NOT NULL DEFAULT 1,
-            version INTEGER NOT NULL DEFAULT 1
+            version INTEGER NOT NULL DEFAULT 1,
+            indir_type TEXT NOT NULL DEFAULT 'BCL_DIR' CHECK (indir_type IN ('BCL_DIR', 'ANALYSIS_DIR', 'ONT_DIR'))
         )
         "#,
     )
@@ -114,6 +115,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             status TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
             attempt_count INTEGER NOT NULL DEFAULT 0,
+            indir TEXT,
+            outdir TEXT,
             FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
         )
@@ -135,6 +138,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             sample_sheet_adn_path TEXT NOT NULL,
             sample_sheet_arn_path TEXT NOT NULL,
             metadata_path TEXT NOT NULL,
+            indir TEXT,
+            outdir TEXT,
             status TEXT NOT NULL,
             comment TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (run_id) REFERENCES Runs(run_id) ON DELETE CASCADE
