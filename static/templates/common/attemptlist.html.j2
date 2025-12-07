@@ -1,0 +1,26 @@
+{% for att in history %}
+<div
+    class="run-attempt {% if att.status == 'Pending' %}pending{% elif att.status == 'Running' %}running{% elif att.status == 'Success' %}success{% elif att.status.Failure %}failure{% else %}idle{% endif %}">
+    <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
+        <strong>Tentative {{ att.attempt_number }}:</strong>
+        <span>
+            {% if att.status == "Pending" %}
+            En attente
+            {% elif att.status == "Running" %}
+            Analyses en cours
+            {% elif att.status == "Idle" %}
+            A valider (ceci est une erreur logique, veuillez contacter votre administrateur
+            système)<br>
+            Run: {{ run.run_id }}
+            Tentative: {{ attempt.attempt_number }}
+            {% elif att.status.Failure %}
+            Échec{% if att.attempt_number == run.attempt_count %} (dernière en date){% endif %}
+            {% elif att.status == "Success" %}
+            Succès{% if att.attempt_number == run.attempt_count %} (dernière en date){% endif %}
+            {% else %}
+            {{ att.status }}
+            {% endif %}
+        </span>
+    </a>
+</div>
+{% endfor %}

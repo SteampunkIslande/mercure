@@ -509,3 +509,77 @@ table td:hover a {
   border: 1px solid #ccc;
   border-radius: 4px;
 }
+/* Run Attempt List Styles */
+.run-attempt {
+  margin-bottom: 8px;
+  border-radius: 6px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  border: 1px solid transparent;
+}
+
+.run-attempt:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.run-attempt a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.run-attempt strong {
+  margin-right: 10px;
+}
+
+/* Status specific styles for run-attempt */
+.run-attempt.idle {
+  background-color: #e3f2fd;
+  border-color: #bbdefb;
+  color: #0d47a1;
+}
+.run-attempt.idle:hover {
+  background-color: #bbdefb;
+}
+
+.run-attempt.pending {
+  background-color: #fff3e0;
+  border-color: #ffe0b2;
+  color: #e65100;
+}
+.run-attempt.pending:hover {
+  background-color: #ffe0b2;
+}
+
+.run-attempt.running {
+  background-color: #f3e5f5;
+  border-color: #e1bee7;
+  color: #4a148c;
+}
+.run-attempt.running:hover {
+  background-color: #e1bee7;
+}
+
+.run-attempt.success {
+  background-color: #e8f5e9;
+  border-color: #c8e6c9;
+  color: #1b5e20;
+}
+.run-attempt.success:hover {
+  background-color: #c8e6c9;
+}
+
+.run-attempt.failure {
+  background-color: #ffebee;
+  border-color: #ffcdd2;
+  color: #b71c1c;
+}
+.run-attempt.failure:hover {
+  background-color: #ffcdd2;
+}

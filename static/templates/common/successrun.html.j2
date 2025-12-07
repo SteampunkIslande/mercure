@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run terminé avec succès</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <script src="/static/scripts/json_list.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Run terminé avec succès</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger">
+                    <span class="material-icons icon-align">logout</span>Déconnexion
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+
+
+
+    <div id="run-details" style="display: flex;">
+        <div id="basic-info" style="flex: 1;">
+            <h2>Détails du run</h2>
+            <div>
+                <label><strong>Nom du run:</strong></label>
+                <span>{{ run.run_name }}</span>
+            </div>
+            <div>
+                <label><strong>Date du run:</strong></label>
+                <span>{{ run.run_date }}</span>
+            </div>
+            <div>
+                <label><strong>Séquenceur:</strong></label>
+                <span id="seq-name">{{ run.run_sequencer }}</span>
+            </div>
+            <div>
+                <label><strong>Flowcell ID:</strong></label>
+                <span>{{ run.run_flowcellid }}</span>
+            </div>
+        </div>
+
+        <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
+            <h2>Tentatives</h3>
+                <div class="attempt-list">
+                    {% include 'common/attemptlist' %}
+                </div>
+        </div>
+    </div>
+
+    <div class="tab">
+        <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>
+        <button id="tab-arn" class="tablinks" onclick="openTab(event,'arn')">ARN</button>
+        <button id="tab-metadata" class="tablinks" onclick="openTab(event,'metadata')">Metadata</button>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
+        <label>Sample sheet ADN:</label>
+        {% if samplesheet_adn_static_name %}
+        <a href="{{ samplesheet_adn_static_name | safe }}" class="btn btn-primary" download>
+            <span class="material-icons" style="vertical-align:middle;">download</span>
+            Télécharger la samplesheet ADN
+        </a>
+        {% else %}
+        <span>Aucune sample sheet ADN fournie.</span>
+        {% endif %}
+        <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
+        <div id="sample_sheet_adn_check"></div>
+        <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
+        <label>Sample sheet ARN:</label>
+        {% if samplesheet_arn_static_name %}
+        <a href="{{ samplesheet_arn_static_name | safe }}" class="download-link" download>
+            <span class="material-icons" style="vertical-align:middle;">download</span>
+            Télécharger la samplesheet ARN
+        </a>
+        {% else %}
+        <span>Aucune sample sheet ARN fournie.</span>
+        {% endif %}
+        <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
+        <div id="sample_sheet_arn_check"></div>
+        <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+    </div>
+
+    <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
+
+        <label>Metadata:</label>
+        {% if metadata_static_name %}
+        <a href="{{ metadata_static_name | safe }}" class="download-link" download>
+            <span class="material-icons" style="vertical-align:middle;">download</span>
+            Télécharger le fichier metadata
+        </a>
+        {% else %}
+        <span>Aucun fichier metadata fourni.</span>
+        {% endif %}
+        <input type="hidden" id="metadata_path" value="{{ run.metadata_path }}">
+    </div>
+
+    <h3>Variables définies par l'utilisateur</h3>
+    <div id="user-defined-vars"></div>
+
+    <div id="advanced-vars-container" style="display:none;">
+        <h4 style="margin-top: 15px; color: #666;">Paramètres avancés (constantes du pipeline)</h4>
+        <div id="user-defined-vars-advanced"></div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <button id="toggle-advanced-btn" class="btn btn-secondary"
+            style="font-size: 0.8em; padding: 5px 10px; display: none;">
+            Afficher les paramètres avancés
+        </button>
+    </div>
+
+    <div style="margin-top: 30px; text-align: left;">
+        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+    </div>
+
+    <script>
+        // Tabs
+        function openTab(evt, tabName) {
+            evt.preventDefault();
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById("tabcontent-" + tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+
+        // Affichage des samples détectés (comme editrun)
+        async function checkSampleSheet(filename) {
+            const formData = new FormData();
+            formData.append('file_name', filename);
+            const response = await fetch('/mercure/api/samplesheet/check', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            try {
+                if (result.success) {
+                    return result.data;
+                } else {
+                    throw new Error(result.message);
+                }
+            }
+            catch (e) {
+                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + e.message };
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            // ADN
+            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
+            if (adnPath) {
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
+                document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_adn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
+                }
+            }
+            else {
+                document.getElementById('sample_sheet_adn_check').innerHTML = "Aucune sample sheet ADN fournie.";
+            }
+            // ARN
+            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
+            if (arnPath) {
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
+                document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_arn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
+                }
+            }
+            // Affichage des variables utilisateur (readonly)
+            const userDefinedVars = {{ user_defined_vars_json | safe
+        }};
+        const currentUserDefinedVars = {{ attempt.user_defined_vars | tojson }};
+        const container = document.getElementById('user-defined-vars');
+        const advancedContainer = document.getElementById('user-defined-vars-advanced');
+        let hasAdvancedVars = false;
+
+        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+            const isConstant = value && typeof value === 'object' && 'Constant' in value;
+
+            const div = document.createElement('div');
+            const label = document.createElement('label');
+            label.innerHTML = `<strong>${key}</strong>: `;
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(' '));
+            const span = document.createElement('span');
+            span.textContent = currentUserDefinedVars[key] || '';
+            div.appendChild(span);
+
+            if (isConstant) {
+                advancedContainer.appendChild(div);
+                hasAdvancedVars = true;
+            } else {
+                container.appendChild(div);
+            }
+
+        }
+
+        if (hasAdvancedVars) {
+            const toggleBtn = document.getElementById('toggle-advanced-btn');
+            const advancedDiv = document.getElementById('advanced-vars-container');
+            toggleBtn.style.display = 'inline-block';
+
+            toggleBtn.addEventListener('click', function () {
+                if (advancedDiv.style.display === 'none') {
+                    advancedDiv.style.display = 'block';
+                    toggleBtn.textContent = 'Masquer les paramètres avancés';
+                } else {
+                    advancedDiv.style.display = 'none';
+                    toggleBtn.textContent = 'Afficher les paramètres avancés';
+                }
+            });
+        }
+
+        // Correction de l'affichage du séquenceur
+        const seqnameDiv = document.getElementById('seq-name');
+        const seqname = seqnameDiv.textContent;
+        try {
+            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
+            if (resp.ok) {
+                const data = await resp.text();
+                seqnameDiv.textContent = data;
+            }
+        } catch (e) {
+            console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
+            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
+        }
+
+
+        });
+
+    </script>
+</body>
+
+</html>

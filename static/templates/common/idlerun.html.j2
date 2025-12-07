@@ -54,18 +54,7 @@
         <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
             <h2>Tentatives</h3>
                 <div class="attempt-list">
-                    {% for att in history %}
-                    <div>
-                        {% if att.attempt_number == run.attempt_count %}
-                        <strong>Dernière tentative (en cours)</strong>
-                        {% else %}
-                        <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">Tentative
-                            {{ att.attempt_number }}: <span>{{
-                                {"Pending":"En
-                                attente","Success":"Succès"}[att.status] }}</span></a>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
+                    {% include 'common/attemptlist' %}
                     {% if history|length == 0 %}
                     <div>Ceci est la première tentative pour ce run.</div>
                     {% endif %}
