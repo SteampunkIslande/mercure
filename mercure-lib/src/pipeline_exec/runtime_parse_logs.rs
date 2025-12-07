@@ -17,6 +17,7 @@ pub struct RTJobInfo {
     pub pending_jobs_count: Option<i64>,
     pub running_jobs_count: Option<i64>,
     pub done_jobs_count: Option<i64>,
+    pub slurm_job_name: Option<String>,
 }
 
 /// Fonction asynchrone qui renvoie un flux de JobInfo en temps réel
@@ -105,6 +106,7 @@ pub async fn watch_log(
         pending_jobs_count: pending,
         running_jobs_count: running,
         done_jobs_count: done,
+        slurm_job_name: last_slurm_id,
     });
 }
 

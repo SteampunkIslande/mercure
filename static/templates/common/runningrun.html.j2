@@ -38,37 +38,12 @@
         </div>
     </div>
 
-    <div style="border:1px solid #ccc; padding:10px; margin-top:20px;margin-bottom:10px; background-color:#f9f9f9;">
-
-        <label><strong>Sample sheet ADN:</strong></label>
-        {% if samplesheet_adn_static_name %}
-        <a href="{{ samplesheet_adn_static_name | safe }}" download>Télécharger la samplesheet ADN</a>
-        {% else %}
-        <span>Aucune sample sheet ADN fournie.</span>
-        {% endif %}
-        <br>
-        <label><strong>Sample sheet ARN:</strong></label>
-        {% if samplesheet_arn_static_name %}
-        <a href="{{ samplesheet_arn_static_name | safe }}" download>Télécharger la samplesheet ARN</a>
-        {% else %}
-        <span>Aucune sample sheet ARN fournie.</span>
-        {% endif %}
-        <br>
-        <label><strong>Fichier metadata:</strong></label>
-        {% if metadata_static_name %}
-        <a href="{{ metadata_static_name | safe }}" download>Télécharger le fichier metadata</a>
-        {% else %}
-        <span>Aucun fichier metadata fourni.</span>
-        {% endif %}
-        <br>
+    <div class="field">
+        <strong>Étape:</strong> <span id="current-step"><em>Non renseignée</em></span>
     </div>
 
     <div class="field">
-        <strong>Étape :</strong> <span id="current-step"><em>Non renseignée</em></span>
-    </div>
-
-    <div class="field">
-        <strong>Progression :</strong>
+        <strong>Progression:</strong>
         <div id="progress-container">
             <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div id="progress-bar" class="progress-bar" style="width:0%">0%</div>
@@ -76,9 +51,18 @@
         </div>
     </div>
 
-    <div class="field" id="slurm-state">
-        <strong>État des jobs SLURM :</strong> <span id="slurm-info"><em>Information non disponible</em></span>
+    <div class="field">
+        <span><strong>Nombre de jobs SLURM en attente pour ce pipeline:</strong>
+            <div id="pending-jobs-count"></div>
+        </span>
     </div>
+    <div class="field">
+        <span><strong>Nombre de jobs SLURM en cours d'exécution pour ce
+                pipeline:</strong>
+            <div id="running-jobs-count"></div>
+        </span>
+    </div>
+
     {% include 'common/slurm_show' %}
 
 
@@ -137,6 +121,31 @@
         </button>
     </div>
 
+    <div style="border:1px solid #ccc; padding:10px; margin-top:20px;margin-bottom:10px; background-color:#f9f9f9;">
+
+        <label><strong>Sample sheet ADN:</strong></label>
+        {% if samplesheet_adn_static_name %}
+        <a href="{{ samplesheet_adn_static_name | safe }}" download>Télécharger la samplesheet ADN</a>
+        {% else %}
+        <span>Aucune sample sheet ADN fournie.</span>
+        {% endif %}
+        <br>
+        <label><strong>Sample sheet ARN:</strong></label>
+        {% if samplesheet_arn_static_name %}
+        <a href="{{ samplesheet_arn_static_name | safe }}" download>Télécharger la samplesheet ARN</a>
+        {% else %}
+        <span>Aucune sample sheet ARN fournie.</span>
+        {% endif %}
+        <br>
+        <label><strong>Fichier metadata:</strong></label>
+        {% if metadata_static_name %}
+        <a href="{{ metadata_static_name | safe }}" download>Télécharger le fichier metadata</a>
+        {% else %}
+        <span>Aucun fichier metadata fourni.</span>
+        {% endif %}
+        <br>
+    </div>
+
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
     </div>
@@ -155,36 +164,42 @@
             bar.parentElement.setAttribute('aria-valuenow', String(p));
         }
 
-        function updateJobInfo(info) {
+        async function updateJobInfo(info) {
             const stepEl = document.getElementById('current-step');
             if (info && info.current_step_string) stepEl.textContent = info.current_step_string;
             else stepEl.innerHTML = '<em>Non renseignée</em>';
 
             if (info) setProgress(info.current_progress);
 
-            const slurmInfoEl = document.getElementById('slurm-info');
-            if (info && (info.pending_jobs_count || info.running_jobs_count || info.done_jobs_count)) {
-                slurmInfoEl.textContent = `Pending: ${info.pending_jobs_count || 0} — Running: ${info.running_jobs_count || 0} — Done: ${info.done_jobs_count || 0}`;
-            } else {
-                slurmInfoEl.innerHTML = '<em>Information non disponible</em>';
-            }
+            const pendingCountEl = document.getElementById("pending-jobs-count")
+            if (info && info.pending_jobs_count) pendingCountEl.textContent = info.pending_jobs_count;
+            else pendingCountEl.textContent = "Inconnu"
+
+            const runningCountEl = document.getElementById("running-jobs-count")
+            if (info && info.running_jobs_count) runningCountEl.textContent = info.running_jobs_count;
+            else runningCountEl.textContent = "Inconnu"
+
+            slurm_job_name = info.slurm_job_name;
+            await refreshData(slurm_job_name);
+
         }
 
-        function pollJobInfo() {
+        async function pollJobInfo() {
             const url = `/mercure/api/watch/${runId}/${attemptNumber}`;
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.success && data.data) {
-                        updateJobInfo(data.data);
-                    } else {
-                        updateJobInfo(null);
-                    }
-                })
-                .catch(err => {
-                    console.warn('Erreur lors de la récupération des infos job', err);
-                    updateJobInfo(null);
-                });
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data && data.success && data.data) {
+                    await updateJobInfo(data.data);
+                } else {
+                    await updateJobInfo(null);
+                }
+            }
+            catch (e) {
+                console.warn('Erreur lors de la récupération des infos job', err);
+                await updateJobInfo(null);
+            }
         }
 
         window.addEventListener('beforeunload', () => {
@@ -192,9 +207,6 @@
                 clearInterval(intervalId);
             }
         });
-
-        intervalId = setInterval(pollJobInfo, 30000);
-        pollJobInfo();
 
         document.addEventListener('DOMContentLoaded', async function () {
             // Affichage des variables utilisateur (readonly)
@@ -255,7 +267,11 @@
             console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
             // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
         }
-        });
+
+        intervalId = setInterval(pollJobInfo, 30000);
+        await pollJobInfo();
+        }
+        );
 
 
     </script>

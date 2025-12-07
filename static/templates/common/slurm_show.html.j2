@@ -13,7 +13,7 @@
                 </select>
             </div>
             <div class="refresh-controls">
-                <button id="refresh-btn" onclick="refreshData()">🔄 Actualiser</button>
+                <button id="refresh-btn" onclick="pollJobInfo()">🔄 Actualiser</button>
             </div>
         </div>
 
@@ -184,21 +184,13 @@
         }
 
         // Fonction pour charger les données depuis l'API
-        async function loadData() {
+        async function loadData(slurm_jobname) {
             try {
-
-                const urlParams = new URLSearchParams("/");
-
-                // S'assurer que le format est défini sur JSON
-                urlParams.set('format', 'json');
-
-                // Construire l'URL de l'endpoint avec tous les paramètres
-                const apiUrl = `/squeue?${urlParams.toString()}`;
 
                 // Afficher un message de chargement
                 showLoading();
-
-                const response = await fetch(apiUrl);
+                const jobname_option = slurm_jobname ? `&jobname=${slurm_jobname}` : "";
+                const response = await fetch(`/squeue?format=json${jobname_option}`);
                 if (!response.ok) {
                     throw new Error(`Erreur HTTP: ${response.status}`);
                 }
@@ -340,7 +332,7 @@
         }
 
         // Fonction de rafraîchissement manuel
-        async function refreshData() {
+        async function refreshData(slurm_jobname) {
             const refreshBtn = document.getElementById('refresh-btn');
             const originalText = refreshBtn.innerHTML;
 
@@ -349,7 +341,7 @@
             refreshBtn.innerHTML = '⏳ Actualisation...';
 
             try {
-                await loadData();
+                await loadData(slurm_jobname);
                 applyFieldPreset();
                 filterTable();
             } catch (error) {
@@ -369,7 +361,6 @@
         // Initialisation au chargement de la page
         document.addEventListener('DOMContentLoaded', async function () {
             await loadFieldPresets();
-            await loadData();
             applyFieldPreset();
             filterTable();
         });

@@ -1,4 +1,5 @@
 use rocket::fs::FileServer;
+use rocket_dyn_templates::minijinja::UndefinedBehavior;
 use rocket_dyn_templates::{Template, context};
 
 #[macro_use]
@@ -114,5 +115,9 @@ async fn rocket() -> _ {
             ],
         )
         .manage(pool)
-        .attach(Template::fairing())
+        .attach(Template::custom(|engines| {
+            engines
+                .minijinja
+                .set_undefined_behavior(UndefinedBehavior::SemiStrict);
+        }))
 }
