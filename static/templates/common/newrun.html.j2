@@ -316,10 +316,10 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    showMessage("success", data.data.message);
-                    setTimeout(() => {
-                        window.location.href = "/mercure/show/run/" + data.data.run_id;
-                    }, 1000);
+                    window.location = `/mercure/api/redirect?target_url=/mercure/show/run/${data.data.run_id}` +
+                        "&title=" + encodeURIComponent("Succès") +
+                        "&message=" + encodeURIComponent(data.data.message) +
+                        "&seconds=5";
                 } else {
                     showMessage("error", data.message);
                 }
