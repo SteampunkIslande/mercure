@@ -14,8 +14,8 @@ ctrlc = true
 [debug]
 mercure_db = "sqlite:///home/charles/mercure/mercure.db"
 
-template_dir = "/home/charles/mercure/static/templates"
-static_dir = "/home/charles/mercure/static"
+template_dir = "./static/templates"
+static_dir = "./static"
 upload_dir = "/home/charles/mercure-arena/uploads"
 logs_dir = "/home/charles/mercure-arena/OPT/JOBS/LOGS"
 
@@ -31,8 +31,8 @@ cli_colors = true
 address = "10.169.192.26"
 mercure_db = "sqlite:///OPT/hermes/mercure.db"
 
-template_dir = "/OPT/hermes/static/templates"
-static_dir = "/OPT/hermes/static"
+template_dir = "/static/templates"
+static_dir = "/static"
 upload_dir = "/OPT/hermes/uploads"
 logs_dir = "/OPT/JOBS/LOGS"
 
