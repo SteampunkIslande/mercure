@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nouveau Run</title>
+    <title>{% if run %}Editer un run{% else %}Nouveau Run{% endif %}</title>
     <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
@@ -16,7 +16,8 @@
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">Nouveau Run - {{ user.username }}</span>
+            <span class="banner-text">{% if run %}Editer un run - {{ user.username }}{% else %}Nouveau Run - {{
+                user.username }}{% endif %}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -28,16 +29,25 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-    <h2>Déclarer un nouveau run</h2>
+    <h2>{% if run %}Edition du run{% else %}Déclarer un nouveau run{% endif %}</h2>
 
-    <form id="newrun-form" class="form-vertical" style="margin: 1em auto;">
+    <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
 
+        {% if run %}
+        <input type="hidden" id="run_id" value="{{ run_id }}">
+        {% else %}
         <input type="hidden" id="form_id" value="{{ form_id }}">
         <input type="hidden" id="user_id" value="{{ user.id }}">
+        {% endif %}
 
         <div>
             <label for="run_name">Nom du run:</label>
+            {% if run %}
+            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
+            <input type="hidden" id="run_name" value="{{ run.run_name }}">
+            {% else %}
             <input type="text" id="run_name" required>
+            {% endif %}
         </div>
         <div id="bcl-dir-def-section" style="display:none;">
             <h3>Informations sur le run</h3>
@@ -101,8 +111,13 @@
         <div id="user-defined-vars"></div>
 
         <div style="text-align: left; margin-top: 20px;">
+            {% if run %}
+            <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/run/{{ run_id }}">Retour</a>
+            <a id="save-changes" onclick="handleSubmit()" class="btn btn-primary">Enregistrer les modifications</a>
+            {% else %}
             <a class="btn btn-secondary" href="/mercure/home">Retour</a>
-            <a class="btn btn-primary" onclick="submitForm()">Soumettre</a>
+            <a class="btn btn-primary" onclick="handleSubmit()">Soumettre</a>
+            {% endif %}
         </div>
     </form>
 
@@ -111,7 +126,14 @@
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
+
+        {% if run %}
+        const indirType = {{ run.form.indir_type | tojson }};
+        const currentIndir = {{ run.indir | tojson }};
+        const currentOutdir = {{ run.outdir | tojson }};
+        {% else %}
         const indirType = "{{ indir_type | safe }}";
+        {% endif %}
 
         // Remplacement dynamique des noms de séquenceurs par leur pretty_name
         document.addEventListener('DOMContentLoaded', async function () {
@@ -177,16 +199,29 @@
                     container.appendChild(div);
                 }
             }
+
+            // Populate user-defined variables with current values
+            {% if run %}
+            const currentUserDefinedVars = {{ run.user_defined_vars | tojson
+        }};
+
+        for (const [key, value] of Object.entries(currentUserDefinedVars)) {
+            const element = document.getElementById('udv_' + key);
+            if (element) {
+                element.value = value;
+            }
+        }
+        {% endif %}
         }
 
         async function init_indir_selection() {
-            const indirSelectionDiv = document.getElementById('indir-selection-content');
-            const indirSelectionSectionDiv = document.getElementById('indir-selection-section');
+            const container = document.getElementById('indir-selection-content');
 
-            if (indirType === 'AnalysisDir') {
+            if (indirType === 'BclDir') {
+
+            } else if (indirType === 'ANALYSIS_DIR') {
                 // Pour ANALYSIS_DIR, choix parmi les dossiers dans /data/analysis
-                indirSelectionSectionDiv.style.display = "block";
-                indirSelectionDiv.innerHTML = '<label for="analysis_indir">Veuillez choisir un dossier d\'analyse:</label>';
+                container.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
                 const select = document.createElement('select');
                 select.id = 'analysis_indir';
                 select.required = true;
@@ -195,39 +230,50 @@
                     const response = await fetch('/mercure/api/directories/list?dirtype=analysis');
                     const result = await response.json();
                     if (result.success) {
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = '';
+                        defaultOption.textContent = 'Sélectionner un dossier...';
+                        select.appendChild(defaultOption);
 
                         result.data.forEach(dir => {
                             const option = document.createElement('option');
                             option.value = dir.path;
                             option.textContent = dir.name;
+                            if (currentIndir === dir.path) {
+                                option.selected = true;
+                            }
                             select.appendChild(option);
                         });
-                        select.size = result.data.length;
                     } else {
-                        showMessage("error", "Erreur lors du chargement des dossiers");
+                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                     }
                 } catch (e) {
-                    showMessage("error", "Erreur lors du chargement des dossiers");
+                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                 }
 
-                indirSelectionDiv.appendChild(select);
+                container.appendChild(select);
 
                 // Champs cachés pour indir et outdir
                 const indirInput = document.createElement('input');
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
-                indirSelectionDiv.appendChild(indirInput);
+                indirInput.value = currentIndir || '';
+                container.appendChild(indirInput);
+
+                const outdirInput = document.createElement('input');
+                outdirInput.type = 'hidden';
+                outdirInput.id = 'outdir';
+                outdirInput.value = currentOutdir || '';
+                container.appendChild(outdirInput);
 
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
                     indirInput.value = this.value;
-                    // outdir pourra être déterminé plus tard selon la logique métier
                 });
 
-            } else if (indirType === 'OntDir') {
+            } else if (indirType === 'ONT_DIR') {
                 // Pour ONT_DIR, choix parmi les dossiers dans /data/raw/sequenceur/GRIDION
-                indirSelectionSectionDiv.style.display = "block";
-                indirSelectionDiv.innerHTML = '<label for="ont_indir">Veuillez choisir un dossier de run ONT:</label>';
+                container.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
                 const select = document.createElement('select');
                 select.id = 'ont_indir';
                 select.required = true;
@@ -241,31 +287,38 @@
                             const option = document.createElement('option');
                             option.value = dir.path;
                             option.textContent = dir.name;
+                            if (currentIndir === dir.path) {
+                                option.selected = true;
+                            }
                             select.appendChild(option);
                         });
                         select.size = result.data.length;
                     } else {
-                        showMessage("error", "Erreur lors du chargement des dossiers");
+                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                     }
                 } catch (e) {
-                    showMessage("error", "Erreur lors du chargement des dossiers");
+                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                 }
 
-                indirSelectionDiv.appendChild(select);
+                container.appendChild(select);
 
                 // Champs cachés pour indir et outdir
                 const indirInput = document.createElement('input');
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
-                indirSelectionDiv.appendChild(indirInput);
+                indirInput.value = currentIndir || '';
+                container.appendChild(indirInput);
+
+                const outdirInput = document.createElement('input');
+                outdirInput.type = 'hidden';
+                outdirInput.id = 'outdir';
+                outdirInput.value = currentOutdir || '';
+                container.appendChild(outdirInput);
+
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
                     indirInput.value = this.value;
                 });
-            }
-            else {
-                // Par défaut, on montre la section BCL
-                document.getElementById('bcl-dir-def-section').style.display = "block";
             }
         }
 
@@ -381,8 +434,7 @@
             }
         });
 
-        async function submitForm() {
-
+        async function handleSubmit() {
             // Collect user_defined_vars
             const userDefinedVars = {};
             const udvElements = document.querySelectorAll('[id^="udv_"]');
@@ -394,43 +446,51 @@
             });
 
             const formData = {
-                form_id: parseInt(document.getElementById('form_id').value),
-                user_id: parseInt(document.getElementById('user_id').value),
-                run_name: document.getElementById('run_name').value,
+                {% if run %}
+            run_id: parseInt(document.getElementById('run_id').value),
                 run_date: document.getElementById('run_date').value,
-                run_sequencer: document.getElementById('run_sequencer').value,
-                run_flowcellid: document.getElementById('run_flowcellid').value,
-                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
-                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
+                    run_sequencer: document.getElementById('run_sequencer').value,
+                        run_flowcellid: document.getElementById('run_flowcellid').value,
+                            {% else %}
+        form_id: parseInt(document.getElementById('form_id').value),
+            user_id: parseInt(document.getElementById('user_id').value),
+                run_name: document.getElementById('run_name').value,
+                    {% endif %}
+
+        sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
+            sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
-                user_defined_vars: userDefinedVars,
-                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
-                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
+
+                    user_defined_vars: userDefinedVars,
+                        indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
+                            outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
             };
 
-            try {
-                const response = await fetch('/mercure/api/newrun', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-                const data = await response.json();
-                if (data.success) {
-                    window.location = `/mercure/api/redirect?target_url=/mercure/show/run/${data.data.run_id}` +
-                        "&title=" + encodeURIComponent("Succès") +
-                        "&message=" + encodeURIComponent(data.data.message) +
-                        "&seconds=5";
-                } else {
-                    showMessage("error", data.message);
-                }
+        try {
+            const endpoint = {% if run %}'/mercure/api/editrun/'{% else %} '/mercure/api/newrun'{% endif %};
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        const data = await response.json();
+        if (response.status !== 200) {
+            throw new Error(data.message || 'Erreur lors de la sauvegarde du run.');
+        }
+        if (data.success) {
+            window.location = "/mercure/api/redirect?target_url={% if run %}/mercure/show/run/{{ run_id }}{% else %}/mercure/show/run/" + data.data.run_id{% endif %} +
+                "&title=" + encodeURIComponent("Succès") +
+                "&message=" + encodeURIComponent(data.data.message) +
+                "&seconds=5";
+        } else {
+            showMessage("error", data.message);
+        }
             } catch (error) {
-                showMessage("error", `Erreur: ${error.message}`);
-            }
-        };
-
-
+            showMessage("error", error);
+        }
+        }
     </script>
 </body>
 

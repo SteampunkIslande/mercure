@@ -27,6 +27,7 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
                 pipelines_struct,
                 groups,
                 formid,
+                edit_mode: true,
                 title: "Editer un formulaire de pipeline"
             },
         )

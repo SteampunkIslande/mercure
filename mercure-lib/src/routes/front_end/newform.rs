@@ -53,11 +53,11 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
         let pipelines_struct = list_folders_with_launchers(config.pipeline_dir);
 
         Template::render(
-            "admin/newform",
+            "admin/editform",
             context! {
                 pipelines_struct,
                 groups,
-                formid: None::<i64>,
+                edit_mode: false,
                 title: "Nouveau formulaire de pipeline"
             },
         )

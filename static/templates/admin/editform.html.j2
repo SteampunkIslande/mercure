@@ -15,7 +15,9 @@
     <script>
 
         var userVarCounter = 0;
+        {%if edit_mode %}
         var originalUserVars = {};
+        {% endif %}
 
         async function updateUserVars() {
             const pipelineName = document.getElementById("pipeline_name").value;
@@ -47,6 +49,8 @@
                     addUserVar();
                     document.getElementById(`var_name_${index}`).value = varName;
 
+                    {% if edit_mode %}
+                    // Pré-remplir les valeurs si elles existent dans les UDV originales
                     let original = originalUserVars[varName];
                     if (original && typeof original === 'object') {
                         if (original.Constant) {
@@ -61,6 +65,7 @@
                             document.getElementById(`var_type_${index}`).value = "RunDefined";
                         }
                     }
+                    {% endif %}
                     // Toujours afficher la description si présente
                     if (varDetails.description) {
                         const descText = document.getElementById(`var_description_text_${index}`);
@@ -112,7 +117,9 @@
         document.addEventListener("DOMContentLoaded", async function () {
             await init();
             await load_groups();
+            {% if edit_mode %}
             await fetchFormDefinition();
+            {% endif %}
         });
 
         async function init() {
@@ -120,7 +127,7 @@
             userVarsContainer.innerHTML = "";
             userVarCounter = 0;
         }
-
+        {% if edit_mode %}
         async function fetchFormDefinition() {
             const formId = "{{ formid }}";
             const endpoint = `/mercure/api/forms/${formId}`;
@@ -182,8 +189,7 @@
                 showMessage("error", `Erreur lors de la récupération du formulaire : ${error.message}`, true);
             }
         }
-
-
+        {% endif %}
 
         async function getNextVersion(formName) {
             try {
@@ -207,6 +213,8 @@
             const pipelineName = document.getElementById("pipeline_name").value;
             const launcherName = document.getElementById("launcher_name").value;
             const formName = document.getElementById("form_name").value;
+
+            const indirType = document.getElementById("indir_type").value;
 
             const selectedGroups = Array.from(
                 document.querySelectorAll('input[name="selected_groups"]:checked')
@@ -289,7 +297,8 @@
                 groups: selectedGroups,
                 user_defined_vars: userVars,
                 enabled: true,
-                version: parseInt(version) || 1
+                version: parseInt(version) || 1,
+                indir_type: indirType,
             };
 
             try {
@@ -307,7 +316,7 @@
                 if (!data.success) {
                     throw new Error(data.message);
                 }
-                const message = data.data || "Nouvelle version du formulaire créée avec succès";
+                const message = data.data;
                 window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
                     "&title=" + encodeURIComponent("Succès") +
                     "&message=" + encodeURIComponent(message) +
@@ -349,18 +358,32 @@
                 <!-- Options will be populated by JS -->
             </select>
         </div>
+        {% if edit_mode %}
         <div>
             <label>Nom du formulaire :</label>
             <strong id="form_name_display"></strong>
             <input type="hidden" id="form_name" name="form_name">
         </div>
-
+        {% else %}
+        <div>
+            <label for="form_name">Nom du formulaire :</label>
+            <input type="text" id="form_name" name="form_name" onchange="getNextVersion(this.value)" required>
+        </div>
+        {% endif %}
         <div>
             <label>Version :</label>
             <strong id="version_display"></strong>
             <input type="hidden" id="version" name="version">
         </div>
-
+        <div>
+            <label for="indir_type">IndirType :</label>
+            <select id="indir_type" name="indir_type" required>
+                <option value="">-- Sélectionnez un type --</option>
+                <option value="BclDir">Dossier de run Illumina</option>
+                <option value="AnalysisDir">Dossier d'analyse</option>
+                <option value="OntDir">Dossier Gridion</option>
+            </select>
+        </div>
         <fieldset>
             <legend>Groupes</legend>
             <div id="groups-container">
@@ -379,11 +402,19 @@
         </div>
     </form>
 
+    {% if edit_mode %}
     <!-- Centered submit button at the bottom of the page -->
     <div style="text-align: left; margin-top: 20px;">
         <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
-        <a onclick="submitForm()" class="btn btn-primary">Créer une nouvelle version</a>
+        <a class="btn btn-primary" onclick="submitForm()">Créer une nouvelle version</a>
     </div>
+    {% else %}
+    <!-- Centered submit button at the bottom of the page -->
+    <div style="text-align: left; margin-top: 20px;">
+        <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
+        <a class="btn btn-primary" onclick="submitForm()">Créer un formulaire</a>
+    </div>
+    {% endif %}
 
     <script>
         // Show/hide launcher container based on pipeline selection

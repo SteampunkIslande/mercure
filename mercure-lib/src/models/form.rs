@@ -34,11 +34,27 @@ pub enum UserDefinedVar {
     Invalid,
 }
 
+/// Struct used when submitting a new form definition
+/// Only used when sending data from the browser to the server
+/// See editform.html.jinja2 for more info
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct HgFormDefSubmission {
+    pub pipeline_name: String,
+    pub launcher_name: String,
+    pub form_name: String,
+    pub enabled: bool,
+    pub version: i32,
+    pub groups: Vec<Group>,
+    pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
+    pub indir_type: IndirType,
+}
+
 /// Struct used to define a form template
 /// Only read from JSON, defined within the browser
-/// See newform.html.jinja2 for more info
+/// See editform.html.jinja2 for more info
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct HgFormDef {
+    pub form_id: i64,
     pub pipeline_name: String,
     pub launcher_name: String,
     pub form_name: String,
@@ -65,7 +81,10 @@ pub struct HgFormDef {
 impl HgFormDef {
     /// Add new form definition to the database
     /// Each form will be used as a template for actual runs
-    pub async fn new_form_def(new_formdef: HgFormDef, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub async fn new_form_def(
+        new_formdef: HgFormDefSubmission,
+        pool: &SqlitePool,
+    ) -> Result<(), ModelError> {
         // Insert into Formdef table
 
         if new_formdef.version <= 0 {
@@ -327,6 +346,7 @@ impl HgFormDef {
         let mut def = HgFormDef::default();
         let form_id: i64 = row.try_get("form_id")?;
 
+        def.form_id = form_id;
         def.pipeline_name = row.try_get("pipeline_name")?;
         def.launcher_name = row.try_get("launcher_name")?;
         def.form_name = row.try_get("form_name")?;
@@ -416,6 +436,7 @@ mod tests {
             groups: vec![],
             user_defined_vars: Some(user_defined_vars),
             indir_type: IndirType::BclDir,
+            form_id: 0,
         };
 
         let json = serde_json::to_string_pretty(&form_def).unwrap();

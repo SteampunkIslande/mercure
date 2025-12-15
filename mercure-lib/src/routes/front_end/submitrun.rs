@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::models::HgFormDef;
+use crate::models::{HgFormDef, HgRun};
 use std::fs::read_dir;
 
 #[get("/runs/submit/<form_id>")]
@@ -63,8 +63,9 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
     Template::render(
         "common/newrun",
         context! {
-            form_id,
+            run: None::<HgRun>,
             user: auth.user,
+            form_id,
             sequenceurs_list,
             user_defined_vars_json,
             indir_type: form_def.indir_type

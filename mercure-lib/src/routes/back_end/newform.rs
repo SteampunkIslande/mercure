@@ -11,7 +11,7 @@ use sqlx::SqlitePool;
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
-use crate::models::HgFormDef;
+use crate::models::{HgFormDef, HgFormDefSubmission};
 
 #[get("/nextversion?<formname>")]
 pub async fn get_nextversion(
@@ -118,7 +118,7 @@ pub async fn enable_form(
 pub async fn newform_post(
     auth: Authenticated,
     pool: &State<SqlitePool>,
-    form: Json<HgFormDef>,
+    form: Json<HgFormDefSubmission>,
 ) -> Json<ApiResponse<String>> {
     if !auth.user.is_admin {
         return Json(ApiResponse::error(
