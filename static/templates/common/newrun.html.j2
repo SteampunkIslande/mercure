@@ -31,8 +31,6 @@
     <h2>Déclarer un nouveau run</h2>
 
     <form id="newrun-form" class="form-vertical" style="margin: 1em auto;">
-        <style>
-        </style>
 
         <input type="hidden" id="form_id" value="{{ form_id }}">
         <input type="hidden" id="user_id" value="{{ user.id }}">
@@ -41,24 +39,25 @@
             <label for="run_name">Nom du run:</label>
             <input type="text" id="run_name" required>
         </div>
+        <div id="bcl-dir-def-section" style="display:none;">
+            <h3>Informations sur le run</h3>
+            <div>
+                <label for="run_date">Date du run:</label>
+                <input type="date" id="run_date" required>
+            </div>
 
-        <div>
-            <label for="run_date">Date du run:</label>
-            <input type="date" id="run_date" required>
-        </div>
-
-        <div>
-            <label for="run_sequencer">Séquenceur:</label>
-            <select id="run_sequencer" required>
-                {% for seq in sequenceurs_list %}
-                <option value="{{ seq }}">{{ seq }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div>
-            <label for="run_flowcellid">Flowcell ID:</label>
-            <input type="text" id="run_flowcellid" required>
+            <div>
+                <label for="run_sequencer">Séquenceur:</label>
+                <select id="run_sequencer" required>
+                    {% for seq in sequenceurs_list %}
+                    <option value="{{ seq }}">{{ seq }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="run_flowcellid">Flowcell ID:</label>
+                <input type="text" id="run_flowcellid" required>
+            </div>
         </div>
 
         <!-- Section dynamique pour la sélection du dossier d'entrée selon indir_type -->
@@ -66,6 +65,8 @@
             <h3>Dossier d'entrée</h3>
             <div id="indir-selection-content"></div>
         </div>
+
+        <h3>Fichiers de samplesheet et metadata</h3>
 
         <div class="tab">
             <button class="tablinks active" onclick="openTab(event,`adn`)">ADN</button>
@@ -93,6 +94,7 @@
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path">
+            <div id="spacer" style="overflow:auto;height:400px"></div>
         </div>
 
         <h3>Variables définies par l'utilisateur</h3>
@@ -179,27 +181,20 @@
 
         async function init_indir_selection() {
             const indirSelectionDiv = document.getElementById('indir-selection-content');
-            const indirSelectionSectionDiv = document.getElementById('indir-selection-content')
-
-            console.log(indirType);
-
+            const indirSelectionSectionDiv = document.getElementById('indir-selection-section');
 
             if (indirType === 'AnalysisDir') {
                 // Pour ANALYSIS_DIR, choix parmi les dossiers dans /data/analysis
                 indirSelectionSectionDiv.style.display = "block";
-                indirSelectionDiv.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
+                indirSelectionDiv.innerHTML = '<label for="analysis_indir">Veuillez choisir un dossier d\'analyse:</label>';
                 const select = document.createElement('select');
                 select.id = 'analysis_indir';
                 select.required = true;
 
                 try {
-                    const response = await fetch('/mercure/api/directories/analysis');
+                    const response = await fetch('/mercure/api/directories/list?dirtype=analysis');
                     const result = await response.json();
                     if (result.success) {
-                        const defaultOption = document.createElement('option');
-                        defaultOption.value = '';
-                        defaultOption.textContent = 'Sélectionner un dossier...';
-                        select.appendChild(defaultOption);
 
                         result.data.forEach(dir => {
                             const option = document.createElement('option');
@@ -207,11 +202,12 @@
                             option.textContent = dir.name;
                             select.appendChild(option);
                         });
+                        select.size = result.data.length;
                     } else {
-                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                        showMessage("error", "Erreur lors du chargement des dossiers");
                     }
                 } catch (e) {
-                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                    showMessage("error", "Erreur lors du chargement des dossiers");
                 }
 
                 indirSelectionDiv.appendChild(select);
@@ -221,11 +217,6 @@
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
                 indirSelectionDiv.appendChild(indirInput);
-
-                const outdirInput = document.createElement('input');
-                outdirInput.type = 'hidden';
-                outdirInput.id = 'outdir';
-                indirSelectionDiv.appendChild(outdirInput);
 
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
@@ -236,19 +227,15 @@
             } else if (indirType === 'OntDir') {
                 // Pour ONT_DIR, choix parmi les dossiers dans /data/raw/sequenceur/GRIDION
                 indirSelectionSectionDiv.style.display = "block";
-                indirSelectionDiv.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
+                indirSelectionDiv.innerHTML = '<label for="ont_indir">Veuillez choisir un dossier de run ONT:</label>';
                 const select = document.createElement('select');
                 select.id = 'ont_indir';
                 select.required = true;
 
                 try {
-                    const response = await fetch('/mercure/api/directories/ont');
+                    const response = await fetch('/mercure/api/directories/list?dirtype=ont');
                     const result = await response.json();
                     if (result.success) {
-                        const defaultOption = document.createElement('option');
-                        defaultOption.value = '';
-                        defaultOption.textContent = 'Sélectionner un dossier...';
-                        select.appendChild(defaultOption);
 
                         result.data.forEach(dir => {
                             const option = document.createElement('option');
@@ -256,11 +243,12 @@
                             option.textContent = dir.name;
                             select.appendChild(option);
                         });
+                        select.size = result.data.length;
                     } else {
-                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                        showMessage("error", "Erreur lors du chargement des dossiers");
                     }
                 } catch (e) {
-                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
+                    showMessage("error", "Erreur lors du chargement des dossiers");
                 }
 
                 indirSelectionDiv.appendChild(select);
@@ -270,17 +258,14 @@
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
                 indirSelectionDiv.appendChild(indirInput);
-
-                const outdirInput = document.createElement('input');
-                outdirInput.type = 'hidden';
-                outdirInput.id = 'outdir';
-                indirSelectionDiv.appendChild(outdirInput);
-
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
                     indirInput.value = this.value;
-                    // outdir pourra être déterminé plus tard selon la logique métier
                 });
+            }
+            else {
+                // Par défaut, on montre la section BCL
+                document.getElementById('bcl-dir-def-section').style.display = "block";
             }
         }
 

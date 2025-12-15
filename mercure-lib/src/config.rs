@@ -12,6 +12,7 @@ pub struct MercureConfig {
     pub pipeline_dir: String,
     pub jobs_dir: String,
     pub logs_dir: String,
+    pub ont_dir: String,
 }
 
 impl Default for MercureConfig {
@@ -25,6 +26,7 @@ impl Default for MercureConfig {
             pipeline_dir: "/home/charles/mercure/pipelines".into(),
             jobs_dir: "/home/charles/mercure/JOBS".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),
+            ont_dir: "/home/charles/mercure/ont".into(),
         }
     }
 }

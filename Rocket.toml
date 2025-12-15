@@ -24,6 +24,7 @@ jobs_dir = "/home/charles/mercure-arena/OPT/JOBS"
 
 sequencers_dir = "/home/charles/mercure-arena/data/raw/sequenceurs"
 analysis_dir = "/home/charles/mercure-arena/data/analysis"
+ont_dir = "/home/charles/mercure-arena/data/raw/sequenceurs/GRIDION/output"
 
 cli_colors = true
 
@@ -41,3 +42,4 @@ jobs_dir = "/OPT/JOBS"
 
 sequencers_dir = "/data/raw/sequenceurs"
 analysis_dir = "/data/analysis"
+ont_dir = "/data/raw/sequenceurs/GRIDION/output"

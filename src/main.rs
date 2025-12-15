@@ -111,10 +111,7 @@ async fn rocket() -> _ {
                 // Route pour traduire les noms des séquenceurs
                 routes::backend::prettify_seqname,
                 // Routes pour lister les dossiers selon le type
-                routes::backend::list_analysis_directories,
-                routes::backend::list_analysis_directories_custom,
-                routes::backend::list_ont_directories,
-                routes::backend::validate_directory_path,
+                routes::backend::list_directories_by_type,
                 // Route pour toutes les redirections
                 routes::backend::redirect_post,
             ],

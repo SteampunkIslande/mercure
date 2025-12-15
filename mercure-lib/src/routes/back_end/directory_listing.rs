@@ -5,72 +5,30 @@ use sqlx::SqlitePool;
 
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
-use crate::models::DirectoryUtils;
+use crate::models::directory_utils::list_directory;
 
 /// Route: /mercure/api/directories/analysis
 /// Liste les dossiers d'analyse disponibles
-#[get("/directories/analysis")]
-pub async fn list_analysis_directories(
+#[get("/directories/list?<dirtype>")]
+pub async fn list_directories_by_type(
     _auth: Authenticated,
     _pool: &State<SqlitePool>,
+    dirtype: Option<&str>,
 ) -> Json<ApiResponse<Value>> {
-    match DirectoryUtils::list_analysis_directories(None) {
+    let config = crate::config::get_mercure_config();
+    let base_path = match dirtype {
+        Some("analysis") => &config.analysis_dir,
+        Some("ont") => &config.ont_dir,
+        _ => {
+            return Json(ApiResponse::error(
+                "Type de dossier invalide. Utilisez 'analysis' ou 'ont'.".to_string(),
+            ));
+        }
+    };
+    match list_directory(base_path) {
         Ok(directories) => Json(ApiResponse::success(json!(directories))),
         Err(e) => Json(ApiResponse::error(format!(
             "Erreur lors de la lecture des dossiers d'analyse: {}",
-            e
-        ))),
-    }
-}
-
-/// Route: /mercure/api/directories/analysis/custom?<base_path>
-/// Liste les dossiers d'analyse dans un chemin personnalisé
-#[get("/directories/analysis/custom?<base_path>")]
-pub async fn list_analysis_directories_custom(
-    _auth: Authenticated,
-    _pool: &State<SqlitePool>,
-    base_path: Option<String>,
-) -> Json<ApiResponse<Value>> {
-    let path = base_path.as_deref();
-    match DirectoryUtils::list_analysis_directories(path) {
-        Ok(directories) => Json(ApiResponse::success(json!(directories))),
-        Err(e) => Json(ApiResponse::error(format!(
-            "Erreur lors de la lecture des dossiers d'analyse: {}",
-            e
-        ))),
-    }
-}
-
-/// Route: /mercure/api/directories/ont
-/// Liste les dossiers ONT disponibles
-#[get("/directories/ont")]
-pub async fn list_ont_directories(
-    _auth: Authenticated,
-    _pool: &State<SqlitePool>,
-) -> Json<ApiResponse<Value>> {
-    match DirectoryUtils::list_ont_directories() {
-        Ok(directories) => Json(ApiResponse::success(json!(directories))),
-        Err(e) => Json(ApiResponse::error(format!(
-            "Erreur lors de la lecture des dossiers ONT: {}",
-            e
-        ))),
-    }
-}
-
-/// Route: /mercure/api/directories/validate?<path>
-/// Valide qu'un chemin de dossier existe et est accessible
-#[get("/directories/validate?<path>")]
-pub async fn validate_directory_path(
-    _auth: Authenticated,
-    _pool: &State<SqlitePool>,
-    path: String,
-) -> Json<ApiResponse<Value>> {
-    match DirectoryUtils::validate_directory_path(&path) {
-        Ok(is_valid) => Json(ApiResponse::success(
-            json!({"valid": is_valid, "path": path}),
-        )),
-        Err(e) => Json(ApiResponse::error(format!(
-            "Erreur lors de la validation du chemin: {}",
             e
         ))),
     }
