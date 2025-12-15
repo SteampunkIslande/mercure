@@ -80,8 +80,6 @@ pub async fn watch_log(
             last_progress = Some(percent);
             if part == total {
                 // pipeline terminé: réinitialiser
-                last_step = None;
-                last_progress = None;
                 last_slurm_id = None;
             }
         }
