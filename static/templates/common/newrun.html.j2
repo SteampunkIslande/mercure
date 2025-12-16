@@ -312,14 +312,16 @@
         }
 
         async function init_indir_selection(indirTypeConst) {
+            {% if run %}
+            document.getElementById('run_name').textContent = "{{ run.run_name }}";
+            document.getElementById('run_date').value = "{{ run.run_date }}";
+            document.getElementById('run_sequencer').value = "{{ run.run_sequencer }}";
+            {% endif %}
             // BclDir case
             if (indirTypeConst === 'BclDir') {
                 const bclDirDefSection = document.getElementById('bcl-dir-def-section');
                 bclDirDefSection.style.display = 'block';
                 {% if run %}
-                document.getElementById('run_name').textContent = "{{ run.run_name }}";
-                document.getElementById('run_date').value = "{{ run.run_date }}";
-                document.getElementById('run_sequencer').value = "{{ run.run_sequencer }}";
                 document.getElementById('run_flowcellid').value = "{{ run.run_flowcellid }}";
                 {% endif %}
             } else if (indirTypeConst === 'AnalysisDir') {
@@ -533,6 +535,7 @@
                     new_url += "&title=" + encodeURIComponent("Succès") +
                         "&message=" + encodeURIComponent(data.data.message) +
                         "&seconds=5";
+                    window.location.href = new_url;
                 } else {
                     showMessage("error", data.message);
                 }
