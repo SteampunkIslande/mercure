@@ -133,7 +133,6 @@
         {% if run %}
         const indirType = "{{ indir_type | safe }}";
         const currentIndir = {{ run.indir | tojson }};
-        const currentOutdir = {{ run.outdir | tojson }};
         {% else %}
         const indirType = "{{ indir_type | safe }}";
         {% endif %}
@@ -274,21 +273,45 @@
                 select.style.height = '400px';
                 select.style.overflowY = 'scroll';
 
+                // Champ caché pour indir
+                const indirInput = document.createElement('input');
+                indirInput.type = 'hidden';
+                indirInput.id = 'indir';
+                {% if run %}
+                indirInput.value = currentIndir || '';
+                {% endif %}
+                indirSelectionSection.appendChild(indirInput);
+
+                // Mettre à jour indir quand l'utilisateur sélectionne
+                select.addEventListener('change', function () {
+                    indirInput.value = this.value;
+                });
+
                 try {
                     const response = await fetch('/mercure/api/directories/list?dirtype=analysis');
                     const result = await response.json();
-                    if (result.success) {
-                        result.data.forEach(dir => {
+                    if (result.success && result.data.length > 0) {
+                        result.data.forEach((dir, index) => {
                             const option = document.createElement('option');
                             option.value = dir.path;
                             option.textContent = dir.name;
+                            {% if run %}
                             if (currentIndir === dir.path) {
                                 option.selected = true;
                             }
+                            {% else %}
+                            if (index === 0) {
+                                option.selected = true;
+                            }
+                            {% endif %}
                             select.appendChild(option);
                         });
                         select.size = result.data.length;
-                    } else {
+                    }
+                    else if (result.success && result.data.length === 0) {
+                        select.innerHTML = '<option value="">Aucun dossier d\'analyse disponible</option>';
+                    }
+                    else {
                         select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                     }
                 } catch (e) {
@@ -297,63 +320,6 @@
 
                 indirSelectionSection.appendChild(select);
 
-                // Champs cachés pour indir et outdir
-                const indirInput = document.createElement('input');
-                indirInput.type = 'hidden';
-                indirInput.id = 'indir';
-                indirInput.value = currentIndir || '';
-                indirSelectionSection.appendChild(indirInput);
-
-                // Mettre à jour indir quand l'utilisateur sélectionne
-                select.addEventListener('change', function () {
-                    indirInput.value = this.value;
-                });
-
-            } else if (indirType === 'OntDir') {
-                // Pour ONT_DIR, choix parmi les dossiers dans /data/raw/sequenceur/GRIDION
-                indirSelectionSection.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
-                indirSelectionSection.style.display = 'block';
-                const select = document.createElement('select');
-                select.id = 'ont_indir';
-                select.required = true;
-                select.style.height = '400px';
-                select.style.overflowY = 'scroll';
-
-                try {
-                    const response = await fetch('/mercure/api/directories/list?dirtype=ont');
-                    const result = await response.json();
-                    if (result.success) {
-
-                        result.data.forEach(dir => {
-                            const option = document.createElement('option');
-                            option.value = dir.path;
-                            option.textContent = dir.name;
-                            if (currentIndir === dir.path) {
-                                option.selected = true;
-                            }
-                            select.appendChild(option);
-                        });
-                        select.size = result.data.length;
-                    } else {
-                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
-                    }
-                } catch (e) {
-                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
-                }
-
-                indirSelectionSection.appendChild(select);
-
-                // Champs cachés pour indir
-                const indirInput = document.createElement('input');
-                indirInput.type = 'hidden';
-                indirInput.id = 'indir';
-                indirInput.value = currentIndir || '';
-                indirSelectionSection.appendChild(indirInput);
-
-                // Mettre à jour indir quand l'utilisateur sélectionne
-                select.addEventListener('change', function () {
-                    indirInput.value = this.value;
-                });
             }
         }
 
