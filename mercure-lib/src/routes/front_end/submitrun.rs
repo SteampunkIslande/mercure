@@ -66,6 +66,7 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             run: None::<HgRun>,
             user: auth.user,
             form_id,
+            run_id: None::<i64>,
             sequenceurs_list,
             user_defined_vars_json,
             indir_type: form_def.indir_type
