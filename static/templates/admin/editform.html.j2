@@ -216,6 +216,11 @@
 
             const indirType = document.getElementById("indir_type").value;
 
+            if (indirType.length === 0) {
+                window.alert("Veuillez sélectionner un type de dossier d'entrée.");
+                return;
+            }
+
             const selectedGroups = Array.from(
                 document.querySelectorAll('input[name="selected_groups"]:checked')
             ).map((input) => {
@@ -310,7 +315,7 @@
                     body: JSON.stringify(formData),
                 });
                 if (!response.ok) {
-                    throw new Error("Erreur lors de la création de la nouvelle version du formulaire.");
+                    throw new Error(`Erreur: ${response.statusText}`);
                 }
                 const data = await response.json();
                 if (!data.success) {
