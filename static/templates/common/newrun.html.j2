@@ -50,31 +50,58 @@
             <input type="text" id="run_name" required>
             {% endif %}
         </div>
-        <div id="bcl-dir-def-section" style="display:none;">
-            <h3>Informations sur le run</h3>
-            <div>
-                <label for="run_date">Date du run:</label>
-                <input type="date" id="run_date" required>
-            </div>
 
-            <div>
-                <label for="run_sequencer">Séquenceur:</label>
-                <select id="run_sequencer" required>
-                    {% for seq in sequenceurs_list %}
-                    <option value="{{ seq }}">{{ seq }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        <!-- Section statique pour les informations du run -->
+        <h3>Informations sur le run</h3>
+        <div>
+            <label for="run_date">Date du run:</label>
+            <input type="date" id="run_date" required>
+        </div>
+        <div>
+            <label for="run_sequencer">Séquenceur:</label>
+            <select id="run_sequencer" required>
+                {% for seq in sequenceurs_list %}
+                <option value="{{ seq }}">{{ seq }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Section statique pour la définition du BclDir -->
+        <div id="bcl-dir-def-section" style="display:none;">
             <div>
                 <label for="run_flowcellid">Flowcell ID:</label>
                 <input type="text" id="run_flowcellid" required>
             </div>
         </div>
 
-        <!-- Section dynamique pour la sélection du dossier d'entrée selon indir_type -->
-        <div id="indir-selection-section" style="display:none;">
-            <h3>Dossier d'entrée</h3>
-            <div id="indir-selection-content"></div>
+        <!-- Hidden input for indir -->
+        {% if run %}
+        <input type="hidden" id="indir" value="{{ run.indir }}">
+        {% else %}
+        <input type="hidden" id="indir" value="">
+        {% endif %}
+
+        <!-- Section statique pour le choix du dossier d'analyse -->
+        <div id="analysis-dir-section" style="display:none;">
+            <h3>Dossier d'analyse</h3>
+            <div>
+                <label for="analysis_indir">Choisir un dossier d'analyse:</label>
+                <select id="analysis_indir" required style="height:400px; overflow-y:scroll;"></select>
+                <span id="no-analysis-dir" style="display: none;"><em>Aucun dossier d'analyse
+                        trouvé</em></span>
+            </div>
+        </div>
+
+        <!-- Section statique pour le choix du dossier OntDir -->
+        <div id="ont-dir-section" style="display:none;">
+            <h3>Dossier de run nanopore</h3>
+            <div>
+                <label for="ont_indir">Choisir un dossier de run nanopore:</label>
+                <select id="ont_indir" required style="height:400px; overflow-y:scroll;"></select>
+                <span id="no-ont-dir" style="display: none;"><em>Aucun dossier de run
+                        nanopore
+                        trouvé</em></span>
+            </div>
         </div>
 
         <h3>Fichiers de samplesheet et metadata</h3>
@@ -124,8 +151,6 @@
         </div>
     </form>
 
-    <div id="message"></div>
-
     <script>
         // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
@@ -141,7 +166,7 @@
         document.addEventListener('DOMContentLoaded', async function () {
 
             await init_udv_fields();
-            await init_indir_selection();
+            await init_indir_selection(indirType);
             await init_samplesheet_checks();
 
             const select = document.getElementById('run_sequencer');
@@ -194,6 +219,7 @@
 
             // Generate user-defined fields
             const container = document.getElementById('user-defined-vars');
+
             for (const [key, value] of Object.entries(userDefinedVars).sort()) {
                 if (typeof value === 'object' && value.Constant) {
                     const hidden = document.createElement('input');
@@ -247,79 +273,79 @@
         {% endif %}
         }
 
-        async function init_indir_selection() {
-            const indirSelectionSection = document.getElementById('indir-selection-section');
+        // Generic function to populate directory select
+        async function populateDirSelect(select, error_div, dirtype) {
+            try {
+                const response = await fetch(`/mercure/api/directories/list?dirtype=${dirtype}`);
+                const result = await response.json();
+                const indirInput = document.getElementById('indir');
+                if (result.success && result.data.length > 0) {
+                    result.data.forEach((dir, index) => {
+                        const option = document.createElement('option');
+                        option.value = dir.path;
+                        option.textContent = dir.name;
+                        {% if run %}
+                        if (currentIndir === dir.path) {
+                            option.selected = true;
+                            indirInput.value = dir.path;
+                        }
+                        {% else %}
+                        if (index === 0) {
+                            option.selected = true;
+                            indirInput.value = dir.path;
+                        }
+                        {% endif %}
+                        select.appendChild(option);
+                    });
+                    select.size = result.data.length;
+                } else if (result.success && result.data.length === 0) {
+                    error_div.style.display = 'block';
+                    select.style.display = 'none';
+                } else {
+                    error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + result.message;
+                    select.style.display = 'none';
+                }
+            } catch (e) {
+                error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + e.message;
+                select.style.display = 'none';
+            }
+        }
 
-            if (indirType === 'BclDir') {
-                // Pour BclDir, on affiche bcl-dir-def-section
+        async function init_indir_selection(indirTypeConst) {
+            // BclDir case
+            if (indirTypeConst === 'BclDir') {
                 const bclDirDefSection = document.getElementById('bcl-dir-def-section');
                 bclDirDefSection.style.display = 'block';
-
-                // Mettre à jour les champs RunName, RunDate, Sequencer, FlowcellID si run existant
                 {% if run %}
                 document.getElementById('run_name').textContent = "{{ run.run_name }}";
                 document.getElementById('run_date').value = "{{ run.run_date }}";
                 document.getElementById('run_sequencer').value = "{{ run.run_sequencer }}";
                 document.getElementById('run_flowcellid').value = "{{ run.run_flowcellid }}";
                 {% endif %}
-
-            } else if (indirType === 'AnalysisDir') {
-                // Pour ANALYSIS_DIR, choix parmi les dossiers dans /data/analysis
-                indirSelectionSection.style.display = 'block';
-                indirSelectionSection.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
-                const select = document.createElement('select');
-                select.id = 'analysis_indir';
-                select.required = true;
-                select.style.height = '400px';
-                select.style.overflowY = 'scroll';
-
-                // Champ caché pour indir
-                const indirInput = document.createElement('input');
-                indirInput.type = 'hidden';
-                indirInput.id = 'indir';
+            } else if (indirTypeConst === 'AnalysisDir') {
+                const analysisSection = document.getElementById('analysis-dir-section');
+                analysisSection.style.display = 'block';
+                const select = document.getElementById('analysis_indir');
+                const indirInput = document.getElementById('indir');
                 {% if run %}
                 indirInput.value = currentIndir || '';
                 {% endif %}
-                indirSelectionSection.appendChild(indirInput);
-
-                // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
                     indirInput.value = this.value;
                 });
-
-                try {
-                    const response = await fetch('/mercure/api/directories/list?dirtype=analysis');
-                    const result = await response.json();
-                    if (result.success && result.data.length > 0) {
-                        result.data.forEach((dir, index) => {
-                            const option = document.createElement('option');
-                            option.value = dir.path;
-                            option.textContent = dir.name;
-                            {% if run %}
-                            if (currentIndir === dir.path) {
-                                option.selected = true;
-                            }
-                            {% else %}
-                            if (index === 0) {
-                                option.selected = true;
-                            }
-                            {% endif %}
-                            select.appendChild(option);
-                        });
-                        select.size = result.data.length;
-                    }
-                    else if (result.success && result.data.length === 0) {
-                        select.innerHTML = '<option value="">Aucun dossier d\'analyse disponible</option>';
-                    }
-                    else {
-                        select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
-                    }
-                } catch (e) {
-                    select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
-                }
-
-                indirSelectionSection.appendChild(select);
-
+                await populateDirSelect(select, document.getElementById('no-analysis-dir'), 'analysis');
+            } else if (indirTypeConst === 'OntDir') {
+                const ontSection = document.getElementById('ont-dir-section');
+                ontSection.style.display = 'block';
+                const select = document.getElementById('ont_indir');
+                const indirInput = document.getElementById('indir');
+                {% if run %}
+                indirInput.value = currentIndir || '';
+                {% endif %}
+                select.addEventListener('change', function () {
+                    indirInput.value = this.value;
+                });
+                await populateDirSelect(select, document.getElementById('no-ont-dir'), 'ont');
             }
         }
 
