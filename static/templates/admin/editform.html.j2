@@ -362,14 +362,14 @@
         {% if edit_mode %}
         <div style="width: 50%;">
             <label>Nom du formulaire :</label>
-            <strong id="form_name_display" style="float:right"></strong>
+            <strong id="form_name_display" style="float:right;width:50%"></strong>
             <input type="hidden" id="form_name" name="form_name">
         </div>
         {% else %}
         <div style="width: 50%;">
             <label for="form_name">Nom du formulaire :</label>
             <input type="text" id="form_name" name="form_name" onchange="getNextVersion(this.value)" required
-                style="float:right">
+                style="float:right;width:50%;">
         </div>
         {% endif %}
         <div style="width: 50%;">
