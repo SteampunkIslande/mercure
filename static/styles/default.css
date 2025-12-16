@@ -509,6 +509,7 @@ table td:hover a {
   border: 1px solid #ccc;
   border-radius: 4px;
 }
+
 /* Run Attempt List Styles */
 .run-attempt {
   margin-bottom: 8px;
@@ -544,6 +545,7 @@ table td:hover a {
   border-color: #bbdefb;
   color: #0d47a1;
 }
+
 .run-attempt.idle:hover {
   background-color: #bbdefb;
 }
@@ -553,6 +555,7 @@ table td:hover a {
   border-color: #ffe0b2;
   color: #e65100;
 }
+
 .run-attempt.pending:hover {
   background-color: #ffe0b2;
 }
@@ -562,6 +565,7 @@ table td:hover a {
   border-color: #e1bee7;
   color: #4a148c;
 }
+
 .run-attempt.running:hover {
   background-color: #e1bee7;
 }
@@ -571,6 +575,7 @@ table td:hover a {
   border-color: #c8e6c9;
   color: #1b5e20;
 }
+
 .run-attempt.success:hover {
   background-color: #c8e6c9;
 }
@@ -580,6 +585,14 @@ table td:hover a {
   border-color: #ffcdd2;
   color: #b71c1c;
 }
+
 .run-attempt.failure:hover {
   background-color: #ffcdd2;
+}
+
+fieldset {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }

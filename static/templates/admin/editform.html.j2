@@ -343,41 +343,43 @@
     <div id="error-message" style="display: none;" class="error-msg">
     </div>
     <form>
-        <div>
+        <div style="width: 50%;">
             <label for="pipeline_name">Pipeline :</label>
-            <select id="pipeline_name" name="pipeline_name" onchange="updateLauncherField()" required>
+            <select id="pipeline_name" name="pipeline_name" onchange="updateLauncherField()" required
+                style="float:right;width:50%;">
                 <option value="">-- Sélectionnez un pipeline --</option>
                 {% for key in pipelines_struct %}
                 <option value="{{ key }}">{{ key }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div id="launcher-container" style="display:none;">
+        <div id="launcher-container" style="display:none; width: 50%;">
             <label for="launcher_name">Launcher :</label>
-            <select id="launcher_name" name="launcher_name" required>
+            <select id="launcher_name" name="launcher_name" required style="float:right;width:50%;">
                 <!-- Options will be populated by JS -->
             </select>
         </div>
         {% if edit_mode %}
-        <div>
+        <div style="width: 50%;">
             <label>Nom du formulaire :</label>
-            <strong id="form_name_display"></strong>
+            <strong id="form_name_display" style="float:right"></strong>
             <input type="hidden" id="form_name" name="form_name">
         </div>
         {% else %}
-        <div>
+        <div style="width: 50%;">
             <label for="form_name">Nom du formulaire :</label>
-            <input type="text" id="form_name" name="form_name" onchange="getNextVersion(this.value)" required>
+            <input type="text" id="form_name" name="form_name" onchange="getNextVersion(this.value)" required
+                style="float:right">
         </div>
         {% endif %}
-        <div>
+        <div style="width: 50%;">
             <label>Version :</label>
-            <strong id="version_display"></strong>
+            <strong id="version_display" style="float:right"></strong>
             <input type="hidden" id="version" name="version">
         </div>
-        <div>
-            <label for="indir_type">IndirType :</label>
-            <select id="indir_type" name="indir_type" required>
+        <div style="width: 50%;">
+            <label for="indir_type">Type de dossier d'entrée:</label>
+            <select id="indir_type" name="indir_type" required style="float:right;width:50%;">
                 <option value="">-- Sélectionnez un type --</option>
                 <option value="BclDir">Dossier de run Illumina</option>
                 <option value="AnalysisDir">Dossier d'analyse</option>
