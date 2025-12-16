@@ -16,8 +16,9 @@
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">{% if run %}Editer un run - {{ user.username }}{% else %}Nouveau Run - {{
-                user.username }}{% endif %}</span>
+            <span class="banner-text">{% if run %}Editer un run<br><span class="banner-text"> {{ form.form_name
+                    }}</span>{% else %}Nouveau Run<br><span class="banner-text">{{
+                    form.form_name }}</span>{% endif %}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -87,7 +88,8 @@
         <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
-            <input type="hidden" id="sample_sheet_adn_path">
+            <input type="hidden" id="sample_sheet_adn_path" {% if run %}value="{{ run.sample_sheet_adn_path }}" {% endif
+                %}>
             <div id="sample_sheet_adn_check"></div>
             <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;height:400px"></div>
         </div>
@@ -95,7 +97,8 @@
         <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
-            <input type="hidden" id="sample_sheet_arn_path">
+            <input type="hidden" id="sample_sheet_arn_path" {% if run %}value="{{ run.sample_sheet_arn_path }}" {% endif
+                %}>
             <div id="sample_sheet_arn_check"></div>
             <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;height:400px"></div>
         </div>
@@ -103,7 +106,7 @@
         <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
-            <input type="hidden" id="metadata_path">
+            <input type="hidden" id="metadata_path" {% if run %}value="{{ run.metadata_path }}" {% endif %}>
             <div id="spacer" style="overflow:auto;height:400px"></div>
         </div>
 
@@ -128,7 +131,7 @@
         const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
 
         {% if run %}
-        const indirType = {{ run.form.indir_type | tojson }};
+        const indirType = "{{ indir_type | safe }}";
         const currentIndir = {{ run.indir | tojson }};
         const currentOutdir = {{ run.outdir | tojson }};
         {% else %}
@@ -140,6 +143,7 @@
 
             await init_udv_fields();
             await init_indir_selection();
+            await init_samplesheet_checks();
 
             const select = document.getElementById('run_sequencer');
             const options = select.querySelectorAll('option');
@@ -156,6 +160,36 @@
                 }
             }
         });
+
+        async function init_samplesheet_checks() {
+            try {
+
+                const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
+                const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
+                if (adnPath) {
+                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
+                    document.getElementById('sample_sheet_adn_path').value = file_name;
+                    document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_adn_list');
+                        container.innerHTML = "";
+                        createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
+                    }
+                }
+                if (arnPath) {
+                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
+                    document.getElementById('sample_sheet_arn_path').value = file_name;
+                    document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                    if (sample_names) {
+                        const container = document.getElementById('sample_sheet_arn_list');
+                        container.innerHTML = "";
+                        createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
+                    }
+                }
+            } catch (e) {
+                showMessage("error", e);
+            }
+        }
 
         async function init_udv_fields() {
 
@@ -215,26 +249,35 @@
         }
 
         async function init_indir_selection() {
-            const container = document.getElementById('indir-selection-content');
+            const indirSelectionSection = document.getElementById('indir-selection-section');
 
             if (indirType === 'BclDir') {
+                // Pour BclDir, on affiche bcl-dir-def-section
+                const bclDirDefSection = document.getElementById('bcl-dir-def-section');
+                bclDirDefSection.style.display = 'block';
 
-            } else if (indirType === 'ANALYSIS_DIR') {
+                // Mettre à jour les champs RunName, RunDate, Sequencer, FlowcellID si run existant
+                {% if run %}
+                document.getElementById('run_name').textContent = "{{ run.run_name }}";
+                document.getElementById('run_date').value = "{{ run.run_date }}";
+                document.getElementById('run_sequencer').value = "{{ run.run_sequencer }}";
+                document.getElementById('run_flowcellid').value = "{{ run.run_flowcellid }}";
+                {% endif %}
+
+            } else if (indirType === 'AnalysisDir') {
                 // Pour ANALYSIS_DIR, choix parmi les dossiers dans /data/analysis
-                container.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
+                indirSelectionSection.style.display = 'block';
+                indirSelectionSection.innerHTML = '<label for="analysis_indir">Choisir un dossier d\'analyse:</label>';
                 const select = document.createElement('select');
                 select.id = 'analysis_indir';
                 select.required = true;
+                select.style.height = '400px';
+                select.style.overflowY = 'scroll';
 
                 try {
                     const response = await fetch('/mercure/api/directories/list?dirtype=analysis');
                     const result = await response.json();
                     if (result.success) {
-                        const defaultOption = document.createElement('option');
-                        defaultOption.value = '';
-                        defaultOption.textContent = 'Sélectionner un dossier...';
-                        select.appendChild(defaultOption);
-
                         result.data.forEach(dir => {
                             const option = document.createElement('option');
                             option.value = dir.path;
@@ -244,6 +287,7 @@
                             }
                             select.appendChild(option);
                         });
+                        select.size = result.data.length;
                     } else {
                         select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                     }
@@ -251,32 +295,29 @@
                     select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                 }
 
-                container.appendChild(select);
+                indirSelectionSection.appendChild(select);
 
                 // Champs cachés pour indir et outdir
                 const indirInput = document.createElement('input');
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
                 indirInput.value = currentIndir || '';
-                container.appendChild(indirInput);
-
-                const outdirInput = document.createElement('input');
-                outdirInput.type = 'hidden';
-                outdirInput.id = 'outdir';
-                outdirInput.value = currentOutdir || '';
-                container.appendChild(outdirInput);
+                indirSelectionSection.appendChild(indirInput);
 
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
                     indirInput.value = this.value;
                 });
 
-            } else if (indirType === 'ONT_DIR') {
+            } else if (indirType === 'OntDir') {
                 // Pour ONT_DIR, choix parmi les dossiers dans /data/raw/sequenceur/GRIDION
-                container.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
+                indirSelectionSection.innerHTML = '<label for="ont_indir">Choisir un dossier ONT:</label>';
+                indirSelectionSection.style.display = 'block';
                 const select = document.createElement('select');
                 select.id = 'ont_indir';
                 select.required = true;
+                select.style.height = '400px';
+                select.style.overflowY = 'scroll';
 
                 try {
                     const response = await fetch('/mercure/api/directories/list?dirtype=ont');
@@ -300,20 +341,14 @@
                     select.innerHTML = '<option value="">Erreur lors du chargement des dossiers</option>';
                 }
 
-                container.appendChild(select);
+                indirSelectionSection.appendChild(select);
 
-                // Champs cachés pour indir et outdir
+                // Champs cachés pour indir
                 const indirInput = document.createElement('input');
                 indirInput.type = 'hidden';
                 indirInput.id = 'indir';
                 indirInput.value = currentIndir || '';
-                container.appendChild(indirInput);
-
-                const outdirInput = document.createElement('input');
-                outdirInput.type = 'hidden';
-                outdirInput.id = 'outdir';
-                outdirInput.value = currentOutdir || '';
-                container.appendChild(outdirInput);
+                indirSelectionSection.appendChild(indirInput);
 
                 // Mettre à jour indir quand l'utilisateur sélectionne
                 select.addEventListener('change', function () {
@@ -445,51 +480,73 @@
                 }
             });
 
+            {% if run %}
             const formData = {
-                {% if run %}
-            run_id: parseInt(document.getElementById('run_id').value),
+                run_id: parseInt(document.getElementById('run_id').value),
                 run_date: document.getElementById('run_date').value,
-                    run_sequencer: document.getElementById('run_sequencer').value,
-                        run_flowcellid: document.getElementById('run_flowcellid').value,
-                            {% else %}
-        form_id: parseInt(document.getElementById('form_id').value),
-            user_id: parseInt(document.getElementById('user_id').value),
-                run_name: document.getElementById('run_name').value,
-                    {% endif %}
+                run_sequencer: document.getElementById('run_sequencer').value,
+                run_flowcellid: document.getElementById('run_flowcellid').value,
 
-        sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
-            sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
+                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
+                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
 
-                    user_defined_vars: userDefinedVars,
-                        indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
-                            outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
+                user_defined_vars: userDefinedVars,
+                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
+                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
             };
+            {% else %}
 
-        try {
-            const endpoint = {% if run %}'/mercure/api/editrun/'{% else %} '/mercure/api/newrun'{% endif %};
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
-        const data = await response.json();
-        if (response.status !== 200) {
-            throw new Error(data.message || 'Erreur lors de la sauvegarde du run.');
-        }
-        if (data.success) {
-            window.location = "/mercure/api/redirect?target_url={% if run %}/mercure/show/run/{{ run_id }}{% else %}/mercure/show/run/" + data.data.run_id{% endif %} +
-                "&title=" + encodeURIComponent("Succès") +
-                "&message=" + encodeURIComponent(data.data.message) +
-                "&seconds=5";
-        } else {
-            showMessage("error", data.message);
-        }
+            const formData = {
+                form_id: parseInt(document.getElementById('form_id').value),
+                user_id: parseInt(document.getElementById('user_id').value),
+                run_name: document.getElementById('run_name').value,
+                run_date: document.getElementById('run_date').value,
+                run_sequencer: document.getElementById('run_sequencer').value,
+                run_flowcellid: document.getElementById('run_flowcellid').value,
+
+                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
+                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
+                metadata_path: document.getElementById('metadata_path').value,
+
+                user_defined_vars: userDefinedVars,
+                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
+                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
+            };
+            {% endif %}
+
+            try {
+                {% if run %}
+                const endpoint = `/mercure/api/editrun`;
+                {% else %}
+                const endpoint = '/mercure/api/newrun';
+                {% endif %}
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (response.status !== 200) {
+                    throw new Error(data.message || 'Erreur lors de la sauvegarde du run.');
+                }
+                if (data.success) {
+                    {% if run %}
+                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}";
+                    {% else %}
+                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + data.data.run_id;
+                    {% endif %}
+                    new_url += "&title=" + encodeURIComponent("Succès") +
+                        "&message=" + encodeURIComponent(data.data.message) +
+                        "&seconds=5";
+                } else {
+                    showMessage("error", data.message);
+                }
             } catch (error) {
-            showMessage("error", error);
-        }
+                showMessage("error", error);
+            }
         }
     </script>
 </body>

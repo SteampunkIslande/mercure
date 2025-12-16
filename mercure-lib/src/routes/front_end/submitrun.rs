@@ -45,9 +45,11 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             );
         }
     };
-    let user_defined_vars = form_def.user_defined_vars.unwrap_or_default();
-    let user_defined_vars_json = match serde_json::to_string(&user_defined_vars) {
-        Ok(udv_string) => udv_string,
+
+    let user_defined_vars_json = match serde_json::to_string(
+        &form_def.user_defined_vars.clone().unwrap_or_default(),
+    ) {
+        Ok(json_str) => json_str,
         Err(e) => {
             return Template::render(
                 "common/error",
@@ -69,7 +71,8 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             run_id: None::<i64>,
             sequenceurs_list,
             user_defined_vars_json,
-            indir_type: form_def.indir_type
+            indir_type: &form_def.indir_type,
+            form: &form_def,
         },
     )
 }

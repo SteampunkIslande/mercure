@@ -94,7 +94,16 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                     &run.form.user_defined_vars.clone().unwrap_or_default(),
                 ) {
                     Ok(json_str) => json_str,
-                    Err(_) => "{}".to_string(),
+                    Err(e) => {
+                        return Template::render(
+                            "common/error",
+                            context! {
+                                title:"Formulaire invalide",
+                                h2:"Formulaire invalide",
+                                message:format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
+                            },
+                        );
+                    }
                 };
 
                 Template::render(
@@ -104,9 +113,10 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         user: auth.user,
                         form_id: &run.form.form_id,
                         run_id: &run.run_id,
-                        sequenceurs_list: sequenceurs_list,
-                        user_defined_vars_json: user_defined_vars_json,
-                        indir_type: &run.form.indir_type
+                        sequenceurs_list,
+                        user_defined_vars_json,
+                        indir_type: &run.form.indir_type,
+                        form: &run.form,
                     },
                 )
             }

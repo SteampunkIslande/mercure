@@ -62,6 +62,28 @@ impl FromStr for RunStatus {
     }
 }
 
+/// Édition d'un run existant
+/// Utilisé dans la route /mercure/api/editrun
+///
+/// Ne permet pas de modifier le nom du run, l'utilisateur, ou le formulaire associé.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct HgRunEdit {
+    pub run_id: i64,
+    pub run_date: String,
+    pub run_sequencer: String,
+    pub run_flowcellid: String,
+
+    pub sample_sheet_adn_path: String,
+    pub sample_sheet_arn_path: String,
+    pub metadata_path: String,
+
+    pub user_defined_vars: HashMap<String, String>,
+    pub indir: Option<String>,
+    pub outdir: Option<String>,
+}
+
+/// Soumission d'un nouveau run
+/// Utilisé dans la route /mercure/api/newrun
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRunSubmission {
     pub form_id: i64,
@@ -70,24 +92,11 @@ pub struct HgRunSubmission {
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
+
     pub sample_sheet_adn_path: String,
     pub sample_sheet_arn_path: String,
     pub metadata_path: String,
-    pub user_defined_vars: HashMap<String, String>,
-    pub indir: Option<String>,
-    pub outdir: Option<String>,
-}
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgRunEdit {
-    pub run_id: i64,
-
-    pub run_date: String,
-    pub run_sequencer: String,
-    pub run_flowcellid: String,
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
     pub user_defined_vars: HashMap<String, String>,
     pub indir: Option<String>,
     pub outdir: Option<String>,
