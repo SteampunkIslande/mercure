@@ -55,11 +55,11 @@
         <h3>Informations sur le run</h3>
         <div>
             <label for="run_date">Date du run:</label>
-            <input type="date" id="run_date" required>
+            <input type="date" id="run_date">
         </div>
         <div>
             <label for="run_sequencer">Séquenceur:</label>
-            <select id="run_sequencer" required>
+            <select id="run_sequencer">
                 {% for seq in sequenceurs_list %}
                 <option value="{{ seq }}">{{ seq }}</option>
                 {% endfor %}
@@ -70,7 +70,7 @@
         <div id="bcl-dir-def-section" style="display:none;">
             <div>
                 <label for="run_flowcellid">Flowcell ID:</label>
-                <input type="text" id="run_flowcellid" required>
+                <input type="text" id="run_flowcellid">
             </div>
         </div>
 
@@ -86,7 +86,7 @@
             <h3>Dossier d'analyse</h3>
             <div>
                 <label for="analysis_indir">Choisir un dossier d'analyse:</label>
-                <select id="analysis_indir" required style="height:400px; overflow-y:scroll;"></select>
+                <select id="analysis_indir" class="tall-select"></select>
                 <span id="no-analysis-dir" style="display: none;"><em>Aucun dossier d'analyse
                         trouvé</em></span>
             </div>
@@ -97,7 +97,7 @@
             <h3>Dossier de run nanopore</h3>
             <div>
                 <label for="ont_indir">Choisir un dossier de run nanopore:</label>
-                <select id="ont_indir" required style="height:400px; overflow-y:scroll;"></select>
+                <select id="ont_indir" class="tall-select"></select>
                 <span id="no-ont-dir" style="display: none;"><em>Aucun dossier de run
                         nanopore
                         trouvé</em></span>
