@@ -168,14 +168,14 @@
             if (info && info.running_jobs_count) runningCountEl.textContent = info.running_jobs_count;
             else runningCountEl.textContent = "Inconnu"
 
-            if (info) {
+            if (info && info.slurm_job_name) {
                 slurm_job_name = info.slurm_job_name;
                 await refreshData(slurm_job_name);
             }
             else {
                 document.getElementById("controls-bar").style.display = "none";
                 document.getElementById("slurm-table-container").style.display = "none";
-                document.getElementById("error-container").innerHTML = "<p>Informations SLURM indisponibles pour le moment.</p>";
+                document.getElementById("error-container").innerHTML = "<p>Informations SLURM indisponibles pour le moment. Cela signifie généralement qu'aucun job SLURM n'est actuellement associé à cette exécution.</p>";
             }
 
         }
