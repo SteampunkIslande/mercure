@@ -40,8 +40,13 @@ p {
   transition: background-color 0.3s ease;
 }
 
-.btn:hover {
-  background-color: #0056b3;
+.btn-primary {
+  display: inline-block;
+  padding: 10px 20px;
+  text-decoration: none;
+  border-radius: 5px;
+  margin: 10px;
+  font-weight: bold;
 }
 
 .btn-secondary {
@@ -51,6 +56,10 @@ p {
 
 .btn-secondary:hover {
   background-color: #5a6268;
+}
+
+.btn:hover {
+  background-color: #0056b3;
 }
 
 .container {
@@ -152,28 +161,6 @@ p {
 
 .banner-text span {
   font-size: 1rem;
-}
-
-.btn-primary {
-  display: inline-block;
-  padding: 10px 20px;
-  text-decoration: none;
-  border-radius: 5px;
-  margin: 10px;
-  font-weight: bold;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background-color: #5a6268;
-}
-
-.btn:hover {
-  background-color: #0056b3;
 }
 
 .user-var-item {

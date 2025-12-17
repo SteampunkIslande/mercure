@@ -130,6 +130,7 @@ pub async fn show_run_get(
                 context! {
                     run: &run,
                     user: auth.user,
+                    form: &run.form,
                     run_id: run.run_id,
                     sequenceurs_list: sequenceurs_list,
                     user_defined_vars_json: &user_defined_vars_json,
@@ -184,6 +185,7 @@ pub async fn show_run_get(
                     "common/pendingrun",
                     context! {
                         run: &run,
+                        form: &run.form,
                         attempt: &attempt,
                         history: &history,
                         samplesheet_adn_static_name: samplesheet_adn_static_name,
@@ -197,6 +199,7 @@ pub async fn show_run_get(
                     "common/runningrun",
                     context! {
                         run: &run,
+                        form: &run.form,
                         attempt: &attempt,
                         history: &history,
                         samplesheet_adn_static_name: samplesheet_adn_static_name,
@@ -210,6 +213,7 @@ pub async fn show_run_get(
                     "common/successrun",
                     context! {
                         run: &run,
+                        form: &run.form,
                         attempt: &attempt,
                         history: &history,
                         samplesheet_adn_static_name: samplesheet_adn_static_name,
@@ -224,6 +228,7 @@ pub async fn show_run_get(
                     context! {
                         run: &run,
                         attempt: &attempt,
+                        form: &run.form,
                         history: &history,
                         samplesheet_adn_static_name: samplesheet_adn_static_name,
                         samplesheet_arn_static_name: samplesheet_arn_static_name,

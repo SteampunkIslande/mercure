@@ -15,7 +15,7 @@
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">Run en attente - {{ user.username }}</span>
+            <span class="banner-text">Run en attente<br>{{ form.form_name }}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger">
                     <span class="material-icons icon-align">logout</span>Déconnexion
@@ -28,40 +28,7 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-
-
-    <div id="run-details" style="display: flex;">
-        <div id="basic-info" style="flex: 1;">
-            <h2>Détails du run</h2>
-            <div>
-                <label><strong>Nom du run:</strong></label>
-                <span>{{ run.run_name }}</span>
-            </div>
-            <div>
-                <label><strong>Date du run:</strong></label>
-                <span>{{ run.run_date }}</span>
-            </div>
-            <div>
-                <label><strong>Séquenceur:</strong></label>
-                <span id="seq-name">{{ run.run_sequencer }}</span>
-            </div>
-            <div>
-                <label><strong>Flowcell ID:</strong></label>
-                <span>{{ run.run_flowcellid }}</span>
-            </div>
-        </div>
-
-        <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
-            <h2>Tentatives</h3>
-                <div class="attempt-list">
-                    {% include 'common/attemptlist' %}
-                    {% if history|length == 0 %}
-                    <div>Ceci est la première tentative pour ce run.</div>
-                    {% endif %}
-                </div>
-        </div>
-    </div>
-
+    {% include 'common/runinfo' %}
 
     <div class="tab">
         <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>
@@ -69,64 +36,32 @@
         <button id="tab-metadata" class="tablinks" onclick="openTab(event,'metadata')">Metadata</button>
     </div>
 
-    <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
-        <label>Sample sheet ADN:</label>
-        {% if samplesheet_adn_static_name %}
-        <a href="{{ samplesheet_adn_static_name | safe }}" class="btn btn-primary" download>
-            <span class="material-icons" style="vertical-align:middle;">download</span>
-            Télécharger la samplesheet ADN
-        </a>
-        {% else %}
+    <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto; height:400px;">
+        {% if not samplesheet_adn_static_name %}
         <span>Aucune sample sheet ADN fournie.</span>
         {% endif %}
         <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
         <div id="sample_sheet_adn_check"></div>
-        <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+        <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;"></div>
     </div>
 
-    <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
-        <label>Sample sheet ARN:</label>
-        {% if samplesheet_arn_static_name %}
-        <a href="{{ samplesheet_arn_static_name | safe }}" class="download-link" download>
-            <span class="material-icons" style="vertical-align:middle;">download</span>
-            Télécharger la samplesheet ARN
-        </a>
-        {% else %}
+    <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto; height:400px;">
+        {% if not samplesheet_arn_static_name %}
         <span>Aucune sample sheet ARN fournie.</span>
         {% endif %}
         <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
         <div id="sample_sheet_arn_check"></div>
-        <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+        <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;"></div>
     </div>
 
-    <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
-
-        <label>Metadata:</label>
-        {% if metadata_static_name %}
-        <a href="{{ metadata_static_name | safe }}" class="download-link" download>
-            <span class="material-icons" style="vertical-align:middle;">download</span>
-            Télécharger le fichier metadata
-        </a>
+    <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto; height:400px;">
+        {% if not run.metadata_file_path %}
+        <span>Aucun fichier de métadonnées fourni.</span>
         {% else %}
-        <span>Aucun fichier metadata fourni.</span>
+        <a href="{{ run.metadata_file_static_name | safe }}" download>Télécharger le fichier de métadonnées</a>
         {% endif %}
-        <span>{{ run.metadata_path }}</span>
     </div>
 
-    <h3>Variables définies par l'utilisateur</h3>
-    <div id="user-defined-vars"></div>
-
-    <div id="advanced-vars-container" style="display:none;">
-        <h4 style="margin-top: 15px; color: #666;">Paramètres avancés (constantes du pipeline)</h4>
-        <div id="user-defined-vars-advanced"></div>
-    </div>
-
-    <div style="margin-top: 10px;">
-        <button id="toggle-advanced-btn" class="btn btn-secondary"
-            style="font-size: 0.8em; padding: 5px 10px; display: none;">
-            Afficher les paramètres avancés
-        </button>
-    </div>
 
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
@@ -184,9 +119,6 @@
                     container.innerHTML = "";
                     createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
                 }
-            }
-            else {
-                document.getElementById('sample_sheet_adn_check').innerHTML = "Aucune sample sheet ADN fournie.";
             }
             // ARN
             const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';

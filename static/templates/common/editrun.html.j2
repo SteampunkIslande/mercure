@@ -112,29 +112,29 @@
             <button class="tablinks" onclick="openTab(event,`metadata`)">Metadata</button>
         </div>
 
-        <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto;">
+        <div class="tabcontent" id="tabcontent-adn" style="display:block; height:400px; overflow:auto;">
             <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
             <input type="file" id="sample_sheet_adn_file">
             <input type="hidden" id="sample_sheet_adn_path" {% if run %}value="{{ run.sample_sheet_adn_path }}" {% endif
                 %}>
             <div id="sample_sheet_adn_check"></div>
-            <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+            <div id="sample_sheet_adn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto;">
+        <div class="tabcontent" id="tabcontent-arn" style="display:none; height:400px; overflow:auto;">
             <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
             <input type="file" id="sample_sheet_arn_file">
             <input type="hidden" id="sample_sheet_arn_path" {% if run %}value="{{ run.sample_sheet_arn_path }}" {% endif
                 %}>
             <div id="sample_sheet_arn_check"></div>
-            <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;height:400px"></div>
+            <div id="sample_sheet_arn_list" class="sample-list"></div>
         </div>
 
-        <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto;">
+        <div class="tabcontent" id="tabcontent-metadata" style="display:none; height:400px; overflow:auto;">
             <label for="metadata_file">Fichier metadata:</label>
             <input type="file" id="metadata_file">
             <input type="hidden" id="metadata_path" {% if run %}value="{{ run.metadata_path }}" {% endif %}>
-            <div id="spacer" style="overflow:auto;height:400px"></div>
+            <div id="spacer"></div>
         </div>
 
         <h3>Variables définies par l'utilisateur</h3>

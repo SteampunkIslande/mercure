@@ -1,0 +1,78 @@
+<div id="run-details" style="display: flex;height: 400px;">
+    <div id="basic-info" style="flex: 1;">
+        <h2>Détails du run</h2>
+        <div>
+            <label><strong>Nom du run:</strong></label>
+            <span>{{ run.run_name }}</span>
+        </div>
+        <div>
+            <label><strong>Date du run:</strong></label>
+            <span>{{ run.run_date }}</span>
+        </div>
+        <div>
+            <label><strong>Séquenceur:</strong></label>
+            <span id="seq-name">{{ run.run_sequencer }}</span>
+        </div>
+        {% if form.indir_type == "BclDir" %}
+        <div>
+            <label><strong>Numéro de flowcell:</strong></label>
+            <span>{{ run.run_flowcellid }}</span>
+        </div>
+        {% endif %}
+        <div>
+            <label><strong>Type d'entrée:</strong></label>
+            <span>{{ {"BclDir":"Run brut Illumina","OntDir":"Run brut Oxford Nanopore","AnalysisDir":"Dossier d'analyse
+                pré-existant"}[form.indir_type] }}</span>
+        </div>
+    </div>
+
+    <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
+        <h2>Tentatives</h3>
+            <div class="attempt-list">
+                {% include 'common/attemptlist' %}
+                {% if history|length == 0 %}
+                <div>Ceci est la première tentative pour ce run.</div>
+                {% endif %}
+            </div>
+    </div>
+</div>
+
+<div style="border:1px solid #ccc; padding:10px; margin-top:20px;margin-bottom:10px; background-color:#f9f9f9;">
+
+    <label><strong>Sample sheet ADN:</strong></label>
+    {% if samplesheet_adn_static_name %}
+    <a href="{{ samplesheet_adn_static_name | safe }}" download>Télécharger la samplesheet ADN</a>
+    {% else %}
+    <span>Aucune sample sheet ADN fournie.</span>
+    {% endif %}
+    <br>
+    <label><strong>Sample sheet ARN:</strong></label>
+    {% if samplesheet_arn_static_name %}
+    <a href="{{ samplesheet_arn_static_name | safe }}" download>Télécharger la samplesheet ARN</a>
+    {% else %}
+    <span>Aucune sample sheet ARN fournie.</span>
+    {% endif %}
+    <br>
+    <label><strong>Fichier metadata:</strong></label>
+    {% if metadata_static_name %}
+    <a href="{{ metadata_static_name | safe }}" download>Télécharger le fichier metadata</a>
+    {% else %}
+    <span>Aucun fichier metadata fourni.</span>
+    {% endif %}
+    <br>
+</div>
+
+<h3>Variables définies par l'utilisateur</h3>
+<div id="user-defined-vars"></div>
+
+<div id="advanced-vars-container" style="display:none;">
+    <h4 style="margin-top: 15px; color: #666;">Paramètres avancés (constantes du pipeline)</h4>
+    <div id="user-defined-vars-advanced"></div>
+</div>
+
+<div style="margin-top: 10px;">
+    <button id="toggle-advanced-btn" class="btn btn-secondary"
+        style="font-size: 0.8em; padding: 5px 10px; display: none;">
+        Afficher les paramètres avancés
+    </button>
+</div>
