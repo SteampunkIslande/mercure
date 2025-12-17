@@ -107,7 +107,7 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 };
 
                 Template::render(
-                    "common/newrun",
+                    "common/editrun",
                     context! {
                         run: &run,
                         user: auth.user,

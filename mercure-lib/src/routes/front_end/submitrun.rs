@@ -63,7 +63,7 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
     };
 
     Template::render(
-        "common/newrun",
+        "common/editrun",
         context! {
             run: None::<HgRun>,
             user: auth.user,
