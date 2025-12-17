@@ -16,8 +16,8 @@
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">{% if run %}Editer un run<br><span class="banner-text"> {{ form.form_name
-                    }}</span>{% else %}Nouveau Run<br><span class="banner-text">{{
+            <span class="banner-text">{% if run %}Editer un run<br><span class="banner-text">Pipeline: {{ form.form_name
+                    }}</span>{% else %}Nouveau Run<br><span class="banner-text">Pipeline: {{
                     form.form_name }}</span>{% endif %}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
@@ -242,6 +242,12 @@
                         option.textContent = val;
                         select.appendChild(option);
                     });
+                    // Ajouter une option vide (sélection par défaut)
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    emptyOption.selected = true;
+                    emptyOption.textContent = '---Sélectionner une valeur---';
+                    select.appendChild(emptyOption);
                     div.appendChild(select);
                     container.appendChild(div);
                 } else if (value === 'RunDefined') {
@@ -492,6 +498,7 @@
                 return;
             }
 
+            // Remplir le formulaire, dans le cas d'une édition
             {% if run %}
             const formData = {
                 run_id: parseInt(document.getElementById('run_id').value),
@@ -508,6 +515,8 @@
                 indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
                 outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
             };
+
+            // Remplir le formulaire, dans le cas d'une création
             {% else %}
 
             const run_name = document.getElementById('run_name').value;
