@@ -67,6 +67,8 @@ pub async fn watch_log(
         let line = line?;
         if let Some(cap) = re_step.captures(&line) {
             last_step = Some(cap[1].trim().to_string());
+            last_slurm_id = None;
+            last_progress = None;
             continue;
         }
         if let Some(cap) = re_slurm_id.captures(&line) {
@@ -80,8 +82,6 @@ pub async fn watch_log(
             last_progress = Some(percent);
             if part == total {
                 // pipeline terminé: réinitialiser
-                last_step = None;
-                last_progress = None;
                 last_slurm_id = None;
             }
         }
