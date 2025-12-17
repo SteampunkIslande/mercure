@@ -204,10 +204,16 @@ impl HgRun {
     /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
     pub async fn edit_run(run_form: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
         eprintln!("Received run edit {:?}", run_form);
+
+        let form = HgFormDef::get_formdef_from_id(pool, run_form.run_id).await?;
+
         let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_form.sample_sheet_adn_path.is_empty() && run_form.sample_sheet_arn_path.is_empty() {
+        if run_form.sample_sheet_adn_path.is_empty()
+            && run_form.sample_sheet_arn_path.is_empty()
+            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
+        {
             return Err(ModelError::FormError(
                 "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
             ));
