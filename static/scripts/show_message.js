@@ -26,6 +26,7 @@ function showMessage(type, message) {
   if (msgDiv) {
     msgDiv.style.display = "block";
     msgDiv.innerHTML = `<span class="material-icons icon-align" style="color:${colors[type]};">${icons[type]}</span>${message}`;
+    window.scrollTo(0, 0);
     if (type !== "error") {
       setTimeout(() => {
         msgDiv.style.display = "none";
