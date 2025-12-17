@@ -168,8 +168,15 @@
             if (info && info.running_jobs_count) runningCountEl.textContent = info.running_jobs_count;
             else runningCountEl.textContent = "Inconnu"
 
-            slurm_job_name = info.slurm_job_name;
-            await refreshData(slurm_job_name);
+            if (info) {
+                slurm_job_name = info.slurm_job_name;
+                await refreshData(slurm_job_name);
+            }
+            else {
+                document.getElementById("controls-bar").style.display = "none";
+                document.getElementById("slurm-table-container").style.display = "none";
+                document.getElementById("error-container").innerHTML = "<p>Informations SLURM indisponibles pour le moment.</p>";
+            }
 
         }
 
@@ -186,7 +193,7 @@
                 }
             }
             catch (e) {
-                console.warn('Erreur lors de la récupération des infos job', err);
+                console.warn('Erreur lors de la récupération des infos job', e);
                 await updateJobInfo(null);
             }
         }
