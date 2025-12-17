@@ -34,17 +34,14 @@
 
     <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
 
-        {% if run %}
         <input type="hidden" id="run_id" value="{{ run_id }}">
-        {% else %}
         <input type="hidden" id="form_id" value="{{ form_id }}">
         <input type="hidden" id="user_id" value="{{ user.id }}">
-        {% endif %}
 
         <div>
             <label for="run_name">Nom du run:</label>
             {% if run %}
-            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
+            <span id="run_name" style="font-weight: bold;">{{ run.run_name | safe }}</span>
             <input type="hidden" id="run_name" value="{{ run.run_name }}">
             {% else %}
             <input type="text" id="run_name" required>
@@ -501,6 +498,8 @@
             // Remplir le formulaire, dans le cas d'une édition
             {% if run %}
             const formData = {
+                form_id: parseInt(document.getElementById('form_id').value),
+
                 run_id: parseInt(document.getElementById('run_id').value),
                 run_date: run_date,
                 run_sequencer: run_sequencer,

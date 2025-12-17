@@ -69,6 +69,8 @@ impl FromStr for RunStatus {
 /// Ne permet pas de modifier le nom du run, l'utilisateur, ou le formulaire associé.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRunEdit {
+    pub form_id: i64,
+
     pub run_id: i64,
     pub run_date: String,
     pub run_sequencer: String,
@@ -153,19 +155,22 @@ pub struct HgRun {
 
 impl HgRun {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub async fn new_run(run_form: HgRunSubmission, pool: &SqlitePool) -> Result<i64, ModelError> {
+    pub async fn new_run(
+        run_submission: HgRunSubmission,
+        pool: &SqlitePool,
+    ) -> Result<i64, ModelError> {
         // Date de création
         let creation_date = OffsetDateTime::now_utc().to_string();
 
         // Obtenir les informations du formulaire
-        let form = HgFormDef::get_formdef_from_id(pool, run_form.form_id).await?;
+        let form = HgFormDef::get_formdef_from_id(pool, run_submission.form_id).await?;
 
         // Insérer dans la table Runs
-        let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
+        let user_defined_vars_json = serde_json::to_string(&run_submission.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_form.sample_sheet_adn_path.is_empty()
-            && run_form.sample_sheet_arn_path.is_empty()
+        if run_submission.sample_sheet_adn_path.is_empty()
+            && run_submission.sample_sheet_arn_path.is_empty()
             && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
         {
             return Err(ModelError::FormError(
@@ -180,21 +185,21 @@ impl HgRun {
             RETURNING run_id
             "#,
         )
-        .bind(run_form.form_id)
-        .bind(run_form.user_id)
-        .bind(&run_form.run_name)
-        .bind(&run_form.run_date)
+        .bind(run_submission.form_id)
+        .bind(run_submission.user_id)
+        .bind(&run_submission.run_name)
+        .bind(&run_submission.run_date)
         .bind(&creation_date)
-        .bind(&run_form.run_sequencer)
-        .bind(&run_form.run_flowcellid)
-        .bind(&run_form.sample_sheet_adn_path)
-        .bind(&run_form.sample_sheet_arn_path)
-        .bind(&run_form.metadata_path)
+        .bind(&run_submission.run_sequencer)
+        .bind(&run_submission.run_flowcellid)
+        .bind(&run_submission.sample_sheet_adn_path)
+        .bind(&run_submission.sample_sheet_arn_path)
+        .bind(&run_submission.metadata_path)
         .bind("Idle")
         .bind(&user_defined_vars_json)
         .bind(0)
-        .bind(&run_form.indir)
-        .bind(&run_form.outdir)
+        .bind(&run_submission.indir)
+        .bind(&run_submission.outdir)
         .fetch_one(pool)
         .await?.try_get("run_id")?;
 
@@ -202,16 +207,16 @@ impl HgRun {
     }
 
     /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
-    pub async fn edit_run(run_form: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
-        eprintln!("Received run edit {:?}", run_form);
+    pub async fn edit_run(run_edit: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
+        eprintln!("Received run edit {:?}", run_edit);
 
-        let form = HgFormDef::get_formdef_from_id(pool, run_form.run_id).await?;
+        let form = HgFormDef::get_formdef_from_id(pool, run_edit.form_id).await?;
 
-        let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
+        let user_defined_vars_json = serde_json::to_string(&run_edit.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_form.sample_sheet_adn_path.is_empty()
-            && run_form.sample_sheet_arn_path.is_empty()
+        if run_edit.sample_sheet_adn_path.is_empty()
+            && run_edit.sample_sheet_arn_path.is_empty()
             && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
         {
             return Err(ModelError::FormError(
@@ -219,7 +224,7 @@ impl HgRun {
             ));
         }
 
-        let run: HgRun = Self::get_run_from_id(run_form.run_id, pool).await?;
+        let run: HgRun = Self::get_run_from_id(run_edit.run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
             return Err(ModelError::FormError(
                 "Impossible d'éditer un run validé, en cours d'analyse, ou terminé".to_string(),
@@ -236,18 +241,18 @@ impl HgRun {
             "#,
         )
         .bind(&user_defined_vars_json)
-        .bind(&run_form.run_date)
-        .bind(&run_form.run_sequencer)
-        .bind(&run_form.run_flowcellid)
-        .bind(&run_form.sample_sheet_adn_path)
-        .bind(&run_form.sample_sheet_arn_path)
-        .bind(&run_form.metadata_path)
-        .bind(&run_form.indir)
-        .bind(&run_form.outdir)
-        .bind(run_form.run_id)
+        .bind(&run_edit.run_date)
+        .bind(&run_edit.run_sequencer)
+        .bind(&run_edit.run_flowcellid)
+        .bind(&run_edit.sample_sheet_adn_path)
+        .bind(&run_edit.sample_sheet_arn_path)
+        .bind(&run_edit.metadata_path)
+        .bind(&run_edit.indir)
+        .bind(&run_edit.outdir)
+        .bind(run_edit.run_id)
         .execute(pool).await?;
 
-        Ok(run_form.run_id)
+        Ok(run_edit.run_id)
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
