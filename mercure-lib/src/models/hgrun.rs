@@ -1,3 +1,4 @@
+use crate::models::IndirType;
 use crate::models::User;
 
 use super::form::HgFormDef;
@@ -156,13 +157,19 @@ impl HgRun {
         // Date de création
         let creation_date = OffsetDateTime::now_utc().to_string();
 
+        // Obtenir les informations du formulaire
+        let form = HgFormDef::get_formdef_from_id(pool, run_form.form_id).await?;
+
         // Insérer dans la table Runs
         let user_defined_vars_json = serde_json::to_string(&run_form.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_form.sample_sheet_adn_path.is_empty() && run_form.sample_sheet_arn_path.is_empty() {
+        if run_form.sample_sheet_adn_path.is_empty()
+            && run_form.sample_sheet_arn_path.is_empty()
+            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
+        {
             return Err(ModelError::FormError(
-                "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
+                "Erreur de soumission d'un run: au moins une SampleSheet est requise (à moins que vous ne partiez d'un dossier d'analyse)".to_string(),
             ));
         }
 

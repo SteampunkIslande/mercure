@@ -474,13 +474,32 @@
                 }
             });
 
+            const run_date = document.getElementById('run_date').value;
+            if (!run_date) {
+                showMessage("error", "La date du run est obligatoire.");
+                return;
+            }
+            const run_sequencer = document.getElementById('run_sequencer').value;
+            if (!run_sequencer) {
+                showMessage("error", "Le séquenceur est obligatoire.");
+                return;
+            }
+
+            const run_flowcellid = document.getElementById('run_flowcellid').value;
+
+            if (!run_flowcellid && indirType === 'BclDir') {
+                showMessage("error", "Le numéro de flowcell est obligatoire pour les runs Illumina.");
+                return;
+            }
+
             {% if run %}
             const formData = {
                 run_id: parseInt(document.getElementById('run_id').value),
-                run_date: document.getElementById('run_date').value,
-                run_sequencer: document.getElementById('run_sequencer').value,
-                run_flowcellid: document.getElementById('run_flowcellid').value,
+                run_date: run_date,
+                run_sequencer: run_sequencer,
+                run_flowcellid: run_flowcellid,
 
+                // A l'appréciation du backend de gérer les fichiers absents
                 sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
                 sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
@@ -491,14 +510,21 @@
             };
             {% else %}
 
+            const run_name = document.getElementById('run_name').value;
+            if (!run_name) {
+                showMessage("error", "Le nom du run est obligatoire.");
+                return;
+            }
+
             const formData = {
                 form_id: parseInt(document.getElementById('form_id').value),
                 user_id: parseInt(document.getElementById('user_id').value),
-                run_name: document.getElementById('run_name').value,
-                run_date: document.getElementById('run_date').value,
-                run_sequencer: document.getElementById('run_sequencer').value,
-                run_flowcellid: document.getElementById('run_flowcellid').value,
+                run_name: run_name,
+                run_date: run_date,
+                run_sequencer: run_sequencer,
+                run_flowcellid: run_flowcellid,
 
+                // A l'appréciation du backend de gérer les fichiers absents
                 sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
                 sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
                 metadata_path: document.getElementById('metadata_path').value,
@@ -524,7 +550,7 @@
                 });
                 const data = await response.json();
                 if (response.status !== 200) {
-                    throw new Error(data.message || 'Erreur lors de la sauvegarde du run.');
+                    throw new Error(response.statusText || 'Erreur lors de la sauvegarde du run.');
                 }
                 if (data.success) {
                     {% if run %}
