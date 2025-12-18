@@ -25,7 +25,7 @@ demul_job_name=$(date +%s)
 echo "SLURM run ID: $demul_job_name"
 
 # Lancement du job SLURM pour le démultiplexage avec bcl-convert (en interactif de manière à bloquer le script jusqu'à la fin du job)
-srun --job-name=$demul_job_name --output=$OUTDIR/slurm%j.out --mem=64G \
+srun --job-name=$demul_job_name --output=$OUTDIR/demul-%j.out --mem=64G \
     singularity exec /SINGULARITIES/bcl-convert.sif bcl-convert --sample-sheet $INDIR/adn.csv \
     --output-dir $OUTDIR/fastq --bcl-input-dir $INDIR --no-lane-splitting true
 
