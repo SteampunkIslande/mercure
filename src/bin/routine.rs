@@ -1,16 +1,19 @@
 use chrono::Local;
 use env_logger::Builder;
 use log::{error, info};
-use mercure::models::ModelError;
+use mercure::models::{HgFormDef, HgRun, IndirType, ModelError};
 use mercure_lib::config::get_mercure_config;
-use mercure_lib::models::HgRun;
 use mercure_lib::models::analysis;
 use std::io::Error as IoError;
 use tokio::task::JoinError as TokioJoinError;
 
+use sqlx::SqlitePool;
+use std::fs::{create_dir_all, exists};
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
+
 use tokio::signal::unix::SignalKind;
 
 // Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
@@ -29,8 +32,8 @@ use chrono::ParseError;
 use core::convert::Infallible;
 use glob::PatternError;
 use mercure_lib::models::AnalysisStateMachineError;
+use regex::{Error as RegexError, Regex};
 use sqlx::{Error, Row};
-use thiserror::Error;
 use tokio::sync::watch;
 
 use mercure_lib::models::HgAttempt;
@@ -59,15 +62,16 @@ enum RoutineError {
     IO(#[from] IoError),
     #[error(transparent)]
     TokioJoin(#[from] TokioJoinError),
+    #[error(transparent)]
+    InvalidRegex(#[from] RegexError),
+    #[error("Le dossier d'entrée {0} est introuvable")]
+    IndirNotFound(String),
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
 
 /// Fonction qui exécute la boucle de routine avec des points de contrôle pour l'annulation
-async fn run_routine_loop(
-    pool: sqlx::SqlitePool,
-    mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), RoutineError> {
+async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiver<bool>) {
     use std::time::Duration;
 
     loop {
@@ -81,15 +85,19 @@ async fn run_routine_loop(
                         "Erreur lors du traitement de la tentive {} du run {}: {e}",
                         attempt.attempt_number, attempt.run_id
                     );
-                    // Attention, seul point dans la routine qui peut l'interrompre en cas d'erreur
-                    // Cas extrêmement spécifiques et improbables:
-                    // - Obtenir le run à partir de l'ID contenu dans attempt échoue
-                    // - La transition d'état est invalide (normalement impossible ici)
-                    // - Impossible de mettre à jour la table Runs
-                    // - Impossible de mettre à jour la table Attempts
-                    // A part ces cas particuliers, les erreurs sont loggées mais la routine continue
-                    analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool)
-                        .await?;
+
+                    match analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool)
+                        .await
+                    {
+                        Ok(_) => info!(
+                            "La tentative {} du run {} a été marqué comme Failed.",
+                            attempt.attempt_number, attempt.run_id
+                        ),
+                        Err(err) => error!(
+                            "Erreur lors du marquage du run {}, tentative {} comme Failed:\n {}",
+                            attempt.run_id, attempt.attempt_number, err
+                        ),
+                    }
                 }
             }
         }
@@ -111,123 +119,71 @@ async fn run_routine_loop(
             }
         }
     }
-    Ok(())
+}
+
+fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBuf), RoutineError> {
+    // Le dossier de run brut Illumina devrait être dans {sequencers_dir}/{run_sequencer}/output/{run_date}_{run_sequencer}_*_{run_flowcellid}*
+    let config = get_mercure_config();
+    let raw_dir = Path::new(&config.sequencers_dir)
+        .join(&attempt.run_sequencer)
+        .join("output");
+
+    let run_date_short = attempt.run_date[2..].replace("-", "");
+    let seq_name = &attempt.run_sequencer;
+    let flowcell_id = &attempt.run_flowcellid;
+
+    let run_dir_pattern = format!(r"^{run_date_short}_{seq_name}_(\d+)_{flowcell_id}");
+    let run_dir_re = Regex::new(&run_dir_pattern)?;
+
+    let (bcl_dir_base, seq_run_counter) = std::fs::read_dir(&raw_dir)?
+        .into_iter()
+        .filter_map(|e| {
+            e.and_then(|e| {
+                Ok(run_dir_re
+                    .captures(&e.file_name().display().to_string())
+                    .and_then(|cap| {
+                        cap.get(1).and_then(|c| {
+                            Some((
+                                e.file_name().display().to_string(),
+                                c.as_str().to_string().parse::<i64>().ok()?,
+                            ))
+                        })
+                    }))
+            })
+            .ok()?
+        })
+        .next()
+        .ok_or_else(|| RoutineError::IndirNotFound(run_dir_pattern))?;
+
+    let output_dir = PathBuf::from(&config.analysis_dir).join(format!(
+        "{}_{}_{}",
+        run_date_short, seq_name, seq_run_counter
+    ));
+
+    Ok((raw_dir.join(bcl_dir_base), output_dir))
 }
 
 /// Cette fonction crée un fichier tel que spécifié dans le formulaire
 /// C'est HgRun qui a un membre dédié
 async fn start_analysis(
     attempt: &HgAttempt,
-    run_dir: &Path,
+    input_dir: &Path,
+    output_dir: &Path,
     pool: &sqlx::SqlitePool,
 ) -> Result<(), RoutineError> {
-    use std::fs;
-
     let config = get_mercure_config();
-    let analysis_base_dir = PathBuf::from(&config.analysis_dir);
 
-    // Extraction du nom brut du dossier de run
-    let run_rawdir_basename =
-        run_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or(RoutineError::CustomParse(
-                "Failed to extract run basename".into(),
-            ))?;
+    // En mode reproduction, le dossier de pipeline sera cloné dans un dossier temporaire avec le commit préalablement enregistré dans la tentative
+    let pipeline_base_dir = Path::new(&config.pipeline_dir);
 
-    // Extraction des composants
-    let parts: Vec<&str> = run_rawdir_basename.splitn(4, '_').collect();
-    if parts.len() < 4 {
-        return Err(RoutineError::CustomParse(format!(
-            "Le nom du dossier de run '{}' ne contient pas assez de parties",
-            run_rawdir_basename
-        )));
-    }
-    let date = parts[0];
-    let sequencer = parts[1];
-    let number = parts[2];
-
-    // Construction du nom du dossier d'analyse
-    let analysis_dir_name = format!("{}_{}_{}", date, sequencer, number);
-    let analysis_dir = analysis_base_dir.join(analysis_dir_name);
-
-    // Création du dossier d'analyse si nécessaire
-    if !analysis_dir.exists() {
-        if let Err(e) = fs::create_dir_all(&analysis_dir) {
-            error!("Erreur lors de la création du dossier d'analyse: {}", e);
-            return Ok(());
-        }
-        info!("Dossier d'analyse créé: {}", analysis_dir.display());
-    }
-
-    // Obtention des informations sur le pipeline et le launcher choisis
-    let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
-
-    // Le chemin du launcher doit être absolu. C'est ce chemin qui va se trouver dans le script généré
-    let launcher_abs_path = format!(
-        "{base}/{pipeline}/launchers/{launcher}",
-        base = config.pipeline_dir,
-        pipeline = run.form.pipeline_name,
-        launcher = run.form.launcher_name
-    );
-    if !std::fs::exists(&launcher_abs_path)? {
-        return Err(RoutineError::from(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!(
-                "Impossible de trouver le launcher au chemin suivant: {}",
-                launcher_abs_path
-            ),
-        )));
-    }
-
-    let script_path = format!(
-        "{jobs_dir}/TODO/job-{run_id}-{attempt_number}.sh",
-        jobs_dir = config.jobs_dir,
-        run_id = attempt.run_id,
-        attempt_number = attempt.attempt_number
-    );
-    if std::fs::exists(&script_path)? {
-        return Err(RoutineError::IO(std::io::Error::new(
-            std::io::ErrorKind::AlreadyExists,
-            format!("Le fichier {} existe déjà!", &script_path),
-        )));
-    }
-
-    let exported_vars = attempt
-        .user_defined_vars
-        .iter()
-        .map(|(k, v)| format!(r#"export {k}="{v}""#))
-        .chain([
-            format!(r#"export RAW_DIR="{}""#, run_dir.display()),
-            format!(r#"export ANALYSIS_DIR="{}""#, analysis_dir.display()),
-            format!(r#"export RUN_NAME="{}""#, &run.run_name),
-        ])
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let mut script_file = std::fs::OpenOptions::new()
-        .mode(0o775)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&script_path)?;
-
-    write!(
-        &mut script_file,
-        r#"#!/bin/bash
-
-export PATH=/usr/bin:$PATH
-source /etc/profile
-{}
-{}
-"#,
-        exported_vars, launcher_abs_path
-    )?;
+    // Génération du script d'analyse
+    generate_script(input_dir, output_dir, pipeline_base_dir, attempt, pool).await?;
 
     Ok(())
 }
 
 /// Fonction pour trouver les runs en attente
+///
 /// Quelques effets de bord :
 /// - Log les erreurs SQL
 /// - Log les erreurs de récupération des tentatives
@@ -307,66 +263,169 @@ async fn find_running_runs(pool: &sqlx::SqlitePool) -> Vec<HgAttempt> {
     }
 }
 
-fn get_supposed_run_dir_glob(run: &HgAttempt) -> String {
-    let config = get_mercure_config();
-    format!(
-        "{raw}/{seq}/output/{date}_{seq}_*_{flowcellid}",
-        raw = config.sequencers_dir,
-        seq = run.run_sequencer,
-        date = run.run_date[2..].replace("-", ""),
-        flowcellid = run.run_flowcellid
-    )
+/// Génère le script d'analyse pour une tentative donnée
+async fn generate_script(
+    input_dir: &Path,
+    output_dir: &Path,
+    pipeline_base_dir: &Path,
+    attempt: &HgAttempt,
+    pool: &SqlitePool,
+) -> Result<(), RoutineError> {
+    let config = mercure_lib::config::get_mercure_config();
+    // Création du dossier d'analyse si nécessaire
+    if !output_dir.exists() {
+        if let Err(e) = create_dir_all(&output_dir) {
+            error!("Erreur lors de la création du dossier d'analyse: {}", e);
+            return Err(e.into());
+        }
+        info!("Dossier d'analyse créé: {}", output_dir.display());
+    }
+
+    // Obtention des informations sur le pipeline et le launcher choisis
+    let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
+
+    // Le chemin du launcher doit être absolu. C'est ce chemin qui va se trouver dans le script généré
+    let launcher_abs_path = format!(
+        "{base}/{pipeline}/launchers/{launcher}",
+        base = pipeline_base_dir.display(),
+        pipeline = run.form.pipeline_name,
+        launcher = run.form.launcher_name
+    );
+    if !exists(&launcher_abs_path)? {
+        return Err(IoError::new(
+            std::io::ErrorKind::NotFound,
+            format!("Le launcher {} est introuvable!", &launcher_abs_path),
+        )
+        .into());
+    }
+
+    let script_path = format!(
+        "{jobs_dir}/TODO/job-{run_id}-{attempt_number}.sh",
+        jobs_dir = config.jobs_dir,
+        run_id = attempt.run_id,
+        attempt_number = attempt.attempt_number
+    );
+    if exists(&script_path)? {
+        return Err(IoError::new(
+            std::io::ErrorKind::AlreadyExists,
+            format!("Le fichier {} existe déjà!", &script_path),
+        )
+        .into());
+    }
+
+    let exported_vars = attempt
+        .user_defined_vars
+        .iter()
+        .map(|(k, v)| format!(r#"export {k}="{v}""#))
+        .chain([
+            format!(r#"export INDIR="{}""#, input_dir.display()),
+            format!(r#"export OUTDIR="{}""#, output_dir.display()),
+            format!(r#"export RUN_NAME="{}""#, &run.run_name),
+        ])
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut script_file = std::fs::OpenOptions::new()
+        .mode(0o775)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&script_path)?;
+
+    write!(
+        &mut script_file,
+        r#"#!/bin/bash
+
+export PIPELINE_DIR={pipeline_dir}
+export PIPELINE_NAME={pipeline_name}
+export PATH=/usr/bin:$PATH
+source /etc/profile
+{udv}
+{launcher_abs_path}
+"#,
+        pipeline_dir = pipeline_base_dir.display(),
+        pipeline_name = run.form.pipeline_name,
+        udv = exported_vars
+    )?;
+
+    Ok(())
 }
 
+/// Traite un run en état Pending (décide ou non de lancer l'analyse automatiquement)
+///
+/// Si indir_type == BclDir, cherche le dossier de run et démarre l'analyse si trouvé et que le contenu du dossier reflète que le run est terminé.
+/// Si indir_type == AnalysisDir, démarre directement l'analyse dans le dossier spécifié (indir = outdir = analysis_dir)
+/// Si indir_type == OntDir, démarre directement l'analyse. outdir = /data/analysis/{run_date}_{run_sequencer}_{RUN_NAME (sans espaces)}
 async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     use chrono::{Duration, Local, NaiveDate};
-    let supposed_run_dir = get_supposed_run_dir_glob(attempt);
-    let paths: Vec<PathBuf> = glob::glob(&supposed_run_dir)
-        .map_err(RoutineError::from)?
-        .filter_map(Result::ok)
-        .collect();
+
+    let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
+    let form: HgFormDef = run.form;
 
     // Vérifier si la date actuelle est > run_date + 1 jour
     let run_date = NaiveDate::parse_from_str(&attempt.run_date, "%Y-%m-%d")?;
     let now = Local::now().date_naive();
 
-    // Le run est considéré comme "non trouvé" si la date actuelle est > run_date + 1 jour et qu'aucun dossier n'est trouvé
-    // En effet, normalement, le séquenceur crée le dossier le jour même
-    if now > run_date + Duration::days(1) && paths.is_empty() {
-        info!(
-            "Dossier non trouvé pour la tentative {} du run {}: {}. Tentative placée en erreur.",
-            attempt.attempt_number, attempt.run_id, supposed_run_dir
-        );
-        let reason = "Le run ne se trouvait pas à l'emplacement prévu. Il peut s'agir d'une erreur dans la date, le numéro de flowcell, ou du séquenceur";
-        mercure::models::analysis::fail_cannot_analyse_run(attempt.run_id, reason, pool)
-            .await
-            .map_err(RoutineError::from)?;
-        Ok(())
-    } else if paths.is_empty() {
-        // Pas encore de dossier, mais on n'est pas encore le lendemain de la date du run déclarée
-        info!(
-            "Le run {} n'a pas encore produit de résultats. Attente.",
-            attempt.run_id
-        );
-        Ok(())
-    } else {
-        let run_dir = &paths[0];
-        // On démarre l'analyse
-        start_analysis(attempt, run_dir, pool).await?;
+    let (input_dir, output_dir) = match form.indir_type {
+        IndirType::BclDir => {
+            match get_indir_outdir_for_illumina(attempt) {
+                Err(RoutineError::IndirNotFound(expected_name)) => {
+                    // Le run est considéré comme "non trouvé" si la date actuelle est > run_date + 1 jour et qu'aucun dossier n'est trouvé
+                    // En effet, normalement, le séquenceur crée le dossier le jour même
+                    if now > run_date + Duration::days(1) {
+                        info!(
+                            "Dossier non trouvé pour la tentative {} du run {}: Nom du dossier attendu: {}. Tentative placée en erreur.",
+                            attempt.attempt_number, attempt.run_id, expected_name
+                        );
+                        let reason = "Le run ne se trouvait pas à l'emplacement prévu. Il peut s'agir d'une erreur dans la date, le numéro de flowcell, ou du séquenceur";
+                        mercure::models::analysis::fail_cannot_analyse_run(
+                            attempt.run_id,
+                            reason,
+                            pool,
+                        )
+                        .await
+                        .map_err(RoutineError::from)?;
+                    }
+                    return Err(RoutineError::IndirNotFound(expected_name));
+                }
+                Err(RoutineError::InvalidRegex(e)) => {
+                    error!("Regex invalide: {}", e);
+                    return Err(RoutineError::InvalidRegex(e));
+                }
+                Err(e) => {
+                    error!("Erreur générique: {}", e);
+                    return Err(e);
+                }
+                Ok((in_dir, out_dir)) => (in_dir, out_dir),
+            }
+        }
+        IndirType::AnalysisDir => {
+            todo!();
+        }
+        IndirType::OntDir => {
+            todo!();
+        }
+    };
 
-        // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
-        mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
-            .await
-            .map_err(RoutineError::from)?;
-        info!(
-            "Dossier trouvé pour la tentative {} du run {}: {}. Passage à l'état Running.",
-            attempt.attempt_number,
-            attempt.run_id,
-            run_dir.display()
-        );
-        Ok(())
-    }
+    // Vérifier le contenu du dossier d'entrée pour s'assurer que le run est terminé (uniquement pour Illumina/BclDir)
+    // (TODO)
+
+    // On démarre l'analyse
+    start_analysis(&attempt, &input_dir, &output_dir, &pool).await?;
+
+    // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
+    mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
+        .await
+        .map_err(RoutineError::from)?;
+    info!(
+        "Dossier trouvé pour la tentative {} du run {}: {}. Passage à l'état Running.",
+        attempt.attempt_number,
+        attempt.run_id,
+        input_dir.display()
+    );
+    Ok(())
 }
+
 async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     let config = get_mercure_config();
 
@@ -452,12 +511,12 @@ async fn main() -> Result<(), RoutineError> {
         _ = stream_sigterm.recv() => {
             info!("Signal SIGTERM reçu, arrêt de la routine...");
             let _ = shutdown_tx.send(true);
-            routine_handle.await??;
+            routine_handle.await?;
         }
         _ = stream_sigint.recv() => {
             info!("Signal SIGINT reçu, arrêt de la routine...");
             let _ = shutdown_tx.send(true);
-            routine_handle.await??;
+            routine_handle.await?;
         }
     }
 
