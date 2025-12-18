@@ -28,13 +28,40 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
+    {% if run.status == "Idle" %}
+    <div style="margin-top: 30px; text-align: left;">
+        <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative actuelle</a>
+    </div>
+    {% else %}
+    <div style="margin-top: 30px; text-align: left;">
+        <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer l'analyse</a>
+    </div>
+    {% endif %}
+
     {% include 'common/runinfo' %}
 
-    <div style="margin-top: 30px; text-align: left;">
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-    </div>
+    
 
     <script>
+
+        // Retry logic
+        async function retryAnalysis(run_id) {
+            try {
+                const resp = await fetch(`/mercure/api/retry/${run_id}`);
+                if (resp.ok) {
+                    const json = await resp.json();
+                    if (json.data) {
+                        location.href = `/mercure/show/run/${run_id}`;
+                    } else {
+                        alert('Relance de l\'analyse refusée');
+                    }
+                } else {
+                    console.error('Erreur lors de la requête de retry', resp.status);
+                }
+            } catch (e) {
+                console.error('Exception lors de la requête de retry', e.message);
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', async function () {
             // Affichage des variables utilisateur (readonly)

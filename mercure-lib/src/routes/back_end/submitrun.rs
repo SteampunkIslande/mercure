@@ -1,5 +1,5 @@
 use rocket::serde::json::Json;
-use rocket::{State, post};
+use rocket::{State, get, post};
 use serde_json::{Value, json};
 use sqlx::SqlitePool;
 
@@ -37,6 +37,18 @@ pub async fn validate_run_post(
         Ok(_) => Json(ApiResponse::success(
             json!({"message":"Run validé avec succès!","run_id":run_id}),
         )),
+        Err(e) => Json(ApiResponse::error(format!("{e}"))),
+    }
+}
+
+#[get("/retry/<run_id>")]
+pub async fn retry_run_get(
+    _auth: Authenticated,
+    pool: &State<SqlitePool>,
+    run_id: i64,
+) -> Json<ApiResponse<Value>> {
+    match analysis::relaunch_run(run_id, pool).await {
+        Ok(_) => Json(ApiResponse::success(json!({"data":true}))),
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }
 }

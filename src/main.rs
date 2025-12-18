@@ -114,6 +114,8 @@ async fn rocket() -> _ {
                 routes::backend::list_directories_by_type,
                 // Route pour toutes les redirections
                 routes::backend::redirect_post,
+                // Route pour relancer un run (une fois terminé)
+                routes::backend::retry_run_get,
             ],
         )
         .manage(pool)

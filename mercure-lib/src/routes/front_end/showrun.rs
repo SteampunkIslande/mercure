@@ -88,9 +88,7 @@ pub async fn show_run_get(
             };
 
         // MODE ÉDITION : Si le run est Idle ET qu'on demande (implicitement ou non) la dernière tentative
-        if run.status == RunStatus::Idle
-            && (attempt_number.unwrap_or(run.attempt_count as i64) == run.attempt_count as i64)
-        {
+        if run.status == RunStatus::Idle && attempt_number.is_none() {
             let sequenceurs_folder = config.sequencers_dir;
 
             let sequenceurs_list = read_dir(&sequenceurs_folder)
