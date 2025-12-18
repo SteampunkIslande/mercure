@@ -19,7 +19,7 @@ cd $PIPELINE_DIR/$PIPELINE_NAME
 
 echo "## STEP Etape 1/4: Démultiplexage"
 
-demul_job_name=$(date +%s)
+demul_job_name=$PIPELINE_NAME-$(date +%s)
 
 # Permet de suivre l'évolution du run via l'interface Mercure
 echo "SLURM run ID: $demul_job_name"
