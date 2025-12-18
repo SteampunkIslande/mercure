@@ -223,7 +223,7 @@ pub async fn list_runs_get(
                 "Liste des runs de vos groupes"
             };
 
-            return Json(ApiResponse::success(json!({
+            Json(ApiResponse::success(json!({
                     "title": title,
                     "header": create_header(),
                     "table": runs_list,
@@ -233,12 +233,12 @@ pub async fn list_runs_get(
                         "page_size": page_size_val,
                         "total_count": total_count
                     }
-            })));
+            })))
         }
         Err(_e) => {
-            return Json(ApiResponse::error(
+            Json(ApiResponse::error(
                 "Erreur lors de la récupération des runs.".to_string(),
-            ));
+            ))
         }
     }
 }

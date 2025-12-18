@@ -41,13 +41,13 @@ pub async fn watch_log(
     let re_logfile = Regex::new(&log_pattern).unwrap();
     let mut entries = std::fs::read_dir(&logs_folder)?;
     let mut log_path = None;
-    while let Some(entry) = entries.next() {
+    for entry in entries {
         let path = entry?.path();
-        if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-            if re_logfile.is_match(name) {
-                log_path = Some(path);
-                break;
-            }
+        if let Some(name) = path.file_name().and_then(|s| s.to_str())
+            && re_logfile.is_match(name)
+        {
+            log_path = Some(path);
+            break;
         }
     }
 
@@ -100,14 +100,14 @@ pub async fn watch_log(
         (None, None, None)
     };
 
-    return Ok(RTJobInfo {
+    Ok(RTJobInfo {
         current_step_string: last_step.clone(),
         current_progress: last_progress,
         pending_jobs_count: pending,
         running_jobs_count: running,
         done_jobs_count: done,
         slurm_job_name: last_slurm_id,
-    });
+    })
 }
 
 async fn count_jobs_in_squeue(slurm_id: &str) -> Option<(i64, i64, i64)> {
@@ -135,7 +135,7 @@ async fn count_jobs_in_squeue(slurm_id: &str) -> Option<(i64, i64, i64)> {
                         .unwrap_or_default()
                         .into(),
                 )
-                .and_modify(|i| *i = *i + 1)
+                .and_modify(|i| *i += 1)
                 .or_insert(1);
                 acc
             });

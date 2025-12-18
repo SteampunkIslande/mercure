@@ -47,9 +47,7 @@ impl<'r> FromRequest<'r> for Authenticated {
         // Vérifie si l'utilisateur est authentifié via un cookie de session
         match user_from_cookie(request).await {
             Ok(user) => Outcome::Success(Authenticated { user }),
-            Err(err) => match err {
-                _ => Outcome::Error((Status::Unauthorized, err)),
-            },
+            Err(err) => Outcome::Error((Status::Unauthorized, err)),
         }
     }
 }

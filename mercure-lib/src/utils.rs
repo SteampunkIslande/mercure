@@ -108,14 +108,13 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
             cleaned_lines.push(cleaned_values.join(","));
 
             // Extraire l'échantillon si présent
-            if let Some(sample_idx) = sample_col_index {
-                if let Some(val) = values.get(sample_idx) {
+            if let Some(sample_idx) = sample_col_index
+                && let Some(val) = values.get(sample_idx) {
                     let cleaned_sample = clean_string(val);
                     if !cleaned_sample.is_empty() {
                         samples.push(cleaned_sample);
                     }
                 }
-            }
 
             i += 1;
             continue;

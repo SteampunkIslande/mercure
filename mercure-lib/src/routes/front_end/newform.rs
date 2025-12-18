@@ -24,15 +24,14 @@ pub fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<Strin
                 let launchers_path = path.join("launchers");
                 let mut launchers = Vec::new();
 
-                if launchers_path.is_dir() {
-                    if let Ok(launcher_entries) = fs::read_dir(&launchers_path) {
+                if launchers_path.is_dir()
+                    && let Ok(launcher_entries) = fs::read_dir(&launchers_path) {
                         for launcher_entry in launcher_entries.flatten() {
                             if let Some(name) = launcher_entry.file_name().to_str() {
                                 launchers.push(name.to_string());
                             }
                         }
                     }
-                }
 
                 result.insert(folder_name, launchers);
             }

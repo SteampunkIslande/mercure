@@ -50,7 +50,7 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
         Err(e) => {
             return Json(ApiResponse::error(format!(
                 "La samplesheet n'est pas stockée dans le dossier upload {}",
-                e.to_string()
+                e
             )));
         }
     };

@@ -16,11 +16,11 @@ pub async fn watch(job_id: i64, attempt_number: i64) -> Json<ApiResponse<Value>>
     match watch_log(job_id, attempt_number, logs_folder).await {
         Ok(vars) => match to_value(&vars) {
             Ok(json_vars) => Json(ApiResponse::success(json_vars)),
-            Err(e) => Json(ApiResponse::error(&format!(
+            Err(e) => Json(ApiResponse::error(format!(
                 "Erreur de sérialisation: {}",
                 e
             ))),
         },
-        Err(e) => Json(ApiResponse::error(&format!("Erreur: {}", e))),
+        Err(e) => Json(ApiResponse::error(format!("Erreur: {}", e))),
     }
 }

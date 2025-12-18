@@ -60,7 +60,7 @@ impl HgAttempt {
         .bind(&run.metadata_path)
         .bind(&run.indir)
         .bind(&run.outdir)
-        .bind(&run.status.to_string())
+        .bind(run.status.to_string())
         .execute(pool)
         .await?;
 

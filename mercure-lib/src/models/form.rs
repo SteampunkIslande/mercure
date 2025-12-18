@@ -113,7 +113,7 @@ impl HgFormDef {
             SELECT COUNT(*) AS n FROM Formdef WHERE form_name = ? AND version = ?"#,
         )
         .bind(&new_formdef.form_name)
-        .bind(&new_formdef.version)
+        .bind(new_formdef.version)
         .fetch_one(pool)
         .await?
         .try_get::<i64, &str>("n")?

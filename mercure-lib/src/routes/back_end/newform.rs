@@ -23,8 +23,7 @@ pub async fn get_nextversion(
             .bind(&formname)
             .fetch_one(pool.deref())
             .await
-            .map(|r| r.try_get::<i64, &str>("count"))
-            .flatten()
+            .and_then(|r| r.try_get::<i64, &str>("count"))
         {
             Ok(count) => Value::from(count + 1),
             Err(_) => Value::from(1),
@@ -45,10 +44,10 @@ pub async fn parse_launcher_endpoint(
         .join("launchers")
         .join(&launcher);
     if !launcher_abs_path.exists() {
-        return Json(ApiResponse::error(format!(
+        Json(ApiResponse::error(format!(
             "Le launcher spécifié n'existe pas: {}",
             launcher_abs_path.display()
-        )));
+        )))
     } else {
         let launcher_text = match std::fs::read_to_string(&launcher_abs_path) {
             Ok(s) => s,

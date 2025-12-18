@@ -51,8 +51,8 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
         }
 
         // Détection d’un job associé
-        if let Some(cap) = re_job.captures(&line) {
-            if current_run_id.is_some() {
+        if let Some(cap) = re_job.captures(&line)
+            && current_run_id.is_some() {
                 let slurm_id = cap[1].to_string();
                 let log_path = cap[2].to_string();
 
@@ -83,7 +83,6 @@ pub fn parse_log_file(file: impl Read) -> Result<HashMap<(String, u32), Vec<JobI
                     });
                 }
             }
-        }
     }
 
     Ok(runs)

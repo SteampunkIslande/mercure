@@ -145,7 +145,7 @@ pub async fn show_run_get(
             let attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
 
             // On cherche la tentative demandée
-            let attempt = match HgAttempt::get_attempt_from_number(attempt_number, run_id, &pool)
+            let attempt = match HgAttempt::get_attempt_from_number(attempt_number, run_id, pool)
                 .await
             {
                 Ok(a) => a,
