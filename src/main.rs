@@ -116,6 +116,8 @@ async fn rocket() -> _ {
                 routes::backend::redirect_post,
                 // Route pour relancer un run (une fois terminé)
                 routes::backend::retry_run_get,
+                // Route pour commenter une tentative
+                routes::backend::update_comment
             ],
         )
         .manage(pool)
