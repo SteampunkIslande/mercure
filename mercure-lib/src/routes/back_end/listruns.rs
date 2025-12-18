@@ -235,14 +235,13 @@ pub async fn list_runs_get(
                     }
             })))
         }
-        Err(_e) => {
-            Json(ApiResponse::error(
-                "Erreur lors de la récupération des runs.".to_string(),
-            ))
-        }
+        Err(_e) => Json(ApiResponse::error(
+            "Erreur lors de la récupération des runs.".to_string(),
+        )),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[get("/searchrun?<page>&<page_size>&<status>&<date_from>&<date_to>&<run_name_search>")]
 pub async fn search_run_get(
     pool: &State<SqlitePool>,

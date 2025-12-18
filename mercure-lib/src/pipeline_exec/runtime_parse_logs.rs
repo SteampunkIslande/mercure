@@ -39,7 +39,7 @@ pub async fn watch_log(
     // Recherche du fichier
     let log_pattern = format!(r"^\d+-job-{}-{}\.log$", job_id, attempt_number);
     let re_logfile = Regex::new(&log_pattern).unwrap();
-    let mut entries = std::fs::read_dir(&logs_folder)?;
+    let entries = std::fs::read_dir(&logs_folder)?;
     let mut log_path = None;
     for entry in entries {
         let path = entry?.path();

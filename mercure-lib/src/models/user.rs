@@ -145,7 +145,7 @@ impl User {
         Ok(())
     }
 
-    pub async fn update_password<'a>(
+    pub async fn update_password(
         password_update: PasswordUpdate<'_>,
         pool: &SqlitePool,
     ) -> Result<(), AuthError> {
