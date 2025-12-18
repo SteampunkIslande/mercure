@@ -1,13 +1,16 @@
 use chrono::Local;
 use env_logger::Builder;
 use log::{error, info};
+use mercure::models::ModelError;
 use mercure_lib::config::get_mercure_config;
 use mercure_lib::models::HgRun;
 use mercure_lib::models::analysis;
+use std::io::Error as IoError;
+use tokio::task::JoinError as TokioJoinError;
+
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::PathBuf;
-use tokio;
+use std::path::{Path, PathBuf};
 use tokio::signal::unix::SignalKind;
 
 // Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
@@ -22,9 +25,11 @@ fn init_logger() {
         .init();
 }
 
+use chrono::ParseError;
+use core::convert::Infallible;
+use glob::PatternError;
 use mercure_lib::models::AnalysisStateMachineError;
-use sqlx;
-use sqlx::Row;
+use sqlx::{Error, Row};
 use thiserror::Error;
 use tokio::sync::watch;
 
@@ -35,25 +40,25 @@ use mercure_lib::models::RunStatus;
 #[derive(Error, Debug)]
 enum RoutineError {
     #[error(transparent)]
-    SqlxError(#[from] sqlx::Error),
+    Sqlx(#[from] Error),
     #[error(transparent)]
-    InvalidRunStatusError(#[from] InvalidRunStatusError),
+    InvalidRunStatus(#[from] InvalidRunStatusError),
     #[error(transparent)]
-    AnalysisStateMachineError(#[from] AnalysisStateMachineError),
+    AnalysisStateMachine(#[from] AnalysisStateMachineError),
     #[error(transparent)]
-    PathError(#[from] core::convert::Infallible),
+    Path(#[from] Infallible),
     #[error(transparent)]
-    GlobError(#[from] glob::PatternError),
+    Glob(#[from] PatternError),
     #[error(transparent)]
-    DateParseError(#[from] chrono::ParseError),
+    DateParse(#[from] ParseError),
     #[error("{0}")]
-    CustomParseError(String),
+    CustomParse(String),
     #[error(transparent)]
-    ModelError(#[from] mercure::models::ModelError),
+    Model(#[from] ModelError),
     #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    IO(#[from] IoError),
     #[error(transparent)]
-    JoinError(#[from] tokio::task::JoinError),
+    TokioJoin(#[from] TokioJoinError),
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
@@ -113,7 +118,7 @@ async fn run_routine_loop(
 /// C'est HgRun qui a un membre dédié
 async fn start_analysis(
     attempt: &HgAttempt,
-    run_dir: &PathBuf,
+    run_dir: &Path,
     pool: &sqlx::SqlitePool,
 ) -> Result<(), RoutineError> {
     use std::fs;
@@ -126,14 +131,14 @@ async fn start_analysis(
         run_dir
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or(RoutineError::CustomParseError(
+            .ok_or(RoutineError::CustomParse(
                 "Failed to extract run basename".into(),
             ))?;
 
     // Extraction des composants
     let parts: Vec<&str> = run_rawdir_basename.splitn(4, '_').collect();
     if parts.len() < 4 {
-        return Err(RoutineError::CustomParseError(format!(
+        return Err(RoutineError::CustomParse(format!(
             "Le nom du dossier de run '{}' ne contient pas assez de parties",
             run_rawdir_basename
         )));
@@ -166,14 +171,13 @@ async fn start_analysis(
         launcher = run.form.launcher_name
     );
     if !std::fs::exists(&launcher_abs_path)? {
-        return Err(std::io::Error::new(
+        return Err(RoutineError::from(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!(
                 "Impossible de trouver le launcher au chemin suivant: {}",
                 launcher_abs_path
             ),
-        ))
-        .map_err(RoutineError::from);
+        )));
     }
 
     let script_path = format!(
@@ -183,7 +187,7 @@ async fn start_analysis(
         attempt_number = attempt.attempt_number
     );
     if std::fs::exists(&script_path)? {
-        return Err(RoutineError::IOError(std::io::Error::new(
+        return Err(RoutineError::IO(std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
             format!("Le fichier {} existe déjà!", &script_path),
         )));
@@ -205,6 +209,7 @@ async fn start_analysis(
         .mode(0o775)
         .write(true)
         .create(true)
+        .truncate(true)
         .open(&script_path)?;
 
     write!(
@@ -226,6 +231,7 @@ source /etc/profile
 /// Quelques effets de bord :
 /// - Log les erreurs SQL
 /// - Log les erreurs de récupération des tentatives
+///
 /// Retourne une liste vide en cas d'erreur
 async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<HgAttempt> {
     match sqlx::query(
@@ -270,6 +276,7 @@ async fn find_pending_runs(pool: &sqlx::SqlitePool) -> Vec<HgAttempt> {
 /// Quelques effets de bord :
 /// - Log les erreurs SQL
 /// - Log les erreurs de récupération des tentatives
+///
 /// Retourne une liste vide en cas d'erreur
 async fn find_running_runs(pool: &sqlx::SqlitePool) -> Vec<HgAttempt> {
     match sqlx::query(
@@ -313,7 +320,7 @@ fn get_supposed_run_dir_glob(run: &HgAttempt) -> String {
 
 async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     use chrono::{Duration, Local, NaiveDate};
-    let supposed_run_dir = get_supposed_run_dir_glob(&attempt);
+    let supposed_run_dir = get_supposed_run_dir_glob(attempt);
     let paths: Vec<PathBuf> = glob::glob(&supposed_run_dir)
         .map_err(RoutineError::from)?
         .filter_map(Result::ok)
@@ -345,7 +352,7 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     } else {
         let run_dir = &paths[0];
         // On démarre l'analyse
-        start_analysis(&attempt, run_dir, pool).await?;
+        start_analysis(attempt, run_dir, pool).await?;
 
         // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
         mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
@@ -388,7 +395,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
         .collect();
 
     if running_paths.len() + fails_paths.len() + done_paths.len() > 1 {
-        Err(RoutineError::CustomParseError(format!(
+        Err(RoutineError::CustomParse(format!(
             "La tentative {} pour le run {} apparaît dans plusieurs états à la fois",
             attempt.attempt_number, attempt.run_id
         )))
@@ -441,22 +448,19 @@ async fn main() -> Result<(), RoutineError> {
     let mut stream_sigterm = tokio::signal::unix::signal(SignalKind::terminate())?;
     let mut stream_sigint = tokio::signal::unix::signal(SignalKind::interrupt())?;
 
-    loop {
-        tokio::select! {
-            _ = stream_sigterm.recv() => {
-                info!("Signal SIGTERM reçu, arrêt de la routine...");
-                let _ = shutdown_tx.send(true);
-                routine_handle.await??;
-                break;
-            }
-            _ = stream_sigint.recv() => {
-                info!("Signal SIGINT reçu, arrêt de la routine...");
-                let _ = shutdown_tx.send(true);
-                routine_handle.await??;
-                break;
-            }
+    tokio::select! {
+        _ = stream_sigterm.recv() => {
+            info!("Signal SIGTERM reçu, arrêt de la routine...");
+            let _ = shutdown_tx.send(true);
+            routine_handle.await??;
+        }
+        _ = stream_sigint.recv() => {
+            info!("Signal SIGINT reçu, arrêt de la routine...");
+            let _ = shutdown_tx.send(true);
+            routine_handle.await??;
         }
     }
+
     info!("Routine arrêtée.");
     Ok(())
 }
