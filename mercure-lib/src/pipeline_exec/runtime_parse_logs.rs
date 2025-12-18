@@ -1,5 +1,5 @@
 use anyhow::Result;
-use regex::Regex;
+use lazy_regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;

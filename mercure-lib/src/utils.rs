@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use lazy_regex::{Lazy, Regex, lazy_regex};
+
 use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
 
@@ -109,12 +111,13 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
 
             // Extraire l'échantillon si présent
             if let Some(sample_idx) = sample_col_index
-                && let Some(val) = values.get(sample_idx) {
-                    let cleaned_sample = clean_string(val);
-                    if !cleaned_sample.is_empty() {
-                        samples.push(cleaned_sample);
-                    }
+                && let Some(val) = values.get(sample_idx)
+            {
+                let cleaned_sample = clean_string(val);
+                if !cleaned_sample.is_empty() {
+                    samples.push(cleaned_sample);
                 }
+            }
 
             i += 1;
             continue;
@@ -172,12 +175,13 @@ pub fn format_french_date(date_str: &str) -> String {
     }
 }
 
+static VAR_REGEX: Lazy<Regex> = lazy_regex!(r"(?m)^##\s*(\S+)\s+(.+)$");
+
 pub fn parse_launcher(launcher_content: &str) -> Result<HashMap<String, String>, String> {
     // In the launcher content, look for lines starting with ## VAR_NAME description
     let mut vars: HashMap<String, String> = HashMap::new();
-    let re = regex::Regex::new(r"(?m)^##\s*(\S+)\s+(.+)$").map_err(|e| e.to_string())?;
 
-    for cap in re.captures_iter(launcher_content) {
+    for cap in VAR_REGEX.captures_iter(launcher_content) {
         if let (Some(var), Some(desc)) = (cap.get(1), cap.get(2)) {
             let var_name = var.as_str().to_string();
             vars.insert(var_name, desc.as_str().to_string());

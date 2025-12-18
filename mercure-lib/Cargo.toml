@@ -20,11 +20,12 @@ chrono = "0.4.42"
 diacritics = "0.2.2"
 rocket_dyn_templates = "0.2.0"
 intersection = "1.0.0"
-regex = "1.12.2"
 async-stream = "0.3.6"
 futures = "0.3.31"
 anyhow = "1.0.100"
 reqwest = { version = "0.12.24" }
+zip = "6.0.0"
+lazy-regex = "3.4.2"
 
 [dev-dependencies]
 tempfile = "3.8"
