@@ -30,8 +30,9 @@
 
     <h2>Echec du run</h2>
     <p>
-        L'analyse du run <strong>{{ run.run_name }}</strong> a échoué.
-        <br>Message: <span style="color: red;">{{ attempt.comment }}</span>
+    <p>L'analyse du run <strong>{{ run.run_name }}</strong> a échoué.</p>
+    <p>Message: <span style="color: red;">{{ attempt.comment }}</span></p>
+    <p>Raison: {{ fail_reason }}</p>
     </p>
 
     {% include 'common/runinfo' %}
