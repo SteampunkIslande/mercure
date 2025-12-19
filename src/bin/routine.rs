@@ -66,6 +66,8 @@ enum RoutineError {
     InvalidRegex(#[from] RegexError),
     #[error("Le dossier d'entrée {0} est introuvable")]
     IndirNotFound(String),
+    #[error("Aucun dossier d'entrée spécifié")]
+    NoIndir,
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
@@ -119,6 +121,31 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
             }
         }
     }
+}
+
+fn get_indir_outdir_for_analysisdir(
+    attempt: &HgAttempt,
+) -> Result<(PathBuf, PathBuf), RoutineError> {
+    let indir_str = attempt.indir.as_ref().ok_or(RoutineError::NoIndir)?;
+    Ok((PathBuf::from(&indir_str), PathBuf::from(&indir_str)))
+}
+
+fn get_indir_outdir_for_ontdir(
+    attempt: &HgAttempt,
+    run: &HgRun,
+) -> Result<(PathBuf, PathBuf), RoutineError> {
+    let indir_str = attempt.indir.as_ref().ok_or(RoutineError::NoIndir)?;
+
+    let config = get_mercure_config();
+
+    let run_date_short = attempt.run_date[2..].replace("-", "");
+    let seq_name = &attempt.run_sequencer;
+    let run_name = &run.run_name;
+
+    Ok((
+        PathBuf::from(&indir_str),
+        PathBuf::from(config.analysis_dir).join(format!("{run_date_short}_{seq_name}_{run_name}")),
+    ))
 }
 
 fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBuf), RoutineError> {
@@ -360,7 +387,7 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     use chrono::{Duration, Local, NaiveDate};
 
     let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
-    let form: HgFormDef = run.form;
+    let form: &HgFormDef = &run.form;
 
     // Vérifier si la date actuelle est > run_date + 1 jour
     let run_date = NaiveDate::parse_from_str(&attempt.run_date, "%Y-%m-%d")?;
@@ -399,12 +426,8 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
                 Ok((in_dir, out_dir)) => (in_dir, out_dir),
             }
         }
-        IndirType::AnalysisDir => {
-            todo!();
-        }
-        IndirType::OntDir => {
-            todo!();
-        }
+        IndirType::AnalysisDir => get_indir_outdir_for_analysisdir(attempt)?,
+        IndirType::OntDir => get_indir_outdir_for_ontdir(&attempt, &run)?,
     };
 
     // Vérifier le contenu du dossier d'entrée pour s'assurer que le run est terminé (uniquement pour Illumina/BclDir)
