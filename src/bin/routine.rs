@@ -163,10 +163,8 @@ fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBu
     let run_dir_re = Regex::new(&run_dir_pattern)?;
 
     let (bcl_dir_base, seq_run_counter) = std::fs::read_dir(&raw_dir)?
-        .into_iter()
         .filter_map(|e| {
-            e.and_then(|e| {
-                Ok(run_dir_re
+            e.map(|e| run_dir_re
                     .captures(&e.file_name().display().to_string())
                     .and_then(|cap| {
                         cap.get(1).and_then(|c| {
@@ -176,7 +174,6 @@ fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBu
                             ))
                         })
                     }))
-            })
             .ok()?
         })
         .next()
@@ -301,7 +298,7 @@ async fn generate_script(
     let config = mercure_lib::config::get_mercure_config();
     // Création du dossier d'analyse si nécessaire
     if !output_dir.exists() {
-        if let Err(e) = create_dir_all(&output_dir) {
+        if let Err(e) = create_dir_all(output_dir) {
             error!("Erreur lors de la création du dossier d'analyse: {}", e);
             return Err(e.into());
         }
@@ -427,14 +424,14 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
             }
         }
         IndirType::AnalysisDir => get_indir_outdir_for_analysisdir(attempt)?,
-        IndirType::OntDir => get_indir_outdir_for_ontdir(&attempt, &run)?,
+        IndirType::OntDir => get_indir_outdir_for_ontdir(attempt, &run)?,
     };
 
     // Vérifier le contenu du dossier d'entrée pour s'assurer que le run est terminé (uniquement pour Illumina/BclDir)
     // (TODO)
 
     // On démarre l'analyse
-    start_analysis(&attempt, &input_dir, &output_dir, &pool).await?;
+    start_analysis(attempt, &input_dir, &output_dir, pool).await?;
 
     // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
     mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
