@@ -16,21 +16,8 @@ use thiserror::Error;
 
 use tokio::signal::unix::SignalKind;
 
-// Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
-fn init_logger() {
-    Builder::new()
-        .format(|buf, record| {
-            let now = Local::now().format("%Y-%m-%d %H:%M:%S");
-            writeln!(buf, "[{} {}] {}", record.level(), now, record.args())
-        })
-        .filter_level(log::LevelFilter::Info)
-        .target(env_logger::Target::Stderr)
-        .init();
-}
-
 use chrono::ParseError;
 use core::convert::Infallible;
-use glob::PatternError;
 use mercure_lib::models::AnalysisStateMachineError;
 use regex::{Error as RegexError, Regex};
 use sqlx::{Error, Row};
@@ -50,8 +37,6 @@ enum RoutineError {
     AnalysisStateMachine(#[from] AnalysisStateMachineError),
     #[error(transparent)]
     Path(#[from] Infallible),
-    #[error(transparent)]
-    Glob(#[from] PatternError),
     #[error(transparent)]
     DateParse(#[from] ParseError),
     #[error("{0}")]
@@ -148,7 +133,10 @@ fn get_indir_outdir_for_ontdir(
     ))
 }
 
-fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBuf), RoutineError> {
+fn get_indir_outdir_for_illumina(
+    attempt: &HgAttempt,
+    _run: &HgRun,
+) -> Result<(PathBuf, PathBuf), RoutineError> {
     // Le dossier de run brut Illumina devrait être dans {sequencers_dir}/{run_sequencer}/output/{run_date}_{run_sequencer}_*_{run_flowcellid}*
     let config = get_mercure_config();
     let raw_dir = Path::new(&config.sequencers_dir)
@@ -164,7 +152,8 @@ fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBu
 
     let (bcl_dir_base, seq_run_counter) = std::fs::read_dir(&raw_dir)?
         .filter_map(|e| {
-            e.map(|e| run_dir_re
+            e.map(|e| {
+                run_dir_re
                     .captures(&e.file_name().display().to_string())
                     .and_then(|cap| {
                         cap.get(1).and_then(|c| {
@@ -173,7 +162,8 @@ fn get_indir_outdir_for_illumina(attempt: &HgAttempt) -> Result<(PathBuf, PathBu
                                 c.as_str().to_string().parse::<i64>().ok()?,
                             ))
                         })
-                    }))
+                    })
+            })
             .ok()?
         })
         .next()
@@ -392,7 +382,7 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
 
     let (input_dir, output_dir) = match form.indir_type {
         IndirType::BclDir => {
-            match get_indir_outdir_for_illumina(attempt) {
+            match get_indir_outdir_for_illumina(attempt, &run) {
                 Err(RoutineError::IndirNotFound(expected_name)) => {
                     // Le run est considéré comme "non trouvé" si la date actuelle est > run_date + 1 jour et qu'aucun dossier n'est trouvé
                     // En effet, normalement, le séquenceur crée le dossier le jour même
@@ -453,24 +443,35 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
     let fails_dir = format!("{}/FAILS", config.jobs_dir);
     let done_dir = format!("{}/DONE", config.jobs_dir);
 
-    let file_pattern = format!("*-job-{}-{}.sh", attempt.run_id, attempt.attempt_number);
+    let file_pattern = format!("job-{}-{}.sh", attempt.run_id, attempt.attempt_number);
 
-    let fails_files_pattern = format!("{}/{}", &fails_dir, file_pattern);
-    let fails_paths: Vec<PathBuf> = glob::glob(&fails_files_pattern)
-        .map_err(RoutineError::from)?
+    let fails_paths: Vec<PathBuf> = std::fs::read_dir(&fails_dir)?
+        .map(|entry| entry.map(|e| e.path()))
         .filter_map(Result::ok)
-        .collect();
-    let done_files_pattern = format!("{}/{}", &done_dir, file_pattern);
-    let done_paths: Vec<PathBuf> = glob::glob(&done_files_pattern)
-        .map_err(RoutineError::from)?
-        .filter_map(Result::ok)
+        .filter(|path| {
+            path.file_name()
+                .map(|name| name.display().to_string().ends_with(&file_pattern))
+                .unwrap_or(false)
+        })
         .collect();
 
-    // Chercher le chemin running en dernier dans le cas hautement improbable où le système de fichier a déplacé le script de running à done/fail entre le moment où on l'a trouvé dans running et le moment où on le cherche dans done/fail.
-    let running_files_pattern = format!("{}/{}", &running_dir, file_pattern);
-    let running_paths: Vec<PathBuf> = glob::glob(&running_files_pattern)
-        .map_err(RoutineError::from)?
+    let done_paths: Vec<PathBuf> = std::fs::read_dir(&done_dir)?
+        .map(|entry| entry.map(|e| e.path()))
         .filter_map(Result::ok)
+        .filter(|path| {
+            path.file_name()
+                .map(|name| name.display().to_string().ends_with(&file_pattern))
+                .unwrap_or(false)
+        })
+        .collect();
+    let running_paths: Vec<PathBuf> = std::fs::read_dir(&running_dir)?
+        .map(|entry| entry.map(|e| e.path()))
+        .filter_map(Result::ok)
+        .filter(|path| {
+            path.file_name()
+                .map(|name| name.display().to_string().ends_with(&file_pattern))
+                .unwrap_or(false)
+        })
         .collect();
 
     if running_paths.len() + fails_paths.len() + done_paths.len() > 1 {
@@ -501,6 +502,18 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
         }
         Ok(())
     }
+}
+
+// Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
+fn init_logger() {
+    Builder::new()
+        .format(|buf, record| {
+            let now = Local::now().format("%Y-%m-%d %H:%M:%S");
+            writeln!(buf, "[{} {}] {}", record.level(), now, record.args())
+        })
+        .filter_level(log::LevelFilter::Info)
+        .target(env_logger::Target::Stderr)
+        .init();
 }
 
 #[tokio::main]
