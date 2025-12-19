@@ -2,13 +2,13 @@
 
 ## Etape 1: nginx doit être actif
 
-Sur le serveur de production, `hmn-genseq-p01`, nginx est un service actif, défini dans une unité de systemd.
+Sur le serveur de production, `hmn-genseq-p01`, nginx est une instance singularity, qui tourne comme un service. Elle s'exécute en tant que root, car elle doit pouvoir écouter sur le port 80.
 
-Pour savoir si nginx est actif:
-
+Pour savoir si nginx est actif, il faut lancer, en tant que root:
 ```bash
 singularity instance list | grep nginx
 ```
+
 Si le résultat n'est pas vide, activer l'instance nginx.
 
 En tant que root:
@@ -19,7 +19,10 @@ singularity instance start -B /var/log -B /var/cache -B /var/run nginx.sif nginx
 
 ## Etape 2: lancer mercure
 
-
+En tant qu'utilisateur hermes:
+```bash
+singularity instance start -B /OPT/JOBS -B /OPT/hermes
+```
 
 # Configuration
 
