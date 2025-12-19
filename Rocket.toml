@@ -14,8 +14,8 @@ ctrlc = true
 [debug]
 mercure_db = "sqlite:///home/charles/mercure/mercure.db"
 
-template_dir = "./static/templates"
-static_dir = "./static"
+template_dir = "/home/charles/mercure/static/templates"
+static_dir = "/home/charles/mercure/static"
 upload_dir = "/home/charles/mercure-arena/uploads"
 logs_dir = "/home/charles/mercure-arena/OPT/JOBS/LOGS"
 

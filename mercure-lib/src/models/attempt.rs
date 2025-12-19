@@ -121,7 +121,7 @@ impl HgAttempt {
     ) -> Result<Vec<Self>, ModelError> {
         let rows = sqlx::query(
             r#"
-            SELECT * FROM Attempts WHERE run_id = ?
+            SELECT * FROM Attempts WHERE run_id = ? ORDER BY attempt_number DESC
             "#,
         )
         .bind(run_id)
