@@ -210,11 +210,11 @@ async fn start_analysis(
             dest_arn_path.display()
         );
     }
-    if std::path::Path::new(&attempt.metadata_path).exists() {
-        if let Some(src_metadata_filename) =
+    if std::path::Path::new(&attempt.metadata_path).exists()
+        && let Some(src_metadata_filename) =
             std::path::Path::new(&attempt.metadata_path).file_name()
         {
-            let dest_metadata_path = output_dir.join(&src_metadata_filename);
+            let dest_metadata_path = output_dir.join(src_metadata_filename);
             std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
             info!(
                 "Fichier Metadata copié de {} vers {}",
@@ -222,7 +222,6 @@ async fn start_analysis(
                 dest_metadata_path.display()
             );
         }
-    }
     // Génération du script d'analyse
     generate_script(input_dir, output_dir, pipeline_base_dir, attempt, pool).await?;
 
