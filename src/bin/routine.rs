@@ -181,6 +181,7 @@ fn get_indir_outdir_for_illumina(
 /// C'est HgRun qui a un membre dédié
 async fn start_analysis(
     attempt: &HgAttempt,
+    _form: &HgFormDef,
     input_dir: &Path,
     output_dir: &Path,
     pool: &sqlx::SqlitePool,
@@ -190,6 +191,38 @@ async fn start_analysis(
     // En mode reproduction, le dossier de pipeline sera cloné dans un dossier temporaire avec le commit préalablement enregistré dans la tentative
     let pipeline_base_dir = Path::new(&config.pipeline_dir);
 
+    //Copie des fichiers adn.csv, arn.csv et metadata si présents
+    if std::path::Path::new(&attempt.sample_sheet_adn_path).exists() {
+        let dest_adn_path = output_dir.join("adn.csv");
+        std::fs::copy(&attempt.sample_sheet_adn_path, &dest_adn_path)?;
+        info!(
+            "Fichier ADN copié de {} vers {}",
+            &attempt.sample_sheet_adn_path,
+            dest_adn_path.display()
+        );
+    }
+    if std::path::Path::new(&attempt.sample_sheet_arn_path).exists() {
+        let dest_arn_path = output_dir.join("arn.csv");
+        std::fs::copy(&attempt.sample_sheet_arn_path, &dest_arn_path)?;
+        info!(
+            "Fichier ARN copié de {} vers {}",
+            &attempt.sample_sheet_arn_path,
+            dest_arn_path.display()
+        );
+    }
+    if std::path::Path::new(&attempt.metadata_path).exists() {
+        if let Some(src_metadata_filename) =
+            std::path::Path::new(&attempt.metadata_path).file_name()
+        {
+            let dest_metadata_path = output_dir.join(&src_metadata_filename);
+            std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
+            info!(
+                "Fichier Metadata copié de {} vers {}",
+                &attempt.metadata_path,
+                dest_metadata_path.display()
+            );
+        }
+    }
     // Génération du script d'analyse
     generate_script(input_dir, output_dir, pipeline_base_dir, attempt, pool).await?;
 
@@ -354,7 +387,9 @@ export PIPELINE_DIR={pipeline_dir}
 export PIPELINE_NAME={pipeline_name}
 export PATH=/usr/bin:$PATH
 source /etc/profile
+
 {udv}
+
 {launcher_abs_path}
 "#,
         pipeline_dir = pipeline_base_dir.display(),
@@ -421,7 +456,7 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     // (TODO)
 
     // On démarre l'analyse
-    start_analysis(attempt, &input_dir, &output_dir, pool).await?;
+    start_analysis(attempt, form, &input_dir, &output_dir, pool).await?;
 
     // Seulement si l'analyse a pu être démarrée correctement, on arrive à ce point et le run peut être marqué comme en cours d'analyse
     mercure::models::analysis::start_run_analysis(attempt.run_id, pool)
