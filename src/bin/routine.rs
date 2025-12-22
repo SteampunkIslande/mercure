@@ -5,6 +5,7 @@ use mercure::models::{HgFormDef, HgRun, IndirType, ModelError};
 use mercure_lib::config::get_mercure_config;
 use mercure_lib::models::analysis;
 use std::io::Error as IoError;
+use std::process::Command;
 use tokio::task::JoinError as TokioJoinError;
 
 use sqlx::SqlitePool;
@@ -77,7 +78,7 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
                         .await
                     {
                         Ok(_) => info!(
-                            "La tentative {} du run {} a été marqué comme Failed.",
+                            "La tentative {} du run {} a été marquée comme Failed.",
                             attempt.attempt_number, attempt.run_id
                         ),
                         Err(err) => error!(
@@ -213,15 +214,15 @@ async fn start_analysis(
     if std::path::Path::new(&attempt.metadata_path).exists()
         && let Some(src_metadata_filename) =
             std::path::Path::new(&attempt.metadata_path).file_name()
-        {
-            let dest_metadata_path = output_dir.join(src_metadata_filename);
-            std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
-            info!(
-                "Fichier Metadata copié de {} vers {}",
-                &attempt.metadata_path,
-                dest_metadata_path.display()
-            );
-        }
+    {
+        let dest_metadata_path = output_dir.join(src_metadata_filename);
+        std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
+        info!(
+            "Fichier Metadata copié de {} vers {}",
+            &attempt.metadata_path,
+            dest_metadata_path.display()
+        );
+    }
     // Génération du script d'analyse
     generate_script(input_dir, output_dir, pipeline_base_dir, attempt, pool).await?;
 
@@ -382,21 +383,41 @@ async fn generate_script(
         &mut script_file,
         r#"#!/bin/bash
 
-export PIPELINE_DIR={pipeline_dir}
-export PIPELINE_NAME={pipeline_name}
+export PIPELINE_DIR="{pipeline_dir}"
+export PIPELINE_NAME="{pipeline_name}"
 export PATH=/usr/bin:$PATH
 source /etc/profile
 
 {udv}
 
 {launcher_abs_path}
+RESULT=$?
+
+# Script à lancer une fois que l'analyse est terminée.
+# Notez que même en cas d'erreur, le script post-run sera exécuté (son rôle étant entre autres de collecter les logs).
+# Le code de retour de ce script n'est pas pris en compte dans le résultat global de l'analyse.
+{post_run_script}
+
+exit $RESULT
+
 "#,
         pipeline_dir = pipeline_base_dir.display(),
         pipeline_name = run.form.pipeline_name,
-        udv = exported_vars
+        udv = exported_vars,
+        post_run_script = &config.post_run_script
     )?;
 
     Ok(())
+}
+
+fn check_illumina_run_completion(indir: &PathBuf, seq_name: &str) -> Result<bool, RoutineError> {
+    let config = get_mercure_config();
+
+    let output = Command::new(&config.check_run_completed)
+        .arg(indir)
+        .arg(seq_name)
+        .output()?;
+    Ok(output.status.success())
 }
 
 /// Traite un run en état Pending (décide ou non de lancer l'analyse automatiquement)
@@ -452,7 +473,12 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     };
 
     // Vérifier le contenu du dossier d'entrée pour s'assurer que le run est terminé (uniquement pour Illumina/BclDir)
-    // (TODO)
+    // Si le run n'est pas terminé, on retourne prématurément avec un résultat OK
+    if matches!(form.indir_type, IndirType::BclDir)
+        && !check_illumina_run_completion(&input_dir, &attempt.run_sequencer)?
+    {
+        return Ok(());
+    }
 
     // On démarre l'analyse
     start_analysis(attempt, form, &input_dir, &output_dir, pool).await?;

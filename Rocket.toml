@@ -26,6 +26,9 @@ sequencers_dir = "/home/charles/mercure-arena/data/raw/sequenceurs"
 analysis_dir = "/home/charles/mercure-arena/data/analysis"
 ont_dir = "/home/charles/mercure-arena/data/raw/sequenceurs/GRIDION/output"
 
+check_run_completed = "/home/charles/mercure/scripts/run-completed.sh"
+post_run_script = "/home/charles/mercure/scripts/post-run-script.sh"
+
 cli_colors = true
 
 [release]
@@ -43,3 +46,6 @@ jobs_dir = "/OPT/JOBS"
 sequencers_dir = "/data/raw/sequenceurs"
 analysis_dir = "/data/analysis"
 ont_dir = "/data/raw/sequenceurs/GRIDION/output"
+
+check_run_completed = "/OPT/hermes/run-completed.sh"
+post_run_script = "/OPT/hermes/post-run-script.sh"
