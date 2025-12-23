@@ -194,6 +194,15 @@ async fn start_analysis(
     // En mode reproduction, le dossier de pipeline sera cloné dans un dossier temporaire avec le commit préalablement enregistré dans la tentative
     let pipeline_base_dir = Path::new(&config.pipeline_dir);
 
+    // Création du dossier d'analyse si nécessaire, *avant* de copier les fichiers!
+    if !output_dir.exists() {
+        if let Err(e) = create_dir_all(output_dir) {
+            error!("Erreur lors de la création du dossier d'analyse: {}", e);
+            return Err(e.into());
+        }
+        info!("Dossier d'analyse créé: {}", output_dir.display());
+    }
+
     //Copie des fichiers adn.csv, arn.csv et metadata si présents
     if std::path::Path::new(&attempt.sample_sheet_adn_path).exists() {
         let dest_adn_path = output_dir.join("adn.csv");
@@ -321,14 +330,6 @@ async fn generate_script(
     pool: &SqlitePool,
 ) -> Result<(), RoutineError> {
     let config = mercure_lib::config::get_mercure_config();
-    // Création du dossier d'analyse si nécessaire
-    if !output_dir.exists() {
-        if let Err(e) = create_dir_all(output_dir) {
-            error!("Erreur lors de la création du dossier d'analyse: {}", e);
-            return Err(e.into());
-        }
-        info!("Dossier d'analyse créé: {}", output_dir.display());
-    }
 
     // Obtention des informations sur le pipeline et le launcher choisis
     let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
