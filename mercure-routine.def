@@ -10,5 +10,5 @@ From: alpine:latest
 
 %startscript
     cd /
-    mercure
+    routine
 
