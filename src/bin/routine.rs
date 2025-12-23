@@ -54,6 +54,8 @@ enum RoutineError {
     IndirNotFound(String),
     #[error("Aucun dossier d'entrée spécifié")]
     NoIndir,
+    #[error("Impossible de déterminer si le run est terminé: {0}")]
+    CheckRunCompletedError(String),
 }
 
 // Ajout de la méthode utilitaire pour HgAttempt
@@ -416,7 +418,8 @@ fn check_illumina_run_completion(indir: &PathBuf, seq_name: &str) -> Result<bool
     let output = Command::new(&config.check_run_completed)
         .arg(indir)
         .arg(seq_name)
-        .output()?;
+        .output()
+        .map_err(|e| RoutineError::CheckRunCompletedError(format!("{e}")))?;
     Ok(output.status.success())
 }
 
