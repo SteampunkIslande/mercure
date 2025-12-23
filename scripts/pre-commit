@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hook git local (pré-commit) pour n'autoriser que : Untracked, Added, Deleted
+# Si un fichier suivi est modifié (M), on le supprime de l'index et on crée une nouvelle version
+# nommée selon Semantic Versioning (increment patch).
+#
+# Installation recommandée : rendre exécutable et copier vers .git/hooks/pre-commit
+# chmod +x scripts/pre-commit && cp scripts/pre-commit .git/hooks/pre-commit
+
+# Lire les changements mis en stage (null-delimited pour gérer les noms avec espaces)
+git diff --cached --name-status -z | while IFS= read -r -d '' entry; do
+    # entry est de la forme "M<TAB>path" ou "A<TAB>path", etc.
+    status=${entry%%$'\t'*}
+    path=${entry#*$'\t'}
+
+    # Ne traiter que les fichiers modifiés
+    if [[ "$status" != "M" ]]; then
+        continue
+    fi
+
+    # Séparer nom, répertoire et extension
+    dir=$(dirname -- "$path")
+    base=$(basename -- "$path")
+    if [[ "$base" == *.* ]]; then
+        name="${base%.*}"
+        ext="${base##*.}"
+    else
+        name="$base"
+        ext=""
+    fi
+
+    # Chercher les versions existantes trackées dans le repo pour ce fichier
+    max_major=-1
+    max_minor=-1
+    max_patch=-1
+
+    # Parcourir les fichiers trackés
+    while IFS= read -r tracked; do
+        tb=$(basename -- "$tracked")
+        if [[ "$tb" =~ ^${name}-v([0-9]+)\.([0-9]+)\.([0-9]+)(\..+)?$ ]]; then
+            maj=${BASH_REMATCH[1]}
+            min=${BASH_REMATCH[2]}
+            pat=${BASH_REMATCH[3]}
+            matched_ext=${BASH_REMATCH[4]}  # peut être vide ou ".ext"
+            # Si le fichier original a une extension, vérifier cohérence
+            if [[ -n "$ext" ]]; then
+                if [[ -n "$matched_ext" && "${matched_ext:1}" != "$ext" ]]; then
+                    continue
+                fi
+            fi
+            # Comparaison sémantique simple
+            if (( maj > max_major )) || \
+               (( maj == max_major && min > max_minor )) || \
+               (( maj == max_major && min == max_minor && pat > max_patch )); then
+                max_major=$maj
+                max_minor=$min
+                max_patch=$pat
+            fi
+        fi
+    done < <(git ls-files)
+
+    # Déterminer nouvelle version
+    if (( max_major < 0 )); then
+        new_major=0
+        new_minor=1
+        new_patch=0
+    else
+        new_major=$max_major
+        new_minor=$max_minor
+        new_patch=$((max_patch + 1))
+    fi
+
+    # Construire nouveau nom
+    if [[ -n "$ext" ]]; then
+        newbase="${name}-v${new_major}.${new_minor}.${new_patch}.${ext}"
+    else
+        newbase="${name}-v${new_major}.${new_minor}.${new_patch}"
+    fi
+    newpath="${dir}/${newbase}"
+
+    # Créer dossier si nécessaire
+    mkdir -p -- "$dir"
+
+    # Déplacer le fichier de travail vers le nouveau nom puis mettre à jour l'index:
+    # - git rm fichier_original (stage la suppression)
+    # - git add nouveau_fichier (stage l'ajout)
+    if [[ -f "$path" ]]; then
+        # Utiliser mv pour conserver le contenu ; si mv échoue, abort
+        mv -- "$path" "$newpath"
+        git rm --quiet --ignore-unmatch -- "$path"
+        git add -- "$newpath"
+        echo "Réécriture: $path -> $newpath (modification transformée en suppression + ajout)"
+    else
+        # Si le fichier n'existe plus dans l'arbre de travail mais est marqué M, refuser
+        echo "Erreur: fichier en statut M mais absent en travail: $path" >&2
+        exit 1
+    fi
+done
+
+# Re-stager au besoin est déjà fait par git rm/git add ci-dessus.
+# Laisser le commit se poursuivre.
+exit 0
