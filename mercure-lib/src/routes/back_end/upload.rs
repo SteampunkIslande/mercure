@@ -33,7 +33,7 @@ pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<Str
     let filepath = upload_dir.join(filename);
 
     // Persist the file
-    if (form.file.persist_to(&filepath).await).is_err() {
+    if (form.file.move_copy_to(&filepath).await).is_err() {
         return Json(ApiResponse::error("Failed to save file"));
     }
 
