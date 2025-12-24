@@ -205,7 +205,7 @@ async fn start_analysis(
 
     //Copie des fichiers adn.csv, arn.csv et metadata si présents
     if std::path::Path::new(&attempt.sample_sheet_adn_path).exists() {
-        let dest_adn_path = output_dir.join("adn.csv");
+        let dest_adn_path = input_dir.join("adn.csv");
         std::fs::copy(&attempt.sample_sheet_adn_path, &dest_adn_path)?;
         info!(
             "Fichier ADN copié de {} vers {}",
@@ -214,7 +214,7 @@ async fn start_analysis(
         );
     }
     if std::path::Path::new(&attempt.sample_sheet_arn_path).exists() {
-        let dest_arn_path = output_dir.join("arn.csv");
+        let dest_arn_path = input_dir.join("arn.csv");
         std::fs::copy(&attempt.sample_sheet_arn_path, &dest_arn_path)?;
         info!(
             "Fichier ARN copié de {} vers {}",
@@ -226,7 +226,7 @@ async fn start_analysis(
         && let Some(src_metadata_filename) =
             std::path::Path::new(&attempt.metadata_path).file_name()
     {
-        let dest_metadata_path = output_dir.join(src_metadata_filename);
+        let dest_metadata_path = input_dir.join(src_metadata_filename);
         std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
         info!(
             "Fichier Metadata copié de {} vers {}",
