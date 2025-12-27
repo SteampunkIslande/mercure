@@ -47,7 +47,14 @@
                 // 3) Afficher uniquement les cartes pour les variables requises
                 Object.entries(requiredVars).forEach(([varName, varDetails], index) => {
                     addUserVar();
-                    document.getElementById(`var_name_${index}`).value = varName;
+                    const nameInput = document.getElementById(`var_name_${index}`);
+                    const nameLabel = document.getElementById(`var_name_label_${index}`);
+                    if (nameInput) {
+                        nameInput.value = varName;
+                    }
+                    if (nameLabel) {
+                        nameLabel.textContent = varName;
+                    }
 
                     {% if edit_mode %}
                     // Pré-remplir les valeurs si elles existent dans les UDV originales
@@ -231,10 +238,11 @@
 
             userVars = {};
             document.querySelectorAll(".user-var-item").forEach((item) => {
-                const varName = item.querySelector('input[type="text"]').value;
+                const nameInput = item.querySelector('input[type="hidden"][name$="[name]"]');
+                const varName = (nameInput?.value || "").trim();
                 const varType = item.querySelector("select").value;
 
-                if (!varName.trim() || !varType.trim()) {
+                if (!varName || !varType.trim()) {
                     return;
                 }
 

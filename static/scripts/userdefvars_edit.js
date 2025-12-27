@@ -3,8 +3,9 @@ function addUserVar() {
   const div = document.createElement("div");
   div.className = "user-var-item";
   div.innerHTML = `
-                <label for="var_name_${userVarCounter}">Nom de la variable :</label>
-                <input type="text" id="var_name_${userVarCounter}" name="user_defined_vars[${userVarCounter}][name]" required>
+                <label>Nom de la variable :</label>
+                <div id="var_name_label_${userVarCounter}" class="user-var-name-label" style="font-weight: bold;"></div>
+                <input type="hidden" id="var_name_${userVarCounter}" name="user_defined_vars[${userVarCounter}][name]" required>
                 
                 <div id="var_description_${userVarCounter}" style="display:block; font-style: italic; color: #666; margin: 5px 0;">
                     <strong>Description:</strong> <span id="var_description_text_${userVarCounter}"></span>
