@@ -17,8 +17,9 @@
     <div class="banner">
         <div class="banner-content">
             <span class="banner-text">{% if run %}Editer un run<br><span class="banner-text">Pipeline: {{ form.form_name
-                    }}</span>{% else %}Nouveau Run<br><span class="banner-text">Pipeline: {{
-                    form.form_name }}</span>{% endif %}</span>
+                    }} (version {{ form.version }})</span>{% else %}Nouveau Run<br><span class="banner-text">Pipeline:
+                    {{
+                    form.form_name }} (version {{ form.version }})</span>{% endif %}</span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
