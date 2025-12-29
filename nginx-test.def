@@ -1,8 +1,0 @@
-Bootstrap: docker
-From: nginx:trixie-perl
-
-%files
-    nginx-test.conf /etc/nginx/nginx.conf
-
-%startscript
-    nginx -g 'daemon off;'

@@ -4,5 +4,8 @@ From: nginx:trixie-perl
 %files
     nginx.conf /etc/nginx/nginx.conf
 
+%post
+    mkdir -p /opt
+
 %startscript
-    nginx -g 'daemon off;'
+    nginx -g -c /opt/nginx.conf 'daemon off;'

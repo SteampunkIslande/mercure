@@ -1,0 +1,16 @@
+Bootstrap: docker
+From: alpine:latest
+
+%files
+    target/x86_64-unknown-linux-musl/release/mercure /bin/mercure
+    target/x86_64-unknown-linux-musl/release/routine /bin/routine
+    target/x86_64-unknown-linux-musl/release/admin /bin/admin
+    static /static
+
+%environment
+    export ROCKET_CONFIG=/OPT/mercure/Rocket.toml
+
+%startscript
+    cd /
+    mercure
+

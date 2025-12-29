@@ -33,11 +33,11 @@ cli_colors = true
 
 [release]
 address = "10.169.192.26"
-mercure_db = "sqlite:///OPT/hermes/mercure.db"
+mercure_db = "sqlite:///OPT/mercure/mercure.db"
 
 template_dir = "/static/templates"
 static_dir = "/static"
-upload_dir = "/OPT/hermes/uploads"
+upload_dir = "/OPT/mercure/uploads"
 logs_dir = "/OPT/JOBS/LOGS"
 
 pipeline_dir = "/OPT/pipelines"
@@ -47,5 +47,5 @@ sequencers_dir = "/data/raw/sequenceurs"
 analysis_dir = "/data/analysis"
 ont_dir = "/data/raw/sequenceurs/GRIDION/output"
 
-check_run_completed = "/OPT/hermes/run-completed.sh"
-post_run_script = "/OPT/hermes/post-run-script.sh"
+check_run_completed = "/OPT/mercure/run-completed.sh"
+post_run_script = "/OPT/mercure/post-run-script.sh"
