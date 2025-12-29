@@ -8,4 +8,4 @@ From: nginx:trixie-perl
     mkdir -p /opt
 
 %startscript
-    nginx -g -c /opt/nginx.conf 'daemon off;'
+    nginx -c /opt/nginx.conf -g 'daemon off;'
