@@ -69,9 +69,15 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
                         "Erreur lors du traitement de la tentive {} du run {}: {e}",
                         attempt.attempt_number, attempt.run_id
                     );
-
-                    match analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool)
-                        .await
+                    let error_str = if matches!(e, RoutineError::IndirNotFound(_)) {
+                        format!(
+                            "{}. Il peut s'agir d'une erreur dans la date, le numéro de flowcell, ou du séquenceur.",
+                            e
+                        )
+                    } else {
+                        e.to_string()
+                    };
+                    match analysis::fail_cannot_analyse_run(attempt.run_id, &error_str, &pool).await
                     {
                         Ok(_) => info!(
                             "La tentative {} du run {} a été marquée comme Failed.",
@@ -441,19 +447,14 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
                     // En effet, normalement, le séquenceur crée le dossier le jour même
                     if now > run_date + Duration::days(1) {
                         info!(
-                            "Dossier non trouvé pour la tentative {} du run {}: Nom du dossier attendu: {}. Tentative placée en erreur.",
+                            "Dossier non trouvé pour la tentative {} du run {}: Nom du dossier attendu: {}.",
                             attempt.attempt_number, attempt.run_id, expected_name
                         );
-                        let reason = "Le run ne se trouvait pas à l'emplacement prévu. Il peut s'agir d'une erreur dans la date, le numéro de flowcell, ou du séquenceur";
-                        mercure::models::analysis::fail_cannot_analyse_run(
-                            attempt.run_id,
-                            reason,
-                            pool,
-                        )
-                        .await
-                        .map_err(RoutineError::from)?;
+                        return Err(RoutineError::IndirNotFound(expected_name));
+                    } else {
+                        // Rien d'alarmant au fait que le dossier de run soit introuvable. Le run n'a peut-être pas encore été lancé.
+                        return Ok(());
                     }
-                    return Err(RoutineError::IndirNotFound(expected_name));
                 }
                 Err(RoutineError::InvalidRegex(e)) => {
                     error!("Regex invalide: {}", e);
