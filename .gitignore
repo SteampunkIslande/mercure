@@ -1,3 +1,4 @@
 /target
 mercure.db
 mercure-lib/target
+*.sif
