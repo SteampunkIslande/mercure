@@ -18,14 +18,12 @@ use thiserror::Error;
 use tokio::signal::unix::SignalKind;
 
 use chrono::ParseError;
-use core::convert::Infallible;
 use mercure_lib::models::AnalysisStateMachineError;
 use regex::{Error as RegexError, Regex};
 use sqlx::{Error, Row};
 use tokio::sync::watch;
 
 use mercure_lib::models::HgAttempt;
-use mercure_lib::models::InvalidRunStatusError;
 use mercure_lib::models::RunStatus;
 
 #[derive(Error, Debug)]
@@ -33,11 +31,7 @@ enum RoutineError {
     #[error(transparent)]
     Sqlx(#[from] Error),
     #[error(transparent)]
-    InvalidRunStatus(#[from] InvalidRunStatusError),
-    #[error(transparent)]
     AnalysisStateMachine(#[from] AnalysisStateMachineError),
-    #[error(transparent)]
-    Path(#[from] Infallible),
     #[error(transparent)]
     DateParse(#[from] ParseError),
     #[error("{0}")]
