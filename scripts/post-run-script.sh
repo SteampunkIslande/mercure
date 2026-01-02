@@ -15,7 +15,7 @@
 echo "## STEP Exécution du script de post-traitement... Extraction des logs SLURM."
 
 if [[ -z "$HG_LOG_FILE" ]]; then
-    echo "## WARNING: La variable d'environnement HG_LOG_FILE n'est pas définie."
+    echo "## WARNING La variable d'environnement HG_LOG_FILE n'est pas définie."
 else
     cd "$OUTDIR"
     LOG_BASENAME=$(basename "$HG_LOG_FILE")
