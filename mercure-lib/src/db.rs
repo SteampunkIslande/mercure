@@ -48,7 +48,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             form_name TEXT NOT NULL,
             enabled BOOLEAN NOT NULL DEFAULT 1,
             version INTEGER NOT NULL DEFAULT 1,
-            indir_type TEXT NOT NULL DEFAULT 'BCL_DIR' CHECK (indir_type IN ('BCL_DIR', 'ANALYSIS_DIR', 'ONT_DIR'))
+            indir_type TEXT NOT NULL DEFAULT 'BCL_DIR' CHECK (indir_type IN ('BCL_DIR', 'ANALYSIS_DIR', 'ONT_DIR')),
+            latest_launcher_revision TEXT
         )
         "#,
     )

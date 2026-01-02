@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::path::Path;
+use std::process::Command;
 
+use crate::config;
 use crate::models::ModelError;
 
 use super::groups::Group;
@@ -63,6 +66,54 @@ pub struct HgFormDef {
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
     pub indir_type: IndirType,
+    pub latest_launcher_revision: Option<String>,
+}
+
+/// Get the latest git revision of a launcher file
+///
+/// Returns None if the file is not tracked by git or if there are any errors
+/// in executing git commands
+///
+/// Arguments:
+/// - launcher_path: Path to the launcher file
+///
+/// Returns:
+///
+/// - Option<String>: Latest git revision as a String, or None if not tracked or error
+fn get_latest_revision(launcher_path: &Path) -> Option<String> {
+    let config = config::get_mercure_config();
+
+    let pipelines_dir = Path::new(&config.pipeline_dir);
+
+    // Ensure the path is tracked by git
+    let file_status_is_clean = Command::new("git")
+        .current_dir(pipelines_dir)
+        .arg("status")
+        .arg("--porcelain")
+        .arg("--")
+        .arg(launcher_path.strip_prefix(&pipelines_dir).ok()?)
+        .output()
+        .ok()?
+        .stdout
+        .is_empty();
+    if !file_status_is_clean {
+        return None;
+    } else {
+        String::from_utf8(
+            Command::new("git")
+                .current_dir(pipelines_dir)
+                .arg("rev-list")
+                .arg("-n")
+                .arg("1")
+                .arg("HEAD")
+                .arg("--")
+                .arg(launcher_path.strip_prefix(&pipelines_dir).ok()?)
+                .output()
+                .ok()?
+                .stdout,
+        )
+        .ok()
+    }
 }
 
 /// This type helps admin users define a form
@@ -124,10 +175,19 @@ impl HgFormDef {
             )));
         }
 
+        let latest_launcher_revision = {
+            let config = config::get_mercure_config();
+            let launcher_path = Path::new(&config.pipeline_dir)
+                .join(&new_formdef.pipeline_name)
+                .join("launchers")
+                .join(&new_formdef.launcher_name);
+            get_latest_revision(&launcher_path)
+        };
+
         let form_id: i64 = sqlx::query(
             r#"
-            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version, indir_type)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version, indir_type,latest_launcher_revision)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
         )
@@ -141,6 +201,7 @@ impl HgFormDef {
             IndirType::AnalysisDir => "ANALYSIS_DIR",
             IndirType::OntDir => "ONT_DIR",
         })
+        .bind(latest_launcher_revision)
         .fetch_one(pool)
         .await?
         .try_get(0usize)?;
@@ -358,6 +419,7 @@ impl HgFormDef {
             "BCL_DIR" => IndirType::BclDir,
             _ => IndirType::BclDir,
         };
+        def.latest_launcher_revision = row.try_get("latest_launcher_revision")?;
 
         def.groups = sqlx::query(
             r#"SELECT g.group_id,g.group_name FROM Groups g JOIN FormdefHasGroup fg ON g.group_id=fg.group_id WHERE fg.form_id = ? "#,
@@ -437,6 +499,7 @@ mod tests {
             user_defined_vars: Some(user_defined_vars),
             indir_type: IndirType::BclDir,
             form_id: 0,
+            latest_launcher_revision: None,
         };
 
         let json = serde_json::to_string_pretty(&form_def).unwrap();
