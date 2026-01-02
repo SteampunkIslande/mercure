@@ -1,21 +1,28 @@
-#
+# Développement d'un pipeline
+
+Ce document explique comment développer des pipelines pour Mercure, en détaillant les structures, les bonnes pratiques et les exemples concrets.
+
+---
 
 ## Pipeline de copie
 
-Même s'il existe assez peu d'applications concrètes à un pipeline dédié uniquement à la copie, il est possible d'en créer un, avec un launcher dédié.
-Ce launcher fera usage, pour la copie seule, de l'action associée située dans copie/actions/action-1.0.0.sh.
+Bien que les cas d'usage d'un pipeline dédié uniquement à la copie soient limités, il est possible d'en créer un avec un launcher spécifique. Ce dernier utilise l'action associée située dans `copie/actions/copie-1.0.0.sh`.
+
+### Structure du pipeline
 
 ```
 copie
 ├── actions
-│   └── copie-1.0.0.sh
+│   └── copie-1.0.0.sh
 └── launchers
     └── default.sh
 ```
 
-Attention, ne pas oublier de s'assurer que les scripts sont exécutables.
+> **Important** : Assurez-vous que les scripts sont exécutables (`chmod +x`).
 
-### Code de copie/actions/copie-1.0.0.sh
+---
+
+### Action de copie (`copie/actions/copie-1.0.0.sh`)
 
 ```bash
 #!/bin/bash
@@ -29,7 +36,9 @@ job_name=copie-$(date +%s)
 
 echo "SLURM run ID: $job_name"
 
-srun --job-name="$job_name" --mem=4G rsync -a --info=progress2 "$FROM" "$TO" | tr '\r' '\n' | sed -r 's/.+\s([0-9]+)%.+/\1 of 100 (\1%) done/gm'
+srun --job-name="$job_name" --mem=4G rsync -a --info=progress2 "$FROM" "$TO" | \
+    tr '\r' '\n' | \
+    sed -r 's/.+\s([0-9]+)%.+/\1 of 100 (\1%) done/gm'
 res=$?
 
 if [ $res -ne 0 ]; then
@@ -40,168 +49,233 @@ else
 fi
 ```
 
-Le code de cette action réprésente bien une seule étape, avec:
-- la défintion des arguments du script (1 et 2, et leur variable d'environnement correspondante).
-- la définition d'un nom de job SLURM (qui permet de suivre l'exécution dans Mercure)
-- l'utilisation de srun: toujours exécuter une commande en passant par SLURM.
+#### Points clés de l'action
 
-L'exemple donné illustre comment communiquer avec Mercure.
+- **Arguments** : Le script utilise les arguments `1` et `2` pour définir les variables `FROM` et `TO`.
+- **Nom du job SLURM** : Un identifiant unique est généré pour suivre l'exécution dans Mercure.
+- **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter une commande.
+- **Communication avec Mercure** :
+  - La progression est indiquée avec le format `X of 100 (X%) done`, compatible avec l'interface de Mercure.
+  - Les erreurs sont signalées avec le préfixe `##ERROR`.
+- **Gestion des erreurs** : En cas d'échec, retourner un code non nul pour arrêter le launcher (qui s'exécute en mode strict avec `set -euo pipefail`).
 
-Pour informer de la progression, le code présenté ici imite la sortie de snakemake (dont Mercure sait extraire un pourcentage de complétion de la tâche).
+---
 
-En l'occurrence, la chaîne de caractère qui permet d'indiquer la progression est: `X of 100 (X%) done`.
-
-Enfin, le `##ERROR`, qui permet de définir le message d'erreur pour le run dans Mercure.
-
-Il est très important, en cas d'erreur d'une étape, de retourner avec une valeur différente de zéro.
-C'est ce qui permet au launcher, qui s'exécute lui en mode strict (`set -euo pipefail`), de s'arrêter dès la première erreur.
-
-
-### Code de copie/launchers/default.sh
+### Launcher (`copie/launchers/default.sh`)
 
 ```bash
 #!/bin/bash
 
-## COPIE_DEST La destination de copie, sous la forme d'une chaîne de caractères valable en tant que deuxième argument à rsync. Exemple: user@host:/dossier/depot
+## COPIE_DEST : Destination de la copie, au format attendu par rsync (ex: user@host:/dossier/depot)
 
 cd "$PIPELINE_DIR/copie"
 
-echo "##STEP Etape 1/1: copie de $INDIR vers $COPIE_DEST"
+echo "##STEP Étape 1/1: copie de $INDIR vers $COPIE_DEST"
 ./actions/copie-1.0.0.sh "$INDIR" "$COPIE_DEST"
-
 ```
 
-Le launcher regroupe toutes les tâches à exécuter. Il est responsable de la communication de l'étape en cours avec Mercure, en affichant `##STEP ...` avec le numéro correspondant.
+#### Rôle du launcher
 
-Copie seule: 1 launcher qui utilise 1 action.
+- **Orchestration** : Regroupe et exécute les tâches.
+- **Communication** : Informe Mercure de l'étape en cours avec `##STEP` suivi du numéro de l'étape.
+
+> **Résumé** : Un pipeline de copie simple comprend 1 launcher utilisant 1 action.
+
+---
 
 ## Pipeline de démultiplexage
+
+### Structure du pipeline
 
 ```
 demul
 ├── actions
-│   └── action-1.0.0.sh
+│   └── demul-1.0.0.sh
 └── launchers
     ├── default.sh
     └── demul-copie.sh
 ```
 
-### Code de l'action seule `demul/actions/demul-1.0.0.sh`
+---
+
+### Action de démultiplexage (`demul/actions/demul-1.0.0.sh`)
 
 ```bash
 #!/bin/bash
 
 demul_job_name=demul-$(date +%s)
 
-# Permet de suivre l'évolution du run via l'interface Mercure
+# Permet de suivre l'évolution du run via l'interface Mercure
 echo "SLURM run ID: $demul_job_name"
 
-# Lancement du job SLURM pour le démultiplexage avec bcl-convert (en interactif de manière à bloquer le script jusqu'à la fin du job)
-srun --job-name=$demul_job_name --output=$OUTDIR/demul-%j.out --mem=64G
-\ singularity exec /SINGULARITIES/bcl-convert.sif bcl-convert --sample-sheet $INDIR/adn.csv
-\ --output-dir $OUTDIR/fastq --bcl-input-dir $INDIR --no-lane-splitting true
+# Lancement du job SLURM pour le démultiplexage avec bcl-convert
+srun --job-name=$demul_job_name --output=$OUTDIR/demul-%j.out --mem=64G \
+    singularity exec /SINGULARITIES/bcl-convert.sif bcl-convert \
+        --sample-sheet $INDIR/adn.csv \
+        --output-dir $OUTDIR/fastq \
+        --bcl-input-dir $INDIR \
+        --no-lane-splitting true
 ```
 
-### Code du launcher
+---
+
+### Launcher par défaut (`demul/launchers/default.sh`)
 
 ```bash
 #!/bin/bash
 
 cd "$PIPELINE_DIR/demul"
 
-echo "Etape 1/1: Démultiplexage de $INDIR dans $OUTDIR"
+echo "Étape 1/1: Démultiplexage de $INDIR dans $OUTDIR"
 
-./actions/demul-1.0.0.sh 
-
+./actions/demul-1.0.0.sh
 ```
+
+---
 
 ## Pipeline de démultiplexage et copie
 
-### Code du launcher `demul/launchers/demul-copie.sh`
+### Launcher combiné (`demul/launchers/demul-copie.sh`)
 
 ```bash
 #!/bin/bash
 
-## COPIE_DEST La destination de copie, sous la forme d'une chaîne de caractères valable en tant que deuxième argument à rsync. Exemple: user@host:/dossier/depot
+## COPIE_DEST : Destination de la copie, au format attendu par rsync (ex: user@host:/dossier/depot)
 
 [[ -z $COPIE_DEST ]] && { echo "##ERROR COPIE_DEST est obligatoire"; exit 1; };
 
-# Utilisation d'une première action
+# Étape 1 : Démultiplexage
 cd "$PIPELINE_DIR/demul"
-echo "Etape 1/2: Démultiplexage de $INDIR dans $OUTDIR"
-./actions/demul-1.0.0.sh 
+echo "Étape 1/2: Démultiplexage de $INDIR dans $OUTDIR"
+./actions/demul-1.0.0.sh
 
-# Utilisation d'une deuxième action
+# Étape 2 : Copie
 cd "$PIPELINE_DIR/copie"
-echo "Etape 2/2: Copie de $OUTDIR dans $COPIE_DEST"
+echo "Étape 2/2: Copie de $OUTDIR dans $COPIE_DEST"
 ./actions/copie-1.0.0.sh $OUTDIR $COPIE_DEST
-
 ```
 
-## Exemple d'une action qui utilise snakemake
+---
 
-Pour éviter d'avoir à écrire soi-même `echo "SLURM run ID: ..."` ou bien `echo "$X of 100 ($X%) done"`, il est possible de créer des actions qui utilisent snakemake.
+## Utilisation de Snakemake dans les actions
 
-Exemple:
+Pour simplifier la gestion des jobs SLURM et la communication avec Mercure, il est possible d'utiliser Snakemake dans les actions. Cela évite d'écrire manuellement les commandes `echo` pour le suivi de progression.
 
-Dans `vidjil-v1/actions/vidjil-high-memory-1.0.0.sh`
+### Exemple d'actions Snakemake
+
+#### Action à forte demande de mémoire (`vidjil-v1/actions/vidjil-high-memory-1.0.0.sh`)
 
 ```bash
 cd "$PIPELINE_DIR/vidjil-v1"
 snakemake --workflow-profile high_memory -d $OUTDIR
 ```
 
-et dans `vidjil-v1/actions/vidjil-low-memory-1.0.0.sh`
+#### Action à faible demande de mémoire (`vidjil-v1/actions/vidjil-low-memory-1.0.0.sh`)
 
 ```bash
 cd "$PIPELINE_DIR/vidjil-v1"
 snakemake --workflow-profile low_memory -d $OUTDIR
 ```
 
-Ainsi, dans `vidjil-v1/launchers/default.sh`, on peut envisager une sélection du profil de workflow, via une variable d'environnement optionnelle définie dans le formulaire:
+---
+
+### Launcher avec sélection de profil (`vidjil-v1/launchers/default.sh`)
 
 ```bash
 #!/bin/bash
 
-## HIGH_MEMORY Une variable qui vaut OUI ou NON (optionnelle, NON par défaut)
+## HIGH_MEMORY : Variable optionnelle (OUI ou NON, par défaut NON)
 HIGH_MEMORY=${HIGH_MEMORY:-NON}
 
-# Utilisation d'une première action
+# Étape 1 : Démultiplexage
 cd "$PIPELINE_DIR/demul"
-echo "Etape 1/4: Démultiplexage de $INDIR dans $OUTDIR"
-./actions/demul-1.0.0.sh 
+echo "Étape 1/4: Démultiplexage de $INDIR dans $OUTDIR"
+./actions/demul-1.0.0.sh
 
-# Utilisation de l'action principale
+# Étape 2 : Exécution de Vidjil
 cd $PIPELINE_DIR/vidjil-v1
+echo "Étape 2/4: Exécution de vidjil"
 
-echo "Etape 2/4: Exécution de vidjil"
-if [[ $HIGH_MEMORY = "OUI" ]];then
-    action="vidjil-low-memory-1.0.0"
-else
+if [[ $HIGH_MEMORY = "OUI" ]]; then
     action="vidjil-high-memory-1.0.0"
+else
+    action="vidjil-low-memory-1.0.0"
 fi
-# Exécution de l'action
+
 bash actions/$action.sh
 
-# Préparation de la copie
+# Étape 3 : Copie des fichiers fastq
 cd $PIPELINE_DIR/copie
+echo "Étape 3/4: Copie des fastq sur le NAS"
+./actions/copie-1.0.0.sh "$OUTDIR/fastq" "/hard/coded/path/to/nas/$(basename $OUTDIR)"
 
-# Copie 1
-echo "Etape 3/4: copie des fastq sur le NAS"
-./actions/copie-1.0.0 "$OUTDIR/fastq" "/hard/coded/path/to/nas/$(basename $OUTDIR)"
-
-# Copie 2
-echo "Etape 4/4: copie des fichiers vidjil sur le NAS"
-./actions/copie-1.0.0 "$OUTDIR/vidjil-results" "/hard/coded/path/to/nas/$(basename $OUTDIR)"
-
+# Étape 4 : Copie des résultats Vidjil
+echo "Étape 4/4: Copie des fichiers vidjil sur le NAS"
+./actions/copie-1.0.0.sh "$OUTDIR/vidjil-results" "/hard/coded/path/to/nas/$(basename $OUTDIR)"
 ```
 
-# Important à noter
+---
 
-Les variables suivantes seront toujours définies, et il est interdit de les définir comme variables utilisateur dans un launcher:
+## Appel direct à Snakemake dans un launcher
 
-- INDIR (le dossier d'entrée). La variable ne doit en aucun cas être altérée.
-- OUTDIR (le dossier de sortie/de travail). La variable ne doit surtout pas être modifiée: c'est dans ce dossier, et dans ce dossier uniquement, que le pipeline doit écrire.
-- RUN_NAME (le nom de l'analyse, donné par l'utilisateur). Celui-ci peut être altéré (notamment s'il est nécessaire d'en retirer les espaces)
-- PIPELINE_DIR: c'est le dossier où se trouvent tous les pipelines auxquels l'utilisateur peut faire référence. L'objectif de cette variable est de rendre les pipelines portables et robustes.
-- PIPELINE_NAME: le nom du pipeline auquel appartient le launcher actuel.
+Il est possible d'appeler directement Snakemake dans un launcher, sans passer par une action intermédiaire. Cela simplifie la structure du pipeline et permet une intégration directe des workflows Snakemake.
+
+### Exemple de launcher avec appel direct à Snakemake
+
+```bash
+#!/bin/bash
+
+## HIGH_MEMORY : Variable optionnelle (OUI ou NON, par défaut NON)
+HIGH_MEMORY=${HIGH_MEMORY:-NON}
+
+SNAKEFILE=Snakefile-1.0.0
+
+# Étape 1 : Démultiplexage
+cd "$PIPELINE_DIR/demul"
+echo "Étape 1/3: Démultiplexage de $INDIR dans $OUTDIR"
+./actions/demul-1.0.0.sh
+
+# Étape 2 : Exécution directe de Snakemake
+cd "$PIPELINE_DIR/vidjil-v1"
+echo "Étape 2/3: Exécution de Snakemake pour l'analyse Vidjil"
+
+if [[ $HIGH_MEMORY = "OUI" ]]; then
+    echo "##STEP Exécution de Snakemake avec profil haute mémoire"
+    snakemake --workflow-profile high_memory -d $OUTDIR -s $SNAKEFILE
+else
+    echo "##STEP Exécution de Snakemake avec profil basse mémoire"
+    snakemake --workflow-profile low_memory -d $OUTDIR -s $SNAKEFILE
+fi
+
+# Étape 3 : Copie des résultats
+cd "$PIPELINE_DIR/copie"
+echo "Étape 3/3: Copie des résultats vers $COPIE_DEST"
+./actions/copie-1.0.0.sh "$OUTDIR" "$COPIE_DEST"
+```
+
+### Avantages de l'appel direct à Snakemake
+
+- **Clarté** : Il n'est pas toujours nécessaire de passer par des actions. L'approche recommandée est d'utiliser snakemake dans le launcher, et en même temps de partager l'utilisation *via* un script (action).
+
+---
+
+## Variables d'environnement
+
+Les variables suivantes sont toujours définies et **ne doivent en aucun cas** être redéfinies dans un launcher :
+
+- **`INDIR`** : Dossier d'entrée. **Ne pas modifier.**
+- **`OUTDIR`** : Dossier de sortie/travail. **Ne pas modifier.** Tous les fichiers générés doivent être écrits dans ce dossier.
+- **`RUN_NAME`** : Nom de l'analyse, fourni par l'utilisateur. Peut être modifié si nécessaire (ex: suppression des espaces).
+- **`PIPELINE_DIR`** : Dossier contenant tous les pipelines accessibles. Permet de rendre les pipelines portables et robustes.
+- **`PIPELINE_NAME`** : Nom du pipeline auquel appartient le launcher actuel.
+
+---
+
+## Bonnes pratiques
+
+1. **Exécutabilité des scripts** : Toujours vérifier que les scripts sont exécutables (`chmod +x`).
+2. **Gestion des erreurs** : Retourner un code non nul en cas d'échec pour arrêter le launcher.
+3. **Communication avec Mercure** : Utiliser `##STEP` pour les étapes et `##ERROR` pour les erreurs.
+4. **Suivi de progression** : Utiliser le format `X of 100 (X%) done` pour la progression.
+5. **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter les commandes.
+6. **Variables d'environnement** : Respecter les variables prédéfinies et ne pas les redéfinir.
