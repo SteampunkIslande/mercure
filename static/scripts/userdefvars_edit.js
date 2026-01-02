@@ -38,7 +38,6 @@ function updateVarType(index) {
   const valuesDiv = document.getElementById(`var_values_${index}`);
   const textarea = document.getElementById(`var_content_${index}`);
   const contentLabel = document.getElementById(`var_content_label_${index}`);
-  const descriptionDiv = document.getElementById(`var_description_${index}`);
 
   if (typeSelect.value) {
     valuesDiv.style.display = "block";

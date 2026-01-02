@@ -70,6 +70,8 @@
                             document.getElementById(`var_content_${index}`).value = original.FromValuesList.allowed.join("\n");
                         } else if (original.RunDefined) {
                             document.getElementById(`var_type_${index}`).value = "RunDefined";
+                            document.getElementById(`var_content_${index}`).style.display = "none";
+                            document.getElementById(`var_content_label_${index}`).style.display = "none";
                         }
                     }
                     {% endif %}
