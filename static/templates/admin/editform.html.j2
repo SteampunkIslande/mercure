@@ -173,6 +173,11 @@
                     document.getElementById("launcher_name").value = formDefinition.launcher_name;
                 }
 
+                // TYPE DE DOSSIER D'ENTRÉE
+                if (formDefinition.indir_type) {
+                    document.getElementById("indir_type").value = formDefinition.indir_type;
+                }
+
                 // Stocker les UDV existantes pour la fusion
                 if (formDefinition.user_defined_vars) {
                     originalUserVars = formDefinition.user_defined_vars;
