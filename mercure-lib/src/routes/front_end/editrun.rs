@@ -11,8 +11,9 @@ use rocket_dyn_templates::{Template, context};
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::models::Group;
-use crate::models::HgRun;
-use crate::models::RunStatus;
+use crate::models::{HgFormDef, HgRun, RunStatus};
+
+use crate::launchers_check::check_launcher_exists;
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -71,6 +72,22 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 // Get sequencers list for edit form
                 let config = get_mercure_config();
                 let sequenceurs_folder = config.sequencers_dir;
+                let form_def = &run.form;
+
+                // Si le fichier de launcher n'existe plus, afficher une erreur
+                if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
+                    // Désactiver le formulaire si ce n'était pas déjà fait
+                    HgFormDef::disable_form(pool, form_def.form_id).await.ok();
+                    return Template::render(
+                        "common/error",
+                        context! {
+                            title:"Launcher manquant",
+                            h2:"Launcher manquant",
+                            message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                        },
+                    );
+                }
+                //TODO: Si un formulaire compatible est trouvé (= mêmes UDVs), créer un nouveau Run à partir des valeurs entrées par l'utilisateur pour ce formulaire, et rediriger vers la page d'édition de ce nouveau Run
 
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
                     .ok()

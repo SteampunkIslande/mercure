@@ -10,10 +10,11 @@ use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::models::Group;
+use crate::launchers_check::check_launcher_exists;
 use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
+use crate::models::{Group, HgFormDef};
 use crate::utils::filename_to_static_served_name;
 
 #[get("/show/run/<run_id>?<attempt_number>")]
@@ -75,6 +76,21 @@ pub async fn show_run_get(
     };
 
     if can_see_run {
+        let form_def = &run.form;
+
+        if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
+            // Désactiver le formulaire si ce n'était pas déjà fait
+            HgFormDef::disable_form(pool, form_def.form_id).await.ok();
+            return Template::render(
+                "common/error",
+                context! {
+                    title:"Launcher manquant",
+                    h2:"Launcher manquant",
+                    message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                },
+            );
+        }
+
         // Récupérer l'historique des tentatives pour la navigation
         let history = HgAttempt::list_attempts_for_run(run_id, pool)
             .await
@@ -86,8 +102,7 @@ pub async fn show_run_get(
                 Ok(json_str) => json_str,
                 Err(e) => format!("{{\"Error\": \"{}\"}}", e),
             };
-
-        // MODE ÉDITION : Si le run est Idle ET qu'on demande (implicitement ou non) la dernière tentative
+        // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let sequenceurs_folder = config.sequencers_dir;
 

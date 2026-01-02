@@ -22,4 +22,6 @@ pub enum ModelError {
     DatabaseError(#[from] sqlx::Error),
     #[error(transparent)]
     InvalidRunStatusError(#[from] hgrun::InvalidRunStatusError),
+    #[error("Impossible de trouver une révision git pour le lanceur du formulaire.")]
+    LauncherRevisionNotFound,
 }

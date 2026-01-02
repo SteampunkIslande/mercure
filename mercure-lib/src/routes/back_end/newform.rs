@@ -11,6 +11,7 @@ use sqlx::SqlitePool;
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
+use crate::models::ModelError;
 use crate::models::{HgFormDef, HgFormDefSubmission};
 
 #[get("/nextversion?<formname>")]
@@ -129,6 +130,11 @@ pub async fn newform_post(
         Ok(()) => Json(ApiResponse::success(
             "Formulaire créé avec succès!".to_string(),
         )),
-        Err(e) => Json(ApiResponse::error(format!("{e}"))),
+        Err(e) => match e {
+            ModelError::LauncherRevisionNotFound => Json(ApiResponse::error(
+                "Le launcher spécifié n'est pas suivi dans git ou présente des modifications non validées.\nVeuillez valider ou annuler ces modifications avant de créer un nouveau formulaire.".to_string(),
+            )),
+            e => Json(ApiResponse::error(format!("{e}"))),
+        },
     }
 }

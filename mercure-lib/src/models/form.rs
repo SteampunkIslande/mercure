@@ -1,9 +1,9 @@
+use crate::launchers_check::get_current_revision;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command;
 
 use crate::config;
 use crate::models::ModelError;
@@ -69,53 +69,6 @@ pub struct HgFormDef {
     pub latest_launcher_revision: Option<String>,
 }
 
-/// Get the latest git revision of a launcher file
-///
-/// Returns None if the file is not tracked by git or if there are any errors
-/// in executing git commands
-///
-/// Arguments:
-/// - launcher_path: Path to the launcher file
-///
-/// Returns:
-///
-/// - Option<String>: Latest git revision as a String, or None if not tracked or error
-fn get_latest_revision(launcher_path: &Path) -> Option<String> {
-    let config = config::get_mercure_config();
-
-    let pipelines_dir = Path::new(&config.pipeline_dir);
-
-    // Ensure the path is tracked by git
-    let file_status_is_clean = Command::new("git")
-        .current_dir(pipelines_dir)
-        .arg("status")
-        .arg("--porcelain")
-        .arg("--")
-        .arg(launcher_path.strip_prefix(&pipelines_dir).ok()?)
-        .output()
-        .ok()?
-        .stdout
-        .is_empty();
-    if !file_status_is_clean {
-        return None;
-    } else {
-        String::from_utf8(
-            Command::new("git")
-                .current_dir(pipelines_dir)
-                .arg("rev-list")
-                .arg("-n")
-                .arg("1")
-                .arg("HEAD")
-                .arg("--")
-                .arg(launcher_path.strip_prefix(&pipelines_dir).ok()?)
-                .output()
-                .ok()?
-                .stdout,
-        )
-        .ok()
-    }
-}
-
 /// This type helps admin users define a form
 ///
 /// Tables:
@@ -175,14 +128,17 @@ impl HgFormDef {
             )));
         }
 
-        let latest_launcher_revision = {
+        let current_launcher_revision = {
             let config = config::get_mercure_config();
             let launcher_path = Path::new(&config.pipeline_dir)
                 .join(&new_formdef.pipeline_name)
                 .join("launchers")
                 .join(&new_formdef.launcher_name);
-            get_latest_revision(&launcher_path)
+            get_current_revision(&launcher_path)
         };
+        if current_launcher_revision.is_none() {
+            return Err(ModelError::LauncherRevisionNotFound);
+        }
 
         let form_id: i64 = sqlx::query(
             r#"
@@ -201,7 +157,7 @@ impl HgFormDef {
             IndirType::AnalysisDir => "ANALYSIS_DIR",
             IndirType::OntDir => "ONT_DIR",
         })
-        .bind(latest_launcher_revision)
+        .bind(current_launcher_revision)
         .fetch_one(pool)
         .await?
         .try_get(0usize)?;
