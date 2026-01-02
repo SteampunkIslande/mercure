@@ -23,7 +23,7 @@ Utiliser les variables d'environnement `$PIPELINE_DIR` et `$PIPELINE_NAME` perme
 
 Le fichier launcher peut ré-utiliser des scripts d'autres pipelines, en passant par des `actions`, qui sont des scripts que les bio-infos peuvent mettre à disposition de tous.
 
-Une action (située dans le dossiers actions du pipeline), est un script, obligatoirement versionné par SemVer (Majeur.Mineur.Patch), et dont le seul nombre de révisions acceptables dans git est un. En effet, dès lors qu'une action a été créée et testée avec succès, on considère que n'importe quel utilisateur peut l'avoir utilisée une fois dans un de ses pipelines.
+Une action (située dans le dossiers actions du pipeline), est un script, obligatoirement versionné par SemVer (Majeur.Mineur.Patch), et dont le seul nombre de révisions acceptables dans git est un. En effet, dès lors qu'une action a été créée et testée avec succès, on considère que n'importe quel utilisateur peut l'avoir utilisée une fois dans un de ses pipelines. Le fichier ne doit donc en aucun cas être suprimé. En revanche, il doit être suivi dans le dépôt git (le dossier pipelines, le parent de tous les pipelines de production).
 
 # Déclarer un pipeline dans Mercure
 
