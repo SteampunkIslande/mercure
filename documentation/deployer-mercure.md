@@ -8,7 +8,7 @@
 
 ## Obtenir les images singularity correpsondantes
 
-Exécuter `./mercure-build.sh`. Deux fichiers seront générés: `mercure-routine.sif` et `mercure-webapp.sif`.
+Exécuter `./mercure-build.sh` (dans ce dépôt). Deux fichiers seront générés: `mercure-routine.sif` et `mercure-webapp.sif`. (requiert singularity)
 
 Placer ces fichiers `.sif` dans le dossier `/OPT/mercure`, en s'assurant qu'ils appartiennent bien à l'utilisateur `hermes`.
 

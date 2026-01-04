@@ -10,7 +10,7 @@ use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::check_launcher_exists;
+use crate::launchers_check::{check_launcher_exists, is_pipeline_archived};
 use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
@@ -91,6 +91,9 @@ pub async fn show_run_get(
             );
         }
 
+        // Vérifier si le pipeline est archivé
+        let pipeline_is_archived = is_pipeline_archived(&form_def);
+
         // Récupérer l'historique des tentatives pour la navigation
         let history = HgAttempt::list_attempts_for_run(run_id, pool)
             .await
@@ -150,7 +153,8 @@ pub async fn show_run_get(
                     samplesheet_adn_static_name: samplesheet_adn_static_name,
                     samplesheet_arn_static_name: samplesheet_arn_static_name,
                     metadata_static_name: metadata_static_name,
-                    history: history, // Ajout de l'historique
+                    history: history,
+                    pipeline_is_archived: pipeline_is_archived,
                 },
             )
         } else {
@@ -206,6 +210,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        pipeline_is_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Running => Template::render(
@@ -220,6 +225,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        pipeline_is_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Success => Template::render(
@@ -234,6 +240,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        pipeline_is_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
@@ -249,6 +256,7 @@ pub async fn show_run_get(
                         fail_reason: fail_reason,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        pipeline_is_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Idle => Template::render(

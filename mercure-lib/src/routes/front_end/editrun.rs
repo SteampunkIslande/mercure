@@ -13,7 +13,7 @@ use crate::config::get_mercure_config;
 use crate::models::Group;
 use crate::models::{HgFormDef, HgRun, RunStatus};
 
-use crate::launchers_check::check_launcher_exists;
+use crate::launchers_check::{check_launcher_exists, is_pipeline_archived};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -87,6 +87,20 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         },
                     );
                 }
+
+                // Vérifier si le pipeline est archivé (révision git différente)
+                let pipeline_is_archived = is_pipeline_archived(&form_def);
+                if pipeline_is_archived {
+                    return Template::render(
+                        "common/error",
+                        context! {
+                            title: "Pipeline archivé",
+                            h2: "Pipeline archivé",
+                            message: format!("Impossible d'éditer le run {}: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire. Ce run ne peut plus être édité.", run.run_id)
+                        },
+                    );
+                }
+
                 //TODO: Si un formulaire compatible est trouvé (= mêmes UDVs), créer un nouveau Run à partir des valeurs entrées par l'utilisateur pour ce formulaire, et rediriger vers la page d'édition de ce nouveau Run
 
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
@@ -134,6 +148,7 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         user_defined_vars_json,
                         indir_type: &run.form.indir_type,
                         form: &run.form,
+                        pipeline_is_archived: pipeline_is_archived,
                     },
                 )
             }

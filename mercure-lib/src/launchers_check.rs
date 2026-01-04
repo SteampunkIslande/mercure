@@ -112,3 +112,35 @@ pub async fn check_launcher_exists(pipeline_name: &str, launcher_name: &str) -> 
         .join(launcher_name);
     launcher_path.exists()
 }
+
+/// Vérifie si un pipeline est archivé (la révision git actuelle ne correspond pas à celle stockée dans le formulaire)
+///
+/// Un pipeline est considéré comme archivé si:
+/// - Le launcher existe toujours
+/// - Mais la révision git actuelle du launcher ne correspond pas à celle enregistrée dans le formulaire
+///
+/// Arguments:
+/// - form: Référence vers la définition de formulaire
+///
+/// Returns:
+/// - bool: true si le pipeline est archivé, false sinon
+pub fn is_pipeline_archived(form: &HgFormDef) -> bool {
+    // Si nous n'avons pas de révision enregistrée, on ne peut pas savoir si c'est archivé
+    let stored_revision = match &form.latest_launcher_revision {
+        Some(rev) => rev,
+        None => return false,
+    };
+
+    // Obtenons la révision actuelle
+    match get_current_launcher_revision_for_form(form) {
+        Some(current_revision) => {
+            // Comparer les révisions (en supprimant les espaces en début/fin)
+            stored_revision.trim() != current_revision.trim()
+        }
+        None => {
+            // Si on ne peut pas obtenir la révision actuelle, on considère que c'est archivé
+            // car soit le fichier n'existe plus, soit il y a un problème git
+            true
+        }
+    }
+}
