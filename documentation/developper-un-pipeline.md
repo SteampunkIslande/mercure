@@ -15,7 +15,7 @@ copie
 ├── actions
 │   └── copie-1.0.0.sh
 └── launchers
-    └── default.sh
+    └── copie-1.0.0.sh
 ```
 
 > **Important** : Assurez-vous que les scripts sont exécutables (`chmod +x`).

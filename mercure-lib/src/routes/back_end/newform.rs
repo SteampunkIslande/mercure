@@ -131,9 +131,9 @@ pub async fn newform_post(
             "Formulaire créé avec succès!".to_string(),
         )),
         Err(e) => match e {
-            ModelError::LauncherRevisionNotFound => Json(ApiResponse::error(
-                "Le launcher spécifié n'est pas suivi dans git ou présente des modifications non validées.\nVeuillez valider ou annuler ces modifications avant de créer un nouveau formulaire.".to_string(),
-            )),
+            ModelError::LauncherCheckError(e) => Json(ApiResponse::error(format!(
+                "{e}\nVeuillez valider ou annuler ces modifications avant de créer un nouveau formulaire."
+            ))),
             e => Json(ApiResponse::error(format!("{e}"))),
         },
     }

@@ -35,6 +35,9 @@
                     return;
                 }
                 const data = await response.json();
+                if (!data.success) {
+                    showMessage("error", `Erreur lors de la récupération des UDV du launcher:<br>${data.message}`);
+                }
                 let requiredVars = data.data || [];
 
                 // Normaliser les UDV requises

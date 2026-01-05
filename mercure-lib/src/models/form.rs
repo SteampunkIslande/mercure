@@ -134,11 +134,8 @@ impl HgFormDef {
                 .join(&new_formdef.pipeline_name)
                 .join("launchers")
                 .join(&new_formdef.launcher_name);
-            get_current_revision(&launcher_path)
+            get_current_revision(&launcher_path)?
         };
-        if current_launcher_revision.is_none() {
-            return Err(ModelError::LauncherRevisionNotFound);
-        }
 
         let form_id: i64 = sqlx::query(
             r#"
