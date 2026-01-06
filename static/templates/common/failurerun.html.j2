@@ -30,8 +30,9 @@
 
     <!-- Avertissement pour pipeline archivé -->
     {% if pipeline_is_archived %}
-    <div class="info-msg" style="display:block; background-color: #fff3cd; border-color: #ffeaa7; color: #856404; margin-bottom: 20px;">
-        <strong>⚠️ Attention:</strong> Ce pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire. Il est recommandé de demander à votre administrateur de mettre à jour le formulaire avec la version actuelle du pipeline.
+    <div class="warning-msg">
+        <strong>⚠️ Attention:</strong> Ce pipeline utilise une version archivée. Pour relancer l'analyse, il vous faudra
+        choisir un autre formulaire dans la liste ci-dessous.
     </div>
     {% endif %}
 
@@ -51,7 +52,8 @@
         <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
             actuelle</a>
         {% elif pipeline_is_archived %}
-        <span class="btn btn-primary disabled" title="Impossible de relancer: pipeline archivé" style="cursor: not-allowed; opacity: 0.6;">Relancer l'analyse</span>
+        <span class="btn btn-primary disabled" title="Impossible de relancer: pipeline archivé"
+            style="cursor: not-allowed; opacity: 0.6;">Relancer l'analyse</span>
         {% else %}
         <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
             l'analyse</a>
