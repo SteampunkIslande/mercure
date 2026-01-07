@@ -1,103 +1,221 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-# Hook git local (pré-commit) pour n'autoriser que : Untracked, Added, Deleted
-# Si un fichier suivi est modifié (M), on le supprime de l'index et on crée une nouvelle version
-# nommée selon Semantic Versioning (increment patch).
-#
-# Installation recommandée : rendre exécutable et copier vers .git/hooks/pre-commit
-# chmod +x scripts/pre-commit && cp scripts/pre-commit .git/hooks/pre-commit
+# Hook pre-commit pour le système de versionnement des pipelines
+# Applique les règles définies dans documentation/creation-systeme-version-pipelines.md
 
-# Lire les changements mis en stage (null-delimited pour gérer les noms avec espaces)
-git diff --cached --name-status -z | while IFS= read -r -d '' entry; do
-    # entry est de la forme "M<TAB>path" ou "A<TAB>path", etc.
-    status=${entry%%$'\t'*}
-    path=${entry#*$'\t'}
+set -e
 
-    # Ne traiter que les fichiers modifiés
-    if [[ "$status" != "M" ]]; then
+# Couleurs pour les messages
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Fonction pour afficher les messages d'erreur
+error() {
+    echo -e "${RED}ERREUR:${NC} $1" >&2
+}
+
+# Fonction pour afficher les messages d'avertissement
+warning() {
+    echo -e "${YELLOW}AVERTISSEMENT:${NC} $1" >&2
+}
+
+# Fonction pour afficher les messages de succès
+success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+# Fonction pour vérifier le format SemVer
+check_semver() {
+    local filename="$1"
+    
+    if [[ ! "$filename" =~ -[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# Fonction pour vérifier si un fichier a déjà été commité
+file_has_previous_commits() {
+    local filepath="$1"
+    
+    # Vérifier si le fichier existe dans l'historique git
+    if git log --follow --oneline -- "$filepath" &>/dev/null; then
+        local commit_count=$(git log --follow --oneline -- "$filepath" | wc -l)
+        if [ "$commit_count" -gt 0 ]; then
+            return 0  # Le fichier a des commits précédents
+        fi
+    fi
+    return 1  # Le fichier n'a pas de commits précédents
+}
+
+# Fonction pour vérifier la taille d'un fichier
+check_file_size() {
+    local filepath="$1"
+    local max_size_kb="$2"
+    
+    if [ ! -f "$filepath" ]; then
+        return 1
+    fi
+    
+    local file_size_kb=$(du -k "$filepath" | cut -f1)
+    if [ "$file_size_kb" -gt "$max_size_kb" ]; then
+        return 1
+    fi
+    return 0
+}
+
+# Récupérer la liste des fichiers modifiés/ajoutés
+staged_files=$(git diff --cached --name-only --diff-filter=AM)
+
+if [ -z "$staged_files" ]; then
+    success "Aucun fichier à vérifier"
+    exit 0
+fi
+
+echo "Vérification des règles de versionnement des pipelines..."
+
+# Variables de contrôle
+has_errors=false
+
+# Parcourir tous les fichiers staged
+while IFS= read -r file; do
+    # Ignorer les fichiers qui ne sont pas dans un pipeline (pas de structure $PIPELINE_NAME/...)
+    if [[ ! "$file" =~ ^[^/]+/ ]]; then
         continue
     fi
-
-    # Séparer nom, répertoire et extension
-    dir=$(dirname -- "$path")
-    base=$(basename -- "$path")
-    if [[ "$base" == *.* ]]; then
-        name="${base%.*}"
-        ext="${base##*.}"
-    else
-        name="$base"
-        ext=""
+    
+    # Extraire le nom du pipeline
+    pipeline_name=$(echo "$file" | cut -d'/' -f1)
+    relative_path=$(echo "$file" | cut -d'/' -f2-)
+    
+    echo "Vérification: $file"
+    
+    # Règle 1: $PIPELINE_NAME/launchers/*.sh - peut avoir autant de commits que souhaité
+    if [[ "$file" =~ ^[^/]+/launchers/.*\.sh$ ]]; then
+        success "Fichier launcher autorisé: $file"
+        continue
     fi
-
-    # Chercher les versions existantes trackées dans le repo pour ce fichier
-    max_major=-1
-    max_minor=-1
-    max_patch=-1
-
-    # Parcourir les fichiers trackés
-    while IFS= read -r tracked; do
-        tb=$(basename -- "$tracked")
-        if [[ "$tb" =~ ^${name}-v([0-9]+)\.([0-9]+)\.([0-9]+)(\..+)?$ ]]; then
-            maj=${BASH_REMATCH[1]}
-            min=${BASH_REMATCH[2]}
-            pat=${BASH_REMATCH[3]}
-            matched_ext=${BASH_REMATCH[4]}  # peut être vide ou ".ext"
-            # Si le fichier original a une extension, vérifier cohérence
-            if [[ -n "$ext" ]]; then
-                if [[ -n "$matched_ext" && "${matched_ext:1}" != "$ext" ]]; then
-                    continue
-                fi
+    
+    # Règle 2: $PIPELINE_NAME/actions/*.sh - doit avoir une seule révision et suivre SemVer
+    if [[ "$file" =~ ^[^/]+/actions/.*\.sh$ ]]; then
+        filename=$(basename "$file")
+        
+        # Vérifier le format SemVer
+        if ! check_semver "$filename"; then
+            error "Le fichier action $file ne suit pas le format SemVer (Majeure.Mineure.Patch.sh)"
+            has_errors=true
+            continue
+        fi
+        
+        # Vérifier qu'il n'a pas déjà été commité
+        if file_has_previous_commits "$file"; then
+            error "Le fichier action $file a déjà été commité. Les actions ne peuvent avoir qu'une seule révision."
+            has_errors=true
+            continue
+        fi
+        
+        # Vérifier qu'il existe un fichier .md associé
+        md_file="${file%.sh}.md"
+        if [ ! -f "$md_file" ]; then
+            error "Le fichier action $file doit avoir un fichier de documentation associé: $md_file"
+            has_errors=true
+            continue
+        fi
+        
+        success "Fichier action valide: $file"
+        continue
+    fi
+    
+    # Règle 3: Fichiers .md dans actions - peuvent être modifiés, taille max 100Ko
+    if [[ "$file" =~ ^[^/]+/actions/.*\.md$ ]]; then
+        if ! check_file_size "$file" 100; then
+            error "Le fichier de documentation $file dépasse la taille maximale de 100Ko"
+            has_errors=true
+            continue
+        fi
+        
+        success "Fichier de documentation action valide: $file"
+        continue
+    fi
+    
+    # Règle 4: Fichiers Snakefile* - doivent suivre SemVer et avoir une seule révision
+    if [[ "$file" =~ ^[^/]+/Snakefile ]]; then
+        filename=$(basename "$file")
+        
+        # Extraire la partie après "Snakefile" pour vérifier SemVer
+        if [[ "$filename" == "Snakefile" ]]; then
+            # Snakefile sans version - vérifier s'il a déjà été commité
+            if file_has_previous_commits "$file"; then
+                error "Le fichier $file a déjà été commité. Les Snakefiles ne peuvent avoir qu'une seule révision."
+                has_errors=true
+                continue
             fi
-            # Comparaison sémantique simple
-            if (( maj > max_major )) || \
-               (( maj == max_major && min > max_minor )) || \
-               (( maj == max_major && min == max_minor && pat > max_patch )); then
-                max_major=$maj
-                max_minor=$min
-                max_patch=$pat
+        else
+            # Snakefile avec extension - doit suivre SemVer
+            version_part="${filename#Snakefile}"
+            if [[ "$version_part" =~ ^\..*$ ]]; then
+                version_part="${version_part#.}"
+            fi
+            
+            if ! check_semver "${version_part}.dummy"; then
+                error "Le fichier $file ne suit pas le format SemVer (Snakefile.Majeure.Mineure.Patch)"
+                has_errors=true
+                continue
+            fi
+            
+            if file_has_previous_commits "$file"; then
+                error "Le fichier $file a déjà été commité. Les Snakefiles ne peuvent avoir qu'une seule révision."
+                has_errors=true
+                continue
             fi
         fi
-    done < <(git ls-files)
-
-    # Déterminer nouvelle version
-    if (( max_major < 0 )); then
-        new_major=0
-        new_minor=1
-        new_patch=0
-    else
-        new_major=$max_major
-        new_minor=$max_minor
-        new_patch=$((max_patch + 1))
+        
+        success "Fichier Snakefile valide: $file"
+        continue
     fi
-
-    # Construire nouveau nom
-    if [[ -n "$ext" ]]; then
-        newbase="${name}-v${new_major}.${new_minor}.${new_patch}.${ext}"
-    else
-        newbase="${name}-v${new_major}.${new_minor}.${new_patch}"
+    
+    # Règle 5: $PIPELINE_NAME/config/* - doivent suivre SemVer et avoir une seule révision
+    if [[ "$file" =~ ^[^/]+/config/ ]]; then
+        filename=$(basename "$file")
+        
+        # Vérifier le format SemVer (enlever l'extension pour la vérification)
+        if ! check_semver "$filename"; then
+            error "Le fichier de configuration $file ne suit pas le format SemVer (Majeure.Mineure.Patch.extension)"
+            has_errors=true
+            continue
+        fi
+        
+        # Vérifier qu'il n'a pas déjà été commité
+        if file_has_previous_commits "$file"; then
+            error "Le fichier de configuration $file a déjà été commité. Les fichiers de configuration ne peuvent avoir qu'une seule révision."
+            has_errors=true
+            continue
+        fi
+        
+        success "Fichier de configuration valide: $file"
+        continue
     fi
-    newpath="${dir}/${newbase}"
+    
+    # Règle 6: Tous les autres fichiers - peuvent avoir autant de révisions que nécessaire
+    success "Fichier autorisé (autres): $file"
+    
+done <<< "$staged_files"
 
-    # Créer dossier si nécessaire
-    mkdir -p -- "$dir"
+# Vérifier les résultats
+if [ "$has_errors" = true ]; then
+    error "Le commit a été rejeté en raison d'erreurs de validation."
+    echo ""
+    echo "Règles de versionnement des pipelines:"
+    echo "• launchers/*.sh: révisions multiples autorisées"
+    echo "• actions/*.sh: une seule révision, format SemVer requis, documentation .md obligatoire"
+    echo "• actions/*.md: révisions multiples autorisées, taille max 100Ko"
+    echo "• Snakefile*: une seule révision, format SemVer si versionné"
+    echo "• config/*: une seule révision, format SemVer requis"
+    echo "• Autres fichiers: révisions multiples autorisées"
+    exit 1
+fi
 
-    # Déplacer le fichier de travail vers le nouveau nom puis mettre à jour l'index:
-    # - git rm fichier_original (stage la suppression)
-    # - git add nouveau_fichier (stage l'ajout)
-    if [[ -f "$path" ]]; then
-        # Utiliser mv pour conserver le contenu ; si mv échoue, abort
-        mv -- "$path" "$newpath"
-        git rm --quiet --ignore-unmatch -- "$path"
-        git add -- "$newpath"
-        echo "Réécriture: $path -> $newpath (modification transformée en suppression + ajout)"
-    else
-        # Si le fichier n'existe plus dans l'arbre de travail mais est marqué M, refuser
-        echo "Erreur: fichier en statut M mais absent en travail: $path" >&2
-        exit 1
-    fi
-done
-
-# Re-stager au besoin est déjà fait par git rm/git add ci-dessus.
-# Laisser le commit se poursuivre.
+success "Toutes les vérifications sont passées avec succès!"
 exit 0
