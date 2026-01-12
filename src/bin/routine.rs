@@ -550,6 +550,16 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                 "La tentative {} du run {} s'est terminée avec une erreur.",
                 attempt.attempt_number, attempt.run_id
             );
+            //Renommer le dossier de sortie avec le suffixe `-failed-{run_id}-{attempt_id}`
+            if let Some(outdir) = attempt.outdir.as_ref() {
+                let dest = format!(
+                    "{outdir}-failed-{}-{}",
+                    attempt.run_id, attempt.attempt_number
+                );
+                if !std::path::PathBuf::from(&dest).exists() {
+                    std::fs::rename(outdir, dest)?;
+                }
+            }
             analysis::complete_failure(attempt.run_id, "".into(), pool).await?;
         }
         if done_paths.len() == 1 {
