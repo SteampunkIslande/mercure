@@ -67,6 +67,29 @@ impl HgAttempt {
         Ok(())
     }
 
+    /// Crée une tentative hypothétique à partir d'une HgRun (sans l'insérer en base)
+    ///
+    /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
+    /// Pratique pour l'API, uniformise l'environnement jinja2.
+    pub fn get_hypothetic_attempt(run: &HgRun) -> HgAttempt {
+        HgAttempt {
+            attempt_number: run.attempt_count as i64,
+            run_id: run.run_id,
+            attempt_date: OffsetDateTime::now_utc().to_string(),
+            user_defined_vars: run.user_defined_vars.clone(),
+            run_date: run.run_date.clone(),
+            run_sequencer: run.run_sequencer.clone(),
+            run_flowcellid: run.run_flowcellid.clone(),
+            sample_sheet_adn_path: run.sample_sheet_adn_path.clone(),
+            sample_sheet_arn_path: run.sample_sheet_arn_path.clone(),
+            metadata_path: run.metadata_path.clone(),
+            indir: run.indir.clone(),
+            outdir: run.outdir.clone(),
+            status: RunStatus::Idle,
+            comment: String::new(),
+        }
+    }
+
     /// Récupère un HgAttempt à partir de son attempt_number et run_id
     pub async fn get_attempt_from_number(
         attempt_number: i64,

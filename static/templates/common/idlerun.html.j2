@@ -81,7 +81,7 @@
             style="cursor: not-allowed; opacity: 0.6;">Valider</span>
         <span>Vous devriez pouvoir choisir un autre formulaire dans la liste ci-dessous. TODO!!!!</span>
         {% else %}
-        <a href="/mercure/editrun/{{ run_id }}" class="btn btn-primary">Editer</a>
+        <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
         <a id="validate-btn" class="btn btn-primary">Valider</a>
         {% endif %}
     </div>
@@ -210,7 +210,7 @@
 
         // Bouton valider (même logique que editrun)
         document.getElementById('validate-btn').addEventListener('click', async function () {
-            const runId = "{{ run_id }}";
+            const runId = "{{ run.run_id }}";
             if (!runId) {
                 showMessage("error", "ID du run introuvable dans l'URL.");
                 return;
@@ -225,7 +225,7 @@
                     });
                     const data = await response.json();
                     if (data.success) {
-                        window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}" +
+                        window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}" +
                             "&title=" + encodeURIComponent("Succès") +
                             "&message=" + encodeURIComponent(data.data.message) +
                             "&seconds=5";

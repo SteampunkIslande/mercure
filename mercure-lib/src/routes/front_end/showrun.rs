@@ -109,6 +109,8 @@ pub async fn show_run_get(
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let sequenceurs_folder = config.sequencers_dir;
 
+            let attempt = HgAttempt::get_hypothetic_attempt(&run);
+
             let sequenceurs_list = read_dir(&sequenceurs_folder)
                 .ok()
                 .map(|entries| {
@@ -145,15 +147,15 @@ pub async fn show_run_get(
                 "common/idlerun",
                 context! {
                     run: &run,
-                    user: auth.user,
                     form: &run.form,
-                    run_id: run.run_id,
+                    attempt: &attempt,
+                    history: history,
                     sequenceurs_list: sequenceurs_list,
-                    user_defined_vars_json: &user_defined_vars_json,
                     samplesheet_adn_static_name: samplesheet_adn_static_name,
                     samplesheet_arn_static_name: samplesheet_arn_static_name,
                     metadata_static_name: metadata_static_name,
-                    history: history,
+                    user_defined_vars_json: &user_defined_vars_json,
+                    user: auth.user,
                     pipeline_is_archived: pipeline_is_archived,
                 },
             )

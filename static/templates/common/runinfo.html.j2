@@ -7,61 +7,44 @@
         </div>
         <div>
             <label><strong>Date du run:</strong></label>
-            <span>{{ run.run_date }}</span>
+            <span>{{ attempt.run_date }}</span>
         </div>
         <div>
             <label><strong>Séquenceur:</strong></label>
-            <span id="seq-name">{{ run.run_sequencer }}</span>
+            <span id="seq-name">{{ attempt.run_sequencer }}</span>
         </div>
         {% if form.indir_type == "BclDir" %}
         <div>
             <label><strong>Numéro de flowcell:</strong></label>
-            <span>{{ run.run_flowcellid }}</span>
+            <span>{{ attempt.run_flowcellid }}</span>
         </div>
         {% endif %}
         <div>
             <label><strong>Type d'entrée:</strong></label>
-            <span>{{ {"BclDir":"Run brut Illumina","OntDir":"Run brut Oxford Nanopore","AnalysisDir":"Dossier d'analyse pré-existant"}[form.indir_type] }}</span>
+            <span>{{ {"BclDir":"Run brut Illumina","OntDir":"Run brut Oxford Nanopore","AnalysisDir":"Dossier d'analyse
+                pré-existant"}[form.indir_type] }}</span>
         </div>
-        {% if form.indir_type == "AnalysisDir" %}
-            
-            {% if attempt %}
-                {% if attempt.indir %}
-                <div>
-                    <label><strong>Dossier d'analyse:</strong></label>
-                    <span>{{ attempt.indir }}</span>
-                </div>
-                {% else %}
-                <em>
-                    Aucun dossier d'analyse, comment se peut-ce?
-                </em>
-                {% endif %}
-            {% else %}
-                {% if run.indir %}
-                <div>
-                    <label><strong>Dossier d'analyse:</strong></label>
-                    <span>{{ run.indir }}</span>
-                </div>
-                {% else %}
-                <em>
-                    Aucun dossier d'analyse, comment se fait-ce?
-                </em>
-                {% endif %}
-            {% endif %}
+        {% if form.indir_type == "AnalysisDir" and attempt.indir %}
+
+        <div>
+            <label><strong>Dossier d'analyse:</strong></label>
+            <span>{{ attempt.indir }}</span>
+        </div>
+
         {% endif %}
 
     </div>
 
     <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
         <h2>Tentatives</h2>
-            <div class="attempt-list">
-                {% if run.status == "Idle" %}
-                    <div class="run-attempt idle">
-                    <a href="/mercure/show/run/{{ run.run_id }}"><strong>Tentative actuelle</strong></a>
-                    </div>
-                {% endif %}
-                {% include 'common/attemptlist' %}
+        <div class="attempt-list">
+            {% if run.status == "Idle" %}
+            <div class="run-attempt idle">
+                <a href="/mercure/show/run/{{ run.run_id }}"><strong>Tentative actuelle</strong></a>
             </div>
+            {% endif %}
+            {% include 'common/attemptlist' %}
+        </div>
     </div>
 </div>
 
