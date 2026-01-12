@@ -38,6 +38,6 @@ pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<Str
     }
 
     // Return the path
-    let path_str = filepath.to_string_lossy().to_string();
+    let path_str = filepath.display().to_string();
     Json(ApiResponse::success(path_str))
 }

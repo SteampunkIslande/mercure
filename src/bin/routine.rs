@@ -9,9 +9,9 @@ use std::process::Command;
 use tokio::task::JoinError as TokioJoinError;
 
 use sqlx::SqlitePool;
-use std::fs::{create_dir_all, exists};
+use std::fs::{Permissions, create_dir_all, exists};
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -207,6 +207,8 @@ async fn start_analysis(
     if std::path::Path::new(&attempt.sample_sheet_adn_path).exists() {
         let dest_adn_path = input_dir.join("adn.csv");
         std::fs::copy(&attempt.sample_sheet_adn_path, &dest_adn_path)?;
+        std::fs::set_permissions(&dest_adn_path, Permissions::from_mode(0o644))?;
+
         info!(
             "Fichier ADN copié de {} vers {}",
             &attempt.sample_sheet_adn_path,
@@ -216,6 +218,8 @@ async fn start_analysis(
     if std::path::Path::new(&attempt.sample_sheet_arn_path).exists() {
         let dest_arn_path = input_dir.join("arn.csv");
         std::fs::copy(&attempt.sample_sheet_arn_path, &dest_arn_path)?;
+        std::fs::set_permissions(&dest_arn_path, Permissions::from_mode(0o644))?;
+
         info!(
             "Fichier ARN copié de {} vers {}",
             &attempt.sample_sheet_arn_path,
@@ -228,6 +232,8 @@ async fn start_analysis(
     {
         let dest_metadata_path = input_dir.join(src_metadata_filename);
         std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
+        std::fs::set_permissions(&dest_metadata_path, Permissions::from_mode(0o644))?;
+
         info!(
             "Fichier Metadata copié de {} vers {}",
             &attempt.metadata_path,
