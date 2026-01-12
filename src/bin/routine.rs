@@ -25,6 +25,7 @@ use tokio::sync::watch;
 
 use mercure_lib::models::HgAttempt;
 use mercure_lib::models::RunStatus;
+use mercure_lib::pipeline_exec::find_errors;
 
 #[derive(Error, Debug)]
 enum RoutineError {
@@ -546,10 +547,11 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
         )))
     } else {
         if running_paths.len() == 1 {
-            info!(
-                "La tentative {} du run {} n'est pas encore terminée.",
-                attempt.attempt_number, attempt.run_id
-            );
+            // Le run est toujours en cours d'analyse
+            // info!(
+            //     "La tentative {} du run {} n'est pas encore terminée.",
+            //     attempt.attempt_number, attempt.run_id
+            // );
         }
         if fails_paths.len() == 1 {
             info!(
@@ -566,7 +568,27 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                     std::fs::rename(outdir, dest)?;
                 }
             }
-            analysis::complete_failure(attempt.run_id, "".into(), pool).await?;
+            // grep '## ERROR' dans le fichier de log principal pour obtenir la raison de l'échec
+
+            let error_list = find_errors(
+                attempt.run_id,
+                attempt.attempt_number,
+                PathBuf::from(&config.logs_dir),
+            )
+            .await
+            .unwrap_or_default();
+
+            let error_reason = error_list.last().cloned().unwrap_or_else(|| {
+                "Erreur inconnue lors de l'analyse. Voir les logs pour plus de détails.".to_string()
+            });
+            analysis::complete_failure(attempt.run_id, &error_reason, pool).await?;
+            analysis::comment_attempt(
+                attempt.run_id,
+                attempt.attempt_number,
+                &error_list.join("\n"),
+                pool,
+            )
+            .await?;
         }
         if done_paths.len() == 1 {
             info!(

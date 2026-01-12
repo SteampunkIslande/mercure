@@ -75,9 +75,10 @@ pub async fn complete_success(
 /// Termine le run avec échec : Running -> Failure (appelé par la routine de vérification)
 pub async fn complete_failure(
     run_id: i64,
-    reason: String,
+    reason: &str,
     pool: &SqlitePool,
 ) -> Result<(), AnalysisStateMachineError> {
+    let reason = reason.to_string();
     let run: HgRun = HgRun::get_run_from_id(run_id, pool).await?;
     if !matches!(run.status, RunStatus::Running) {
         return Err(AnalysisStateMachineError::InvalidTransition {

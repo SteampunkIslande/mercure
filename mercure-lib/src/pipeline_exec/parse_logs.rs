@@ -110,6 +110,41 @@ pub async fn watch_log(
     })
 }
 
+pub async fn find_errors(
+    job_id: i64,
+    attempt_number: i64,
+    logs_folder: PathBuf,
+) -> Result<Vec<String>> {
+    // Recherche du fichier
+    let log_pattern = format!(r"^\d+-job-{}-{}\.log$", job_id, attempt_number);
+    let re_logfile = Regex::new(&log_pattern).unwrap();
+    let entries = std::fs::read_dir(&logs_folder)?;
+    let mut log_path = None;
+    for entry in entries {
+        let path = entry?.path();
+        if let Some(name) = path.file_name().and_then(|s| s.to_str())
+            && re_logfile.is_match(name)
+        {
+            log_path = Some(path);
+            break;
+        }
+    }
+
+    let log_path = log_path.ok_or_else(|| anyhow::anyhow!("Aucun fichier log trouvé"))?;
+    let file = File::open(&log_path)?;
+    let reader = BufReader::new(file).lines();
+
+    let re_step = Regex::new(r"^##\s+ERROR\s+(.+)$").unwrap();
+    let mut errors: Vec<String> = Vec::new();
+    for line in reader {
+        let line = line?;
+        if let Some(cap) = re_step.captures(&line) {
+            errors.push(cap[1].trim().to_string());
+        }
+    }
+    Ok(errors)
+}
+
 async fn count_jobs_in_squeue(slurm_id: &str) -> Option<(i64, i64, i64)> {
     let json_data = Value::from_str(
         &get(format!("http://127.0.0.1:8080/squeue?jobname={}", slurm_id))

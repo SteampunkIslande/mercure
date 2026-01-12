@@ -1,3 +1,3 @@
-pub mod runtime_parse_logs;
+pub mod parse_logs;
 
-pub use runtime_parse_logs::*;
+pub use parse_logs::*;
