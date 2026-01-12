@@ -150,7 +150,7 @@ fn get_indir_outdir_for_illumina(
     let seq_name = &attempt.run_sequencer;
     let flowcell_id = &attempt.run_flowcellid;
 
-    let run_dir_pattern = format!(r"^{run_date_short}_{seq_name}_(\d+)_{flowcell_id}");
+    let run_dir_pattern = format!(r"^{run_date_short}_{seq_name}_(\d+)_.+{flowcell_id}$");
     let run_dir_re = Regex::new(&run_dir_pattern)?;
 
     let (bcl_dir_base, seq_run_counter) = std::fs::read_dir(&raw_dir)?
