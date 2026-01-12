@@ -31,8 +31,23 @@
     <!-- Avertissement pour pipeline archivé -->
     {% if pipeline_is_archived %}
     <div class="warning-msg">
-        ⚠️ Attention: Ce run utilise une version archivée du pipeline. Vous ne pourrez pas relancer l'analyse de ce run.
-        En revanche, vous pouvez choisir un autre formulaire dans la liste ci-dessous.
+        ⚠️ Attention: Ce run utilise une version archivée du pipeline.
+        Pour relancer l'analyse, vous pouvez choisir un autre formulaire dans la liste ci-dessous.
+        {% if compatible_forms %}
+        <br><br><strong>Formulaires compatibles disponibles :</strong>
+        <ul>
+            {% for form in compatible_forms %}
+            <li>
+                <strong>{{ form.form_name }}</strong> (version {{ form.version }})
+                <button onclick="migrateToForm({{ form.form_id }})" class="btn btn-small btn-primary">
+                    Créer un nouveau run avec cette version
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <br><br><em>Aucun formulaire compatible trouvé.</em>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -140,6 +155,34 @@
 
 
         });
+
+        // Fonction pour migrer vers un formulaire compatible
+        async function migrateToForm(targetFormId) {
+            if (!confirm("Créer un nouveau run à partir de ce formulaire compatible ? Cela créera une copie de ce run avec le nouveau formulaire.")) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/migrate/run?from_run_id={{ run.run_id }}&to_form_id=${targetFormId}`, {
+                    method: 'GET'
+                    });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${result.data.new_run_id}` +
+                        `&title=${encodeURIComponent("Migration réussie")}` +
+                        `&message=${encodeURIComponent(result.data.message)}` +
+                        `&seconds=3`;
+                    window.location.href = redirectUrl;
+                } else {
+                    alert('Erreur lors de la migration: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la migration:', error);
+                alert('Erreur lors de la migration: ' + error.message);
+            }
+        }
 
     </script>
 </body>

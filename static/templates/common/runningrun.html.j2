@@ -52,14 +52,6 @@
         </div>
     </div>
 
-    <!-- Avertissement pour pipeline archivé -->
-    {% if pipeline_is_archived %}
-    <div class="warning-msg">
-        ⚠️ Attention: Ce pipeline utilise une version archivée. Il s'agit là d'une erreur critique, car un run en cours
-        d'analyse ne devrait jamais être associé à un formulaire archivé. Veuillez contacter votre administrateur.
-    </div>
-    {% endif %}
-
     <div class="field">
         <strong>Formulaire:</strong> {{ form.form_name }} v{{ form.version }}
     </div>

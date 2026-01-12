@@ -31,14 +31,12 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
 
     // Si le fichier de launcher n'existe plus, afficher une erreur
     if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
-        // Désactiver le formulaire si ce n'était pas déjà fait
-        HgFormDef::disable_form(pool, form_id).await.ok();
         return Template::render(
             "common/error",
             context! {
                 title:"Launcher manquant",
                 h2:"Launcher manquant",
-                message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}. Il a été désactivé.", form_def.pipeline_name, form_def.launcher_name)
+                message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
             },
         );
     }

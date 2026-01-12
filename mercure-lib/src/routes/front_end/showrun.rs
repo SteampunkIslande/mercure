@@ -94,6 +94,15 @@ pub async fn show_run_get(
         // Vérifier si le pipeline est archivé
         let pipeline_is_archived = is_pipeline_archived(&form_def);
 
+        // Si le pipeline est archivé, rechercher des formulaires compatibles
+        let compatible_forms = if pipeline_is_archived {
+            HgFormDef::find_compatible_forms(&form_def, pool)
+                .await
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
         // Récupérer l'historique des tentatives pour la navigation
         let history = HgAttempt::list_attempts_for_run(run_id, pool)
             .await
@@ -157,6 +166,7 @@ pub async fn show_run_get(
                     user_defined_vars_json: &user_defined_vars_json,
                     user: auth.user,
                     pipeline_is_archived: pipeline_is_archived,
+                    compatible_forms: &compatible_forms,
                 },
             )
         } else {
@@ -213,6 +223,7 @@ pub async fn show_run_get(
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         pipeline_is_archived: pipeline_is_archived,
+                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Running => Template::render(
@@ -228,6 +239,7 @@ pub async fn show_run_get(
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         pipeline_is_archived: pipeline_is_archived,
+                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Success => Template::render(
@@ -243,6 +255,7 @@ pub async fn show_run_get(
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         pipeline_is_archived: pipeline_is_archived,
+                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
@@ -259,6 +272,7 @@ pub async fn show_run_get(
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         pipeline_is_archived: pipeline_is_archived,
+                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Idle => Template::render(
