@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""
+Hook pre-commit pour le système de versionnement des pipelines
+Applique les règles définies dans documentation/creation-systeme-version-pipelines.md
+"""
+
+import os
+import re
+import sys
+import subprocess
+from pathlib import Path
+from typing import List, Tuple
+
+
+class Colors:
+    """Codes de couleur pour les messages de sortie"""
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    YELLOW = '\033[1;33m'
+    NC = '\033[0m'  # No Color
+
+
+def error(message: str) -> None:
+    """Affiche un message d'erreur coloré"""
+    print(f"{Colors.RED}ERREUR:{Colors.NC} {message}", file=sys.stderr)
+
+
+def warning(message: str) -> None:
+    """Affiche un message d'avertissement coloré"""
+    print(f"{Colors.YELLOW}AVERTISSEMENT:{Colors.NC} {message}", file=sys.stderr)
+
+
+def success(message: str) -> None:
+    """Affiche un message de succès coloré"""
+    print(f"{Colors.GREEN}✓{Colors.NC} {message}")
+
+
+def check_semver(filename: str) -> bool:
+    """
+    Vérifie si le nom de fichier suit le format SemVer
+    Format attendu: nom-X.Y.Z(.extension) où X, Y, Z sont des nombres
+    """
+    pattern = r'-\d+\.\d+\.\d+(\.[^\.]+)?$'
+    return bool(re.search(pattern, filename))
+
+
+def file_has_previous_commits(filepath: str) -> bool:
+    """
+    Vérifie si un fichier a déjà été commité dans l'historique git
+    """
+    try:
+        # Vérifier si le fichier existe dans l'historique git
+        result = subprocess.run(
+            ['git', 'log', '--follow', '--oneline', '--', filepath],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        
+        if result.returncode == 0:
+            commit_lines = result.stdout.strip().split('\n')
+            commit_count = len([line for line in commit_lines if line.strip()])
+            return commit_count > 0
+        
+        return False
+    except subprocess.SubprocessError:
+        return False
+
+
+def check_file_size(filepath: str, max_size_kb: int) -> bool:
+    """
+    Vérifie la taille d'un fichier en Ko
+    """
+    try:
+        file_path = Path(filepath)
+        if not file_path.exists():
+            return False
+        
+        # Taille en Ko
+        file_size_kb = file_path.stat().st_size // 1024
+        return file_size_kb <= max_size_kb
+    except (OSError, IOError):
+        return False
+
+
+def get_staged_files() -> List[str]:
+    """
+    Récupère la liste des fichiers modifiés/ajoutés dans le staging area
+    """
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--cached', '--name-only', '--diff-filter=AM'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        files = [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
+        return files
+    except subprocess.SubprocessError:
+        return []
+
+
+def get_pipeline_name(filepath: str) -> str:
+    """
+    Extrait le nom du pipeline
+    """
+    return filepath.split('/')[0]
+
+
+def validate_file(filepath: str) -> bool:
+    """
+    Valide un fichier selon les règles de versionnement des pipelines
+    Retourne True si le fichier est valide, False sinon
+    """
+    # Ignorer les fichiers qui ne sont pas dans un pipeline (pas de structure $PIPELINE_NAME/...)
+    if '/' not in filepath:
+        return False
+    
+    try:
+        pipeline_name = get_pipeline_name(filepath)
+    except IndexError:
+        return False
+    
+    print(f"Vérification: {filepath}")
+    
+    # Règle 1: $PIPELINE_NAME/launchers/*.sh - peut avoir autant de commits que souhaité
+    if re.match(fr'^{pipeline_name}/launchers/.*\.sh$', filepath):
+        success(f"Fichier launcher autorisé: {filepath}")
+        return True
+    
+    # Règle 2: $PIPELINE_NAME/actions/*.sh - doit avoir une seule révision et suivre SemVer
+    if re.match(fr'^{pipeline_name}/actions/.*\.sh$', filepath):
+        filename = os.path.basename(filepath)
+        
+        # Vérifier le format SemVer
+        if not check_semver(filename):
+            error(f"Le fichier action {filepath} ne suit pas le format SemVer (Majeure.Mineure.Patch.sh)")
+            return False
+        
+        # Vérifier qu'il n'a pas déjà été commité
+        if file_has_previous_commits(filepath):
+            error(f"Le fichier action {filepath} a déjà été commité. Les actions ne peuvent avoir qu'une seule révision.")
+            return False
+        
+        # Vérifier qu'il existe un fichier .md associé
+        md_file = filepath.replace('.sh', '.md')
+        if not Path(md_file).exists():
+            error(f"Le fichier action {filepath} doit avoir un fichier de documentation associé: {md_file}")
+            return False
+        
+        success(f"Fichier action valide: {filepath}")
+        return True
+    
+    # Règle 3: Fichiers .md dans actions - peuvent être modifiés, taille max 100Ko
+    if re.match(fr'^{pipeline_name}/actions/.*\.md$', filepath):
+        if not check_file_size(filepath, 100):
+            error(f"Le fichier de documentation {filepath} dépasse la taille maximale de 100Ko")
+            return False
+        
+        success(f"Fichier de documentation action valide: {filepath}")
+        return True
+    
+    # Règle 4: Tous les autres fichiers - doivent suivre SemVer et avoir une seule révision
+    filename = os.path.basename(filepath)
+    
+    # Vérifier le format SemVer
+    if not check_semver(filename):
+        error(f"Le fichier {filepath} ne suit pas le format SemVer (Majeure.Mineure.Patch.extension)")
+        return False
+    
+    # Vérifier qu'il n'a pas déjà été commité
+    if file_has_previous_commits(filepath):
+        error(f"Le fichier {filepath} a déjà été commité. Tous les fichiers (sauf launchers et actions/*.md) ne peuvent avoir qu'une seule révision.")
+        return False
+    
+    success(f"Fichier valide: {filepath}")
+    return True
+
+
+def print_rules() -> None:
+    """Affiche les règles de versionnement des pipelines"""
+    print()
+    print("Règles de versionnement des pipelines:")
+    print("• launchers/*.sh: révisions multiples autorisées")
+    print("• actions/*.sh: une seule révision, format SemVer requis, documentation .md obligatoire")
+    print("• actions/*.md: révisions multiples autorisées, taille max 100Ko")
+    print("• Tous les autres fichiers: une seule révision, format SemVer requis")
+
+
+def main() -> int:
+    """Fonction principale du script"""
+    staged_files = get_staged_files()
+    
+    if not staged_files:
+        success("Aucun fichier à vérifier")
+        return 0
+    
+    print("Vérification des règles de versionnement des pipelines...")
+    
+    has_errors = False
+    
+    for filepath in staged_files:
+        if not validate_file(filepath):
+            has_errors = True
+    
+    if has_errors:
+        error("Le commit a été rejeté en raison d'erreurs de validation.")
+        print_rules()
+        return 1
+    
+    success("Toutes les vérifications sont passées avec succès!")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
