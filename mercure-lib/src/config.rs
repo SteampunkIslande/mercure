@@ -14,7 +14,6 @@ pub struct MercureConfig {
     pub logs_dir: String,
     pub ont_dir: String,
     pub check_run_completed: String,
-    pub post_run_script: String,
 }
 
 impl Default for MercureConfig {
@@ -29,7 +28,6 @@ impl Default for MercureConfig {
             jobs_dir: "/home/charles/mercure/JOBS".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),
             ont_dir: "/home/charles/mercure/ont".into(),
-            post_run_script: "/home/charles/mercure/post-run-script.sh".into(),
             check_run_completed: "/home/charles/mercure/check-run-completed.sh".into(),
         }
     }

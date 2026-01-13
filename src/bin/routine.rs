@@ -403,18 +403,12 @@ source /etc/profile
 {launcher_abs_path}
 RESULT=$?
 
-# Script à lancer une fois que l'analyse est terminée.
-# Notez que même en cas d'erreur, le script post-run sera exécuté (son rôle étant entre autres de collecter les logs).
-# Le code de retour de ce script n'est pas pris en compte dans le résultat global de l'analyse.
-{post_run_script}
-
 exit $RESULT
 
 "#,
         pipeline_dir = pipeline_base_dir.display(),
         pipeline_name = run.form.pipeline_name,
-        udv = exported_vars,
-        post_run_script = &config.post_run_script
+        udv = exported_vars
     )?;
 
     Ok(())
