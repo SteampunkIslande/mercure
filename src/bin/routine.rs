@@ -389,6 +389,8 @@ async fn generate_script(
         .truncate(true)
         .open(&script_path)?;
 
+    let launcher_content = std::fs::read_to_string(&launcher_abs_path)?;
+
     write!(
         &mut script_file,
         r#"#!/bin/bash
@@ -400,10 +402,7 @@ source /etc/profile
 
 {udv}
 
-{launcher_abs_path}
-RESULT=$?
-
-exit $RESULT
+{launcher_content}
 
 "#,
         pipeline_dir = pipeline_base_dir.display(),
