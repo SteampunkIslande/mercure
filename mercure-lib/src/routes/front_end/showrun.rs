@@ -92,11 +92,11 @@ pub async fn show_run_get(
         }
 
         // Vérifier si le pipeline est archivé
-        let pipeline_is_archived = is_pipeline_archived(&form_def);
+        let pipeline_is_archived = is_pipeline_archived(form_def);
 
         // Si le pipeline est archivé, rechercher des formulaires compatibles
         let compatible_forms = if pipeline_is_archived {
-            HgFormDef::find_compatible_forms(&form_def, pool)
+            HgFormDef::find_compatible_forms(form_def, pool)
                 .await
                 .unwrap_or_default()
         } else {

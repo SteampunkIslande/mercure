@@ -89,7 +89,7 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 }
 
                 // Vérifier si le pipeline est archivé (révision git différente)
-                let pipeline_is_archived = is_pipeline_archived(&form_def);
+                let pipeline_is_archived = is_pipeline_archived(form_def);
                 if pipeline_is_archived {
                     return Template::render(
                         "common/error",

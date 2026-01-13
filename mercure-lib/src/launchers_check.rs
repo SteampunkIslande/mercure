@@ -43,7 +43,7 @@ pub fn get_current_revision(launcher_path: &Path) -> Result<String, LauncherChec
         .arg("status")
         .arg("--porcelain")
         .arg("--")
-        .arg(launcher_path.strip_prefix(&pipelines_dir)?)
+        .arg(launcher_path.strip_prefix(pipelines_dir)?)
         .output()?
         .stdout;
     let file_status_is_clean = file_status.is_empty();
@@ -65,7 +65,7 @@ pub fn get_current_revision(launcher_path: &Path) -> Result<String, LauncherChec
             .arg("1")
             .arg("HEAD")
             .arg("--")
-            .arg(launcher_path.strip_prefix(&pipelines_dir)?)
+            .arg(launcher_path.strip_prefix(pipelines_dir)?)
             .output()?
             .stdout,
     )?)
