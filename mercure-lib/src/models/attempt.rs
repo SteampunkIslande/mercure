@@ -67,7 +67,7 @@ impl HgAttempt {
         Ok(())
     }
 
-    /// Crée une tentative hypothétique à partir d'une HgRun (sans l'insérer en base)
+    /// Crée une tentative hypothétique à partir d'un HgRun (sans l'insérer en base)
     ///
     /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
     /// Pratique pour l'API, uniformise l'environnement jinja2.
