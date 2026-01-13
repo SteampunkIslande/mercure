@@ -14,7 +14,7 @@ pub enum AnalysisStateMachineError {
     InvalidOperation(String),
 }
 
-/// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative
+/// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative (appelé par le backend)
 pub async fn validate_form(
     run_id: i64,
     pool: &SqlitePool,
@@ -94,7 +94,7 @@ pub async fn complete_failure(
         .map_err(AnalysisStateMachineError::from)
 }
 
-/// Transitionne un run en échec si le run est introuvable, ou toute ature erreur empêchant le lancement : Pending -> Failure
+/// Transitionne un run en échec si le run est introuvable, ou toute ature erreur empêchant le lancement : Pending -> Failure (appelé par la routine de vérification)
 pub async fn fail_cannot_analyse_run(
     run_id: i64,
     reason: &str,
