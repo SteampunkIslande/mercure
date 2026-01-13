@@ -27,7 +27,7 @@ echo -e "BEGIN_REPRO_SCRIPT\n----" >>"$HG_LOG_FILE" 2>&1
 # Tout le contenu entre les deux marqueurs BEGIN_REPRO_SCRIPT et END_REPRO_SCRIPT est un script à part entière, que l'utilisateur peut adapter (si certaines variables d'environnement doivent changer) et relancer
 echo "#!/bin/bash" >>"$HG_LOG_FILE" 2>&1
 echo "export REPRO_COMMIT=$(git rev-list -n 1 HEAD)" >>"$HG_LOG_FILE" 2>&1
-cat $REPRODUCIBILITY_SCRIPT <( cat "$JOBS_DIR/RUNNING/${job_name}.sh" | sed -n 2p ) | sed '/export PIPELINE_DIR=/d' >>"$HG_LOG_FILE" 2>&1
+cat $REPRODUCIBILITY_SCRIPT <( cat "$JOBS_DIR/RUNNING/${job_name}.sh" ) | sed '/export PIPELINE_DIR=/d' >>"$HG_LOG_FILE" 2>&1
 echo -e "END_REPRO_SCRIPT\n----" >>"$HG_LOG_FILE" 2>&1
 
 stdbuf -oL "$JOBS_DIR/RUNNING/${job_name}.sh" >>"$HG_LOG_FILE" 2>&1
