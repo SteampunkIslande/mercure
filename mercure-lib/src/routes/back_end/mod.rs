@@ -1,4 +1,3 @@
-mod comment;
 mod directory_listing;
 mod editgroups;
 mod getform;
@@ -19,7 +18,6 @@ mod samplesheet;
 mod submitrun;
 mod upload;
 
-pub use comment::*;
 pub use directory_listing::*;
 pub use editgroups::*;
 pub use getform::*;
