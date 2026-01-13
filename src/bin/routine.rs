@@ -102,6 +102,30 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
             }
         }
 
+        // Compter les runs avec le statut Pending. S'il n'y en a aucun, alors on peut lancer `git pull` pour mettre à jour les pipelines
+        let pending_count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM Attempts WHERE status = ?")
+                .bind(RunStatus::Pending.to_string())
+                .fetch_one(&pool)
+                .await
+                .unwrap_or(0);
+        if pending_count == 0 {
+            let config = get_mercure_config();
+            let pipeline_dir = Path::new(&config.pipeline_dir);
+            let output = Command::new("git")
+                .current_dir(pipeline_dir)
+                .arg(pipeline_dir)
+                .arg("pull")
+                .output();
+            if let Err(e) = output {
+                error!(
+                    "Erreur lors de l'exécution de 'git pull' dans {}: {}",
+                    pipeline_dir.display(),
+                    e
+                );
+            }
+        }
+
         // Point de contrôle 2: Attendre avec possibilité d'interruption
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(60)) => {},
