@@ -8,6 +8,7 @@
     <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
     <script src="/static/scripts/json_table.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
     <title>Connexion - Mercure</title>
 </head>
 
@@ -31,7 +32,6 @@
 
     <script>
         async function onConnect() {
-            const errorDiv = document.getElementById('error-message');
             const usermail = document.getElementById('usermail').value;
             const password = document.getElementById('password').value;
 
@@ -44,20 +44,14 @@
                     body: JSON.stringify({ usermail, password })
                 });
 
-                if (response.ok) {
+                if (response.status === 200) {
                     window.location.href = response.url;
                 } else {
                     const data = await response.json();
                     showMessage("error", data.message);
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                    }, 2000);
                 }
             } catch (error) {
                 showMessage("error", error);
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 2000);
             }
         }
         window.onload = function () {
