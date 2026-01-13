@@ -13,7 +13,7 @@ srun --job-name="$job_name" --mem=4G rsync -a --info=progress2 "$FROM" "$TO" | t
 res=$?
 
 if [ $res -ne 0 ]; then
-	echo "##ERROR Erreur lors de la copie avec rsync"
+	echo "## ERROR Erreur lors de la copie avec rsync"
 	exit $res
 else
 	echo "Copie terminée"

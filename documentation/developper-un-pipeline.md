@@ -42,7 +42,7 @@ srun --job-name="$job_name" --mem=4G rsync -a --info=progress2 "$FROM" "$TO" | \
 res=$?
 
 if [ $res -ne 0 ]; then
-    echo "##ERROR Erreur lors de la copie avec rsync (code de retour: $res)"
+    echo "## ERROR Erreur lors de la copie avec rsync (code de retour: $res)"
     exit $res
 else
     echo "Copie terminée"
@@ -56,7 +56,7 @@ fi
 - **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter une commande.
 - **Communication avec Mercure** :
   - La progression est indiquée avec le format `X of 100 (X%) done`, compatible avec l'interface de Mercure.
-  - Les erreurs sont signalées avec le préfixe `##ERROR`.
+  - Les erreurs sont signalées avec le préfixe `## ERROR`.
 - **Gestion des erreurs** : En cas d'échec, retourner un code non nul pour arrêter le launcher (qui s'exécute en mode strict avec `set -euo pipefail`).
 
 ---
@@ -142,7 +142,7 @@ echo "Étape 1/1: Démultiplexage de $INDIR dans $OUTDIR"
 
 ## COPIE_DEST : Destination de la copie, au format attendu par rsync (ex: user@host:/dossier/depot)
 
-[[ -z $COPIE_DEST ]] && { echo "##ERROR COPIE_DEST est obligatoire"; exit 1; };
+[[ -z $COPIE_DEST ]] && { echo "## ERROR COPIE_DEST est obligatoire"; exit 1; };
 
 # Étape 1 : Démultiplexage
 cd "$PIPELINE_DIR/demul"
@@ -289,7 +289,7 @@ Les variables suivantes sont toujours définies et **ne doivent en aucun cas** �
 
 2. **Exécutabilité des scripts** : Toujours vérifier que les scripts sont exécutables (`chmod +x`).
 3. **Gestion des erreurs** : Retourner un code non nul en cas d'échec pour arrêter le launcher.
-4. **Communication avec Mercure** : Utiliser `##STEP` pour les étapes et `##ERROR` pour les erreurs.
+4. **Communication avec Mercure** : Utiliser `##STEP` pour les étapes et `## ERROR` pour les erreurs.
 5. **Suivi de progression** : Utiliser le format `X of 100 (X%) done` pour la progression.
 6. **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter les commandes.
 7. **Variables d'environnement** : Respecter les variables prédéfinies et ne pas les redéfinir.
