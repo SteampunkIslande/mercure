@@ -273,9 +273,23 @@ Les variables suivantes sont toujours définies et **ne doivent en aucun cas** �
 
 ## Bonnes pratiques
 
-1. **Exécutabilité des scripts** : Toujours vérifier que les scripts sont exécutables (`chmod +x`).
-2. **Gestion des erreurs** : Retourner un code non nul en cas d'échec pour arrêter le launcher.
-3. **Communication avec Mercure** : Utiliser `##STEP` pour les étapes et `##ERROR` pour les erreurs.
-4. **Suivi de progression** : Utiliser le format `X of 100 (X%) done` pour la progression.
-5. **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter les commandes.
-6. **Variables d'environnement** : Respecter les variables prédéfinies et ne pas les redéfinir.
+1. **🏆 RÈGLE D'OR - Chemins avec `$PIPELINE_DIR`** : **Tous les chemins mentionnés dans un launcher doivent commencer par `$PIPELINE_DIR`**. Cette variable garantit la portabilité et la robustesse des pipelines en évitant les chemins codés en dur.
+   
+   ✅ **Correct** :
+   ```bash
+   cd "$PIPELINE_DIR/demul"
+   ./actions/demul-1.0.0.sh
+   ```
+   
+   ❌ **Incorrect** :
+   ```bash
+   cd /chemin/absolu/vers/demul
+   ./actions/demul-1.0.0.sh
+   ```
+
+2. **Exécutabilité des scripts** : Toujours vérifier que les scripts sont exécutables (`chmod +x`).
+3. **Gestion des erreurs** : Retourner un code non nul en cas d'échec pour arrêter le launcher.
+4. **Communication avec Mercure** : Utiliser `##STEP` pour les étapes et `##ERROR` pour les erreurs.
+5. **Suivi de progression** : Utiliser le format `X of 100 (X%) done` pour la progression.
+6. **Exécution via SLURM** : Toujours utiliser `srun` pour exécuter les commandes.
+7. **Variables d'environnement** : Respecter les variables prédéfinies et ne pas les redéfinir.
