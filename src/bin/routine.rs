@@ -389,7 +389,13 @@ async fn generate_script(
         .truncate(true)
         .open(&script_path)?;
 
-    let launcher_content = std::fs::read_to_string(&launcher_abs_path)?;
+    // Un launcher peut contenir une ligne shebang (#!). Cette ligne n'est pertinente qu'en standalone.
+    // Dans notre cas, on veut exécuter le launcher dans le contexte du script généré, donc on ignore cette ligne.
+    let launcher_content = std::fs::read_to_string(&launcher_abs_path)?
+        .split('\n')
+        .filter(|s| !s.starts_with("#!"))
+        .collect::<Vec<&str>>()
+        .join("\n");
 
     write!(
         &mut script_file,
