@@ -3,10 +3,10 @@
 # /OPT/JOBS en production
 JOBS_DIR=/home/charles/mercure-arena/OPT/JOBS
 
-# /OPT/mercure/reproductibility-script.sh en production
-REPRODUCIBILITY_SCRIPT="/home/charles/mercure/scripts/reproductibility-script.sh"
+# /OPT/mercure/reproducibility-script.sh en production
+REPRODUCIBILITY_SCRIPT_TEMPLATE="/home/charles/mercure/scripts/reproducibility-script-template.sh"
 
-[[ -f $REPRODUCIBILITY_SCRIPT ]] || { echo "Erreur: le script de reproductibilité $REPRODUCIBILITY_SCRIPT est introuvable, impossible de lancer l'analyse"; exit 1; }
+[[ -f $REPRODUCIBILITY_SCRIPT_TEMPLATE ]] || { echo "Erreur: le script de reproductibilité $REPRODUCIBILITY_SCRIPT_TEMPLATE est introuvable, impossible de lancer l'analyse"; exit 1; }
 
 cd "$JOBS_DIR/TODO"
 
@@ -27,7 +27,7 @@ echo "BEGIN_REPRO_SCRIPT" >>"$HG_LOG_FILE" 2>&1
 # Tout le contenu entre les deux marqueurs BEGIN_REPRO_SCRIPT et END_REPRO_SCRIPT est un script à part entière, que l'utilisateur peut adapter (si certaines variables d'environnement doivent changer) et relancer
 echo "#!/bin/bash" >>"$HG_LOG_FILE" 2>&1
 echo "export REPRO_COMMIT=$(git rev-list -n 1 HEAD)" >>"$HG_LOG_FILE" 2>&1
-cat $REPRODUCIBILITY_SCRIPT <( cat "$JOBS_DIR/RUNNING/${job_name}.sh" | sed 1d ) | sed '/export PIPELINE_DIR=/d' >>"$HG_LOG_FILE" 2>&1
+cat $REPRODUCIBILITY_SCRIPT_TEMPLATE <( cat "$JOBS_DIR/RUNNING/${job_name}.sh" | sed 1d | sed '/export PIPELINE_DIR=/d') >>"$HG_LOG_FILE" 2>&1
 echo "END_REPRO_SCRIPT" >>"$HG_LOG_FILE" 2>&1
 
 stdbuf -oL "$JOBS_DIR/RUNNING/${job_name}.sh" >>"$HG_LOG_FILE" 2>&1

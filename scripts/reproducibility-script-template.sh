@@ -6,6 +6,10 @@
 REMOTE_REPO_PATH="$1"
 NEW_PIPELINE_DIR="$2"
 
+[[ -d $NEW_PIPELINE_DIR ]] && { echo "Erreur: le répertoire $NEW_PIPELINE_DIR existe déjà"; exit 1; }
+
+[[ -z $REPRO_COMMIT ]] && { echo "Erreur: la variable d'environnement REPRO_COMMIT n'est pas définie"; exit 1; }
+
 git clone "$REMOTE_REPO_PATH" "$NEW_PIPELINE_DIR"
 cd "$NEW_PIPELINE_DIR" || { echo "Erreur: impossible de se placer dans $NEW_PIPELINE_DIR"; exit 1; }
 git reset --hard "$REPRO_COMMIT"
