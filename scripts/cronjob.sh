@@ -20,7 +20,7 @@ job_name="$(date +%s)-$(basename ${job%.sh})"
 export HG_LOG_FILE="$JOBS_DIR/LOGS/${job_name}.log"
 
 mv "$job" "$JOBS_DIR/RUNNING/${job_name}.sh"
-echo -e "BEGIN_REPRO_SCRIPT\n----" >>"$HG_LOG_FILE" 2>&1
+echo "BEGIN_REPRO_SCRIPT" >>"$HG_LOG_FILE" 2>&1
 
 # Affiche le script de reproductibilité dans le log, ainsi que le script que l'on s'apprête à lancer
 # Le but est de pouvoir relancer exactement le même job plus tard, juste à partir du log
@@ -28,7 +28,7 @@ echo -e "BEGIN_REPRO_SCRIPT\n----" >>"$HG_LOG_FILE" 2>&1
 echo "#!/bin/bash" >>"$HG_LOG_FILE" 2>&1
 echo "export REPRO_COMMIT=$(git rev-list -n 1 HEAD)" >>"$HG_LOG_FILE" 2>&1
 cat $REPRODUCIBILITY_SCRIPT <( cat "$JOBS_DIR/RUNNING/${job_name}.sh" | sed 1d ) | sed '/export PIPELINE_DIR=/d' >>"$HG_LOG_FILE" 2>&1
-echo -e "END_REPRO_SCRIPT\n----" >>"$HG_LOG_FILE" 2>&1
+echo "END_REPRO_SCRIPT" >>"$HG_LOG_FILE" 2>&1
 
 stdbuf -oL "$JOBS_DIR/RUNNING/${job_name}.sh" >>"$HG_LOG_FILE" 2>&1
 RESULT=$?

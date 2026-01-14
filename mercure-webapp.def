@@ -7,6 +7,9 @@ From: alpine:latest
     target/x86_64-unknown-linux-musl/release/admin /bin/admin
     static /static
 
+%post
+    apk add git
+
 %environment
     export ROCKET_CONFIG=/OPT/mercure/Rocket.toml
 
