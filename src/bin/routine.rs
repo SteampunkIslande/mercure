@@ -53,6 +53,90 @@ enum RoutineError {
     CheckRunCompletedError(String),
 }
 
+/// Fonction de gestion du dossier des pipelines.
+///
+/// Argument: le chemin du dossier des pipelines
+///
+/// Retourne: le hash de la dernière révision (sauf si la commande échoue)
+fn get_last_rev(pipeline_dir: &std::path::Path) -> Option<String> {
+    String::from_utf8(
+        Command::new("git")
+            .current_dir(pipeline_dir)
+            .arg("rev-list")
+            .arg("-n")
+            .arg("1")
+            .arg("HEAD")
+            .output()
+            .ok()?
+            .stdout,
+    )
+    .ok()
+}
+
+/// Fonction de gestion du dossier des pipelines.
+///
+/// Argument: le chemin du dossier des pipelines
+///
+/// Pas de retour: effet de bord. Met à jour le dossier des pipelines
+fn git_pull(pipeline_dir: &std::path::Path) {
+    let pull_output = Command::new("git")
+        .arg("pull")
+        .arg("-C")
+        .arg(pipeline_dir)
+        .output();
+
+    match pull_output {
+        Err(e) => {
+            error!(
+                "Erreur lors de l'exécution de 'git pull' dans {}: {}",
+                pipeline_dir.display(),
+                e
+            );
+        }
+        Ok(output) => {
+            if let Some(code) = output.status.code() {
+                if code != 0 {
+                    error!("{}", String::from_utf8_lossy(output.stdout.as_ref()));
+                }
+            }
+        }
+    }
+}
+
+/// Fonction de gestion du dossier des pipelines.
+///
+/// Argument: le chemin du dossier des pipelines
+///
+/// Pas de retour: effet de bord. Permet de s'assurer que le dossier de pipeline se retrouve read-only
+fn set_read_only(pipeline_dir: &std::path::Path) {
+    let pull_output = Command::new("chmod")
+        .arg("-R")
+        .arg("a-w")
+        .arg(pipeline_dir)
+        .output();
+
+    match pull_output {
+        Err(e) => {
+            error!(
+                "Erreur lors de l'exécution de `chmod -R a-w {}`:\n{}",
+                pipeline_dir.display(),
+                e
+            );
+        }
+        Ok(output) => {
+            if let Some(code) = output.status.code() {
+                if code != 0 {
+                    error!(
+                        "`chmod -R a-w {}`:\n{}",
+                        pipeline_dir.display(),
+                        String::from_utf8_lossy(output.stdout.as_ref())
+                    );
+                }
+            }
+        }
+    }
+}
+
 // Ajout de la méthode utilitaire pour HgAttempt
 
 /// Fonction qui exécute la boucle de routine avec des points de contrôle pour l'annulation
@@ -112,17 +196,12 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
         if pending_count == 0 {
             let config = get_mercure_config();
             let pipeline_dir = Path::new(&config.pipeline_dir);
-            let output = Command::new("git")
-                .current_dir(pipeline_dir)
-                .arg(pipeline_dir)
-                .arg("pull")
-                .output();
-            if let Err(e) = output {
-                error!(
-                    "Erreur lors de l'exécution de 'git pull' dans {}: {}",
-                    pipeline_dir.display(),
-                    e
-                );
+            let rev_before = get_last_rev(pipeline_dir);
+            git_pull(pipeline_dir);
+            set_read_only(pipeline_dir);
+            let rev_after = get_last_rev(pipeline_dir);
+            if rev_before != rev_after {
+                info!("Pipelines mis à jour avec succès !");
             }
         }
 
