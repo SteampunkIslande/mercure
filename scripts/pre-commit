@@ -23,12 +23,12 @@ class Colors:
 
 def error(message: str) -> None:
     """Affiche un message d'erreur coloré"""
-    print(f"{Colors.RED}ERREUR:{Colors.NC} {message}", file=sys.stderr)
+    print(f"{Colors.RED}✗{Colors.NC} {message}", file=sys.stderr)
 
 
 def warning(message: str) -> None:
     """Affiche un message d'avertissement coloré"""
-    print(f"{Colors.YELLOW}AVERTISSEMENT:{Colors.NC} {message}", file=sys.stderr)
+    print(f"{Colors.YELLOW}⚠{Colors.NC} {message}", file=sys.stderr)
 
 
 def success(message: str) -> None:
@@ -70,16 +70,13 @@ def check_file_size(filepath: str, max_size_kb: int) -> bool:
     """
     Vérifie la taille d'un fichier en Ko
     """
-    try:
-        file_path = Path(filepath)
-        if not file_path.exists():
-            return False
-
-        # Taille en Ko
-        file_size_kb = file_path.stat().st_size // 1024
-        return file_size_kb <= max_size_kb
-    except (OSError, IOError):
+    file_path = Path(filepath)
+    if not file_path.exists():
         return False
+
+    # Taille en Ko
+    file_size_kb = file_path.stat().st_size // 1024
+    return file_size_kb <= max_size_kb
 
 
 def get_staged_files() -> List[str]:
