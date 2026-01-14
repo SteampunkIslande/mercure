@@ -59,7 +59,7 @@ def file_has_previous_commits(filepath: str) -> bool:
         )
 
         if result.returncode == 0:
-            return int(result.stdout.strip() >= 1)
+            return int(result.stdout.strip()) >= 1
 
         return False
     except subprocess.SubprocessError:
