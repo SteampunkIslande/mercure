@@ -41,7 +41,7 @@ def check_semver(filename: str) -> bool:
     Vérifie si le nom de fichier suit le format SemVer
     Format attendu: nom-X.Y.Z(.extension) où X, Y, Z sont des nombres
     """
-    pattern = r"-\d+\.\d+\.\d+(\.[^\.]+)?$"
+    pattern = r"-\d+\.\d+\.\d+"
     return bool(re.search(pattern, filename))
 
 
@@ -52,16 +52,14 @@ def file_has_previous_commits(filepath: str) -> bool:
     try:
         # Vérifier si le fichier existe dans l'historique git
         result = subprocess.run(
-            ["git", "log", "--follow", "--oneline", "--", filepath],
+            ["git", "rev-list", "--count", "HEAD", "--", filepath],
             capture_output=True,
             text=True,
             check=False,
         )
 
         if result.returncode == 0:
-            commit_lines = result.stdout.strip().split("\n")
-            commit_count = len([line for line in commit_lines if line.strip()])
-            return commit_count > 0
+            return int(result.stdout.strip() >= 1)
 
         return False
     except subprocess.SubprocessError:
@@ -89,17 +87,136 @@ def get_staged_files() -> List[str]:
     Récupère la liste des fichiers modifiés/ajoutés dans le staging area
     """
     try:
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
+        result_staged = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
             capture_output=True,
             text=True,
             check=True,
         )
-
-        files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
-        return files
+        return [
+            f.strip() for f in result_staged.stdout.strip().split("\n") if f.strip()
+        ]
     except subprocess.SubprocessError:
         return []
+
+
+def get_unstaged_files() -> List[str]:
+    """Récupère la liste des fichiers modifiés qui n'ont pas été ajoutés à l'index"""
+    try:
+        result_unstaged = subprocess.run(
+            ["git", "diff", "--name-only"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return [
+            f.strip() for f in result_unstaged.stdout.strip().split("\n") if f.strip()
+        ]
+    except subprocess.SubprocessError:
+        return []
+
+
+def get_untracked_files() -> List[str]:
+    """Récupère la liste des fichiers non suivis"""
+    try:
+        result_untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return [
+            f.strip() for f in result_untracked.stdout.strip().split("\n") if f.strip()
+        ]
+    except subprocess.SubprocessError:
+        return []
+
+
+def check_single_pipeline_rule(staged_files: List[str]) -> bool:
+    """
+    Vérifie que tous les fichiers stagés appartiennent au même pipeline
+    """
+    pipeline_files = [f for f in staged_files if "/" in f]
+
+    pipelines = set()
+    for filepath in pipeline_files:
+        pipeline_name = get_pipeline_name(filepath)
+        pipelines.add(pipeline_name)
+
+    if len(pipelines) > 1:
+        error(
+            f"Tous les fichiers d'un commit doivent appartenir au même pipeline. Pipelines détectés: {', '.join(sorted(pipelines))}"
+        )
+        return False
+
+    return True
+
+
+def check_complete_pipeline_rule(staged_files: List[str]) -> bool:
+    """
+    Vérifie qu'aucun fichier ne manque dans l'index pour le pipeline concerné
+    """
+    pipeline_files = [f for f in staged_files if "/" in f]
+
+    if not pipeline_files:
+        error("Impossible d'ajouter un fichier à la racine du dossier pipelines.")
+        return False
+
+    # Identifier le pipeline concerné
+    pipeline_name = get_pipeline_name(pipeline_files[0])
+
+    # Récupérer les fichiers modifiés (staged + unstaged) du pipeline
+    try:
+        # Fichiers modifiés mais pas encore stagés
+        result_unstaged = subprocess.run(
+            ["git", "diff", "--name-only"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        unstaged_files = [
+            f.strip() for f in result_unstaged.stdout.strip().split("\n") if f.strip()
+        ]
+
+        # Fichiers non trackés
+        result_untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        untracked_files = [
+            f.strip() for f in result_untracked.stdout.strip().split("\n") if f.strip()
+        ]
+
+    except subprocess.SubprocessError:
+        unstaged_files = []
+        untracked_files = []
+
+    # Filtrer les fichiers du pipeline concerné
+    unstaged_pipeline_files = [
+        f for f in unstaged_files if f.startswith(pipeline_name + "/")
+    ]
+    untracked_pipeline_files = [
+        f for f in untracked_files if f.startswith(pipeline_name + "/")
+    ]
+
+    missing_files = []
+    missing_files.extend(unstaged_pipeline_files)
+    missing_files.extend(untracked_pipeline_files)
+
+    if missing_files:
+        error(
+            f"Tous les fichiers modifiés du pipeline '{pipeline_name}' doivent être inclus dans le commit."
+        )
+        error(f"Fichiers manquants dans l'index: {', '.join(sorted(missing_files))}")
+        warning("Utilisez 'git add <fichier>' pour ajouter ces fichiers à l'index.")
+        return False
+
+    success(
+        f"Tous les fichiers du pipeline '{pipeline_name}' sont inclus dans le commit."
+    )
+    return True
 
 
 def get_pipeline_name(filepath: str) -> str:
@@ -114,14 +231,8 @@ def validate_file(filepath: str) -> bool:
     Valide un fichier selon les règles de versionnement des pipelines
     Retourne True si le fichier est valide, False sinon
     """
-    # Ignorer les fichiers qui ne sont pas dans un pipeline (pas de structure $PIPELINE_NAME/...)
-    if "/" not in filepath:
-        return False
 
-    try:
-        pipeline_name = get_pipeline_name(filepath)
-    except IndexError:
-        return False
+    pipeline_name = get_pipeline_name(filepath)
 
     print(f"Vérification: {filepath}")
 
@@ -195,12 +306,20 @@ def print_rules() -> None:
     """Affiche les règles de versionnement des pipelines"""
     print()
     print("Règles de versionnement des pipelines:")
-    print("• launchers/*.sh: révisions multiples autorisées")
+    print("• {nom_du_pipeline}/launchers/*.sh: révisions multiples autorisées")
     print(
-        "• actions/*.sh: une seule révision, format SemVer requis, documentation .md obligatoire"
+        "• {nom_du_pipeline}/actions/*.sh: une seule révision, format SemVer requis, documentation .md obligatoire"
     )
-    print("• actions/*.md: révisions multiples autorisées, taille max 100Ko")
+    print(
+        "• {nom_du_pipeline}/actions/*.md: révisions multiples autorisées, taille max 100Ko"
+    )
     print("• Tous les autres fichiers: une seule révision, format SemVer requis")
+    print()
+    print("Règles de cohérence des commits:")
+    print("• Tous les fichiers d'un commit doivent appartenir au même pipeline")
+    print(
+        "• Tous les fichiers modifiés d'un pipeline doivent être inclus dans le commit"
+    )
 
 
 def main() -> int:
@@ -215,6 +334,15 @@ def main() -> int:
 
     has_errors = False
 
+    # Vérification 1: Tous les fichiers ajoutés à l'index doivent appartenir au même pipeline
+    if not check_single_pipeline_rule(staged_files):
+        has_errors = True
+
+    # Vérification 2: Tous les fichiers modifiés du pipeline doivent être inclus
+    if not check_complete_pipeline_rule(staged_files):
+        has_errors = True
+
+    # Vérification 3: Règles de versionnement individuelles des fichiers
     for filepath in staged_files:
         if not validate_file(filepath):
             has_errors = True
