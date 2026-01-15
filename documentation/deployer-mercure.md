@@ -31,7 +31,18 @@ Dans le dossier de travail de mercure (`/OPT/mercure` en production ou `/OPT/mer
 
 Edition des fichiers (paramétrage)
 
-
+- mercure-run.sh: s'assurer que les variables MERCURE_DIR, JOBS_DIR et PIPELINES_DIR sont correctement définies.
+- Rocket.toml:
+  - mercure_db: "sqlite:///OPT/mercure(-test)/mercure.db"
+  - address: l'adresse IP sur laquelle écouter
+  - upload_dir: le chemin absolu du dossier d'upload, qui doit être dans MERCURE_DIR (le script mercure-run.sh monte uniquement trois dossiers en plus du home)
+  - logs_dir: chemin absolu du dossier des logs, défini comme $JOBS_DIR/LOGS
+  - pipeline_dir: Le chemin absolu de $PIPELINES_DIR
+  - jobs_dir: Le chemin absolu vers le dossier des jobs ($JOBS_DIR)
+  - sequencers_dir: le chemin absolu vers le dossier où écrivent les séquenceurs. Structure attendue: {séquenceur...}/output/{run...}
+  - analysis_dir: chemin absolu vers le dossier d'analyse. Arbitraire, mais doit être monté par défaut par singularity
+  - ont_dir: cas particulier du dossier dans lequel on trouve les runs du GRIDION. Doit également être monté par défaut par singularity.
+  - check_run_completed: chemin vers le script de test de fin de run. Ce script doit se situer à la racine de $MERCURE_DIR.
 
 ## Obtenir les images singularity correspondantes
 
