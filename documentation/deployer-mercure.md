@@ -1,72 +1,187 @@
-# Installation
+# Guide de Déploiement Mercure
 
+Ce guide décrit les étapes nécessaires pour déployer Mercure en production ou en test.
 
-Trois dossiers importants:
-- MERCURE_DIR: où sont les SIF de mercure, ses fichiers de conf, et ses scripts
-- JOBS_DIR: un dossier, lié de façon unique à une base de donnée. `mkdir -p $JOBS_DIR/{TODO,RUNNING,DONE,FAILS,LOGS}`
-- PIPELINES_DIR: le dossier où mercure va trouver les pipelines
+## Vue d'ensemble
 
-## Préambule: dossiers de travail
+Mercure nécessite trois répertoires principaux :
 
-- Dossier `/OPT/mercure`. Stockage des images singularity, configuration de l'application web, tous les scripts, dossier uploads, base de données (`mercure.db`).
-- Dossier des pipelines (production): `/OPT/pipelines`
-- Dossiers d'exécution des scripts: `/OPT/JOBS/{TODO,RUNNING,DONE,FAILS,LOGS}`. Ces dossiers doivent absolument être vides à chaque changement de la base de données.
+- **MERCURE_DIR** : Contient les images Singularity, fichiers de configuration et scripts
+- **JOBS_DIR** : Dossier lié à la base de données avec la structure `{TODO,RUNNING,DONE,FAILS,LOGS}`
+- **PIPELINES_DIR** : Dossier où Mercure trouve les pipelines
 
-Pour les tests:
-- Dossier `/OPT/mercure-test`. Stockage des images singularity, configuration de l'application web, tous les scripts, dossier uploads, base de données (`mercure.db`).
-- Dossier des pipelines (production): `/OPT/pipelines-test`
-- Dossiers d'exécution des scripts: `/OPT/JOBS-TEST/{TODO,RUNNING,DONE,FAILS,LOGS}`. Ces dossiers doivent absolument être vides à chaque changement de la base de données.
+## Prérequis
 
-## Présentation des fichiers nécessaires
+- Utilisateur `hermes` configuré
+- Singularity installé
+- Accès aux répertoires de destination
+- Permissions d'écriture sur les dossiers de travail
 
-Dans le dossier de travail de mercure (`/OPT/mercure` en production ou `/OPT/mercure-test` en développement), il faut s'assurer, avant de commencer, que les dossiers et fichiers suivants sont bien présents:
+## Structure des Répertoires
 
-- Dossier uploads (et renseigner sa valeur dans Rocket.toml)
-- cronjob.sh (et ajouter une entrée dans le crontab)
-- mercure.db: l'instance a besoin que le fichier existe avant le lancement: touch mercure.db. Ne pas oublier de renseigner le chemin de la base de données dans Rocket.toml
-- mercure-routine.sif: l'image générée par mercure-build.sh
-- mercure-webapp.sif: l'image générée par mercure-build.sh
-- mercure-run.sh: s'assurer que la variable d'environnement MERCURE_DIR indique bien le dossier de travail considéré (par défaut, c'est le chemin de la production qui est indiqué).
-- post-run-script.sh: renseigner son chemin absolu dans Rocket.toml. Ce dernier sera exécuté par la routine
+### Production
+```
+/OPT/mercure/           # MERCURE_DIR - Images SIF, config, scripts, uploads, mercure.db
+/OPT/pipelines/         # PIPELINES_DIR - Pipelines de production  
+/OPT/JOBS/              # JOBS_DIR - {TODO,RUNNING,DONE,FAILS,LOGS}
+```
 
-Edition des fichiers (paramétrage)
+### Test
+```
+/OPT/mercure-test/      # MERCURE_DIR - Images SIF, config, scripts, uploads, mercure.db
+/OPT/pipelines-test/    # PIPELINES_DIR - Pipelines de test
+/OPT/JOBS-TEST/         # JOBS_DIR - {TODO,RUNNING,DONE,FAILS,LOGS}
+```
 
-- mercure-run.sh: s'assurer que les variables MERCURE_DIR, JOBS_DIR et PIPELINES_DIR sont correctement définies.
-- Rocket.toml:
-  - mercure_db: "sqlite:///OPT/mercure(-test)/mercure.db"
-  - address: l'adresse IP sur laquelle écouter
-  - upload_dir: le chemin absolu du dossier d'upload, qui doit être dans MERCURE_DIR (le script mercure-run.sh monte uniquement trois dossiers en plus du home)
-  - logs_dir: chemin absolu du dossier des logs, défini comme $JOBS_DIR/LOGS
-  - pipeline_dir: Le chemin absolu de $PIPELINES_DIR
-  - jobs_dir: Le chemin absolu vers le dossier des jobs ($JOBS_DIR)
-  - sequencers_dir: le chemin absolu vers le dossier où écrivent les séquenceurs. Structure attendue: {séquenceur...}/output/{run...}
-  - analysis_dir: chemin absolu vers le dossier d'analyse. Arbitraire, mais doit être monté par défaut par singularity
-  - ont_dir: cas particulier du dossier dans lequel on trouve les runs du GRIDION. Doit également être monté par défaut par singularity.
-  - check_run_completed: chemin vers le script de test de fin de run. Ce script doit se situer à la racine de $MERCURE_DIR.
+⚠️ **Important** : Les dossiers JOBS doivent être vidés à chaque changement de base de données.
 
-## Obtenir les images singularity correspondantes
+## Étapes d'Installation
 
-Exécuter `./mercure-build.sh` (dans ce dépôt). Deux fichiers seront générés: `mercure-routine.sif` et `mercure-webapp.sif`. (requiert singularity)
+### 1. Préparer l'environnement
 
-Placer ces fichiers `.sif` dans le dossier `/OPT/mercure` (ou `/OPT/mercure-test`), en s'assurant qu'ils appartiennent bien à l'utilisateur `hermes`.
+Créer la structure de répertoires (en tant qu'utilisateur hermes):
+```bash
+# Pour la production
+mkdir -p /OPT/mercure/uploads
+mkdir -p /OPT/pipelines
+mkdir -p /OPT/JOBS/{TODO,RUNNING,DONE,FAILS,LOGS}
 
+# Pour les tests  
+mkdir -p /OPT/mercure-test/uploads
+mkdir -p /OPT/pipelines-test
+mkdir -p /OPT/JOBS-TEST/{TODO,RUNNING,DONE,FAILS,LOGS}
 
-## Scripts de fonctionnement
+# Permissions
+chown -R hermes:hermes /OPT/mercure* /OPT/JOBS* /OPT/pipelines*
+```
 
-Les scripts suivants doivent être situés dans `/OPT/mercure`
+### 2. Générer les images Singularity
 
-- `run-completed.sh`: le chemin absolu de ce script doit être indiqué dans `Rocket.toml`. Ce script prend deux arguments: Le chemin absolu du dossier de séquençage et le nom du séquenceur. Doit renvoyer vrai (0) si le run est terminé, et 1 sinon. Le premier argument (le nom du dossier de run) existe nécessairement (la routine de `mercure` n'appelle pas ce script si le dossier n'existe pas).
-- `post-run-script.sh`: le chemin absolu de ce script doit être indiqué dans `Rocket.toml`. Ce script est appelé
+```bash
+# Depuis le répertoire du projet
+./mercure-build.sh
+```
 
-## Configuration
+Cela génère :
+- [`mercure-routine.sif`](mercure-routine.def:1)
+- [`mercure-webapp.sif`](mercure-webapp.def:1)
 
-- `Rocket.toml`: Doit se situer dans `/OPT/mercure`
+Copier ces fichiers dans `MERCURE_DIR` :
+```bash
+cp mercure-*.sif /OPT/mercure/  # ou /OPT/mercure-test/
+chown hermes:hermes /OPT/mercure/mercure-*.sif
+```
 
-# Exécution
+### 3. Copier les fichiers de configuration
 
-Lancer, en tant qu'utilsateur `hermes`, `/OPT/mercure/mercure-run.sh`. Cela créera deux instances singularity (`mercure-webappd` et `mercure-routined`, respectivement l'application web, et la routine).
+Copier les fichiers nécessaires dans `MERCURE_DIR` :
 
-## Application web
+```bash
+# Scripts essentiels
+cp scripts/mercure-run.sh /OPT/mercure/
+cp scripts/cronjob.sh /OPT/mercure/
+cp scripts/run-completed.sh /OPT/mercure/
+cp scripts/post-run-script.sh /OPT/mercure/
 
+# Configuration
+cp Rocket.toml /OPT/mercure/
 
-# Administration
+# Permissions
+chown hermes:hermes /OPT/mercure/*
+chmod +x /OPT/mercure/*.sh
+```
+
+### 4. Initialiser la base de données
+
+```bash
+cd /OPT/mercure
+touch mercure.db
+chown hermes:hermes mercure.db
+```
+
+### 5. Configurer les fichiers
+
+#### [`mercure-run.sh`](scripts/mercure-run.sh:1)
+Vérifier/modifier les variables d'environnement :
+```bash
+MERCURE_DIR="/OPT/mercure"          # ou /OPT/mercure-test
+JOBS_DIR="/OPT/JOBS"                # ou /OPT/JOBS-TEST  
+PIPELINES_DIR="/OPT/pipelines"      # ou /OPT/pipelines-test
+```
+
+#### [`Rocket.toml`](Rocket.toml:1)
+Configurer la section `[release]` pour la production :
+
+```toml
+[release]
+address = "0.0.0.0"  # IP d'écoute
+mercure_db = "sqlite:///OPT/mercure/mercure.db"
+template_dir = "/static/templates"
+static_dir = "/static" 
+upload_dir = "/OPT/mercure/uploads"
+logs_dir = "/OPT/JOBS/LOGS"
+pipeline_dir = "/OPT/pipelines"
+jobs_dir = "/OPT/JOBS"
+sequencers_dir = "/data/raw/sequenceurs"
+analysis_dir = "/data/analysis"
+ont_dir = "/data/raw/sequenceurs/GRIDION/output"
+check_run_completed = "/OPT/mercure/run-completed.sh"
+```
+
+### 6. Configurer le cron
+
+Éditer le [`cronjob.sh`](scripts/cronjob.sh:1) avec les bons chemins :
+```bash
+JOBS_DIR=/OPT/JOBS  # Adapter selon l'environnement
+```
+
+Ajouter au crontab de l'utilisateur `hermes` :
+```bash
+sudo -u hermes crontab -e
+# Ajouter : * * * * * /OPT/mercure/cronjob.sh
+```
+
+## Démarrage
+
+Lancer Mercure en tant qu'utilisateur `hermes` :
+
+```bash
+sudo -u hermes /OPT/mercure/mercure-run.sh
+```
+
+Cette commande démarre deux instances Singularity :
+- `mercure-webappd` : Application web
+- `mercure-routined` : Routine de traitement
+
+## Vérification
+
+Vérifier que les instances sont actives :
+```bash
+singularity instance list
+```
+
+L'application web sera accessible sur l'IP et le port configurés dans [`Rocket.toml`](Rocket.toml:1).
+
+## Scripts de Fonctionnement
+
+### [`run-completed.sh`](scripts/run-completed.sh:1)
+- Prend en paramètres : chemin du dossier de séquençage, nom du séquenceur
+- Retourne 0 si le run est terminé, 1 sinon
+- Vérifie la présence de `CopyComplete.txt` ou `RTAComplete.txt` + `CompletedJobInfo.xml`
+
+### [`post-run-script.sh`](scripts/post-run-script.sh:1)  
+- Exécuté après chaque analyse
+- Extrait les statistiques SLURM des jobs
+- Génère des fichiers de suivi des ressources
+
+### [`cronjob.sh`](scripts/cronjob.sh:1)
+- Traite les jobs en attente dans `JOBS_DIR/TODO`
+- Déplace les jobs selon leur statut (RUNNING → DONE/FAILS)
+- Génère les logs de reproductibilité
+
+## Dépannage
+
+- **Vérifier les permissions** : tous les fichiers doivent appartenir à `hermes`
+- **Vérifier les chemins** : s'assurer que tous les chemins dans la configuration sont corrects
+- **Logs** : consulter les logs dans `JOBS_DIR/LOGS`
+- **Instances Singularity** : utiliser [`singularity instance list`] pour vérifier l'état
