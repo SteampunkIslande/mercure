@@ -27,6 +27,7 @@ analysis_dir = "/home/charles/mercure-arena/data/analysis"
 ont_dir = "/home/charles/mercure-arena/data/raw/sequenceurs/GRIDION/output"
 
 check_run_completed = "/home/charles/mercure/scripts/run-completed.sh"
+post_run_script = "/home/charles/mercure/scripts/post-run-script.sh"
 
 cli_colors = true
 
@@ -47,3 +48,4 @@ analysis_dir = "/data/analysis"
 ont_dir = "/data/raw/sequenceurs/GRIDION/output"
 
 check_run_completed = "/OPT/mercure/run-completed.sh"
+post_run_script = "/OPT/mercure/post-run-script.sh"
