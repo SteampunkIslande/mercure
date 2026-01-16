@@ -96,13 +96,10 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         context! {
                             title: "Pipeline archivé",
                             h2: "Pipeline archivé",
-                            message: format!("Impossible d'éditer le run {}: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire. Ce run ne peut plus être édité.", run.run_id)
+                            message: format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
                         },
                     );
                 }
-
-                //TODO: Si un formulaire compatible est trouvé (= mêmes UDVs), créer un nouveau Run à partir des valeurs entrées par l'utilisateur pour ce formulaire, et rediriger vers la page d'édition de ce nouveau Run
-
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
                     .ok()
                     .map(|entries| {

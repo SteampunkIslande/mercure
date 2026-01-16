@@ -49,7 +49,7 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             context! {
                 title: "Pipeline archivé",
                 h2: "Pipeline archivé",
-                message: format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire. Veuillez demander à votre administrateur de mettre à jour le formulaire.")
+                message: format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
             },
         );
     }
