@@ -21,17 +21,25 @@ pub fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<Strin
             let path = entry.path();
             if path.is_dir() {
                 let folder_name = entry.file_name().to_string_lossy().to_string();
+                // Ignorer les dossiers commençant par un point
+                if folder_name.starts_with(".") {
+                    continue;
+                }
                 let launchers_path = path.join("launchers");
                 let mut launchers = Vec::new();
 
                 if launchers_path.is_dir()
-                    && let Ok(launcher_entries) = fs::read_dir(&launchers_path) {
-                        for launcher_entry in launcher_entries.flatten() {
-                            if let Some(name) = launcher_entry.file_name().to_str() {
-                                launchers.push(name.to_string());
+                    && let Ok(launcher_entries) = fs::read_dir(&launchers_path)
+                {
+                    for launcher_entry in launcher_entries.flatten() {
+                        if let Some(name) = launcher_entry.file_name().to_str() {
+                            if name.starts_with(".") {
+                                continue;
                             }
+                            launchers.push(name.to_string());
                         }
                     }
+                }
 
                 result.insert(folder_name, launchers);
             }
