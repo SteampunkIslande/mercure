@@ -80,9 +80,8 @@ fn get_last_rev(pipeline_dir: &std::path::Path) -> Option<String> {
 /// Pas de retour: effet de bord. Met à jour le dossier des pipelines
 fn git_pull(pipeline_dir: &std::path::Path) {
     let pull_output = Command::new("git")
+        .current_dir(pipeline_dir)
         .arg("pull")
-        .arg("-C")
-        .arg(pipeline_dir)
         .output();
 
     match pull_output {
