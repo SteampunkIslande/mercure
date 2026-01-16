@@ -107,15 +107,49 @@ fn git_pull(pipeline_dir: &std::path::Path) {
 ///
 /// Argument: le chemin du dossier des pipelines
 ///
+/// Pas de retour: effet de bord. Permet de s'assurer que le dossier de pipeline est read-write partout pour pouvoir mettre à jour (pull)
+fn set_read_write(pipeline_dir: &std::path::Path) {
+    let chmod_output = Command::new("chmod")
+        .arg("-R")
+        .arg("a+w")
+        .arg(pipeline_dir)
+        .output();
+
+    match chmod_output {
+        Err(e) => {
+            error!(
+                "Erreur lors de l'exécution de `chmod -R a-w {}`:\n{}",
+                pipeline_dir.display(),
+                e
+            );
+        }
+        Ok(output) => {
+            if let Some(code) = output.status.code() {
+                if code != 0 {
+                    error!(
+                        "`chmod -R a-w {}`:\n{}",
+                        pipeline_dir.display(),
+                        String::from_utf8_lossy(output.stdout.as_ref())
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Fonction de gestion du dossier des pipelines.
+///
+/// Argument: le chemin du dossier des pipelines
+///
 /// Pas de retour: effet de bord. Permet de s'assurer que le dossier de pipeline se retrouve read-only
 fn set_read_only(pipeline_dir: &std::path::Path) {
-    let pull_output = Command::new("chmod")
+    let chmod_output = Command::new("chmod")
         .arg("-R")
         .arg("a-w")
         .arg(pipeline_dir)
         .output();
 
-    match pull_output {
+    match chmod_output {
         Err(e) => {
             error!(
                 "Erreur lors de l'exécution de `chmod -R a-w {}`:\n{}",
@@ -195,6 +229,7 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
             let config = get_mercure_config();
             let pipeline_dir = Path::new(&config.pipeline_dir);
             let rev_before = get_last_rev(pipeline_dir);
+            set_read_write(pipeline_dir);
             git_pull(pipeline_dir);
             set_read_only(pipeline_dir);
             let rev_after = get_last_rev(pipeline_dir);
