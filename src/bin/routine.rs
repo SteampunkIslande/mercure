@@ -137,8 +137,6 @@ fn set_read_only(pipeline_dir: &std::path::Path) {
     }
 }
 
-// Ajout de la méthode utilitaire pour HgAttempt
-
 /// Fonction qui exécute la boucle de routine avec des points de contrôle pour l'annulation
 async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiver<bool>) {
     use std::time::Duration;
@@ -604,6 +602,48 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     Ok(())
 }
 
+fn post_run_command(attempt: &HgAttempt, log_file_name: &PathBuf, status: &str) {
+    let config = get_mercure_config();
+    match {
+        let mut cmd = Command::new(&config.post_run_script);
+        cmd.env("HG_LOG_FILE", log_file_name.with_extension("log"))
+            .env("OUTDIR", attempt.outdir.as_ref().unwrap_or(&"".to_string()))
+            .env("INDIR", attempt.indir.as_ref().unwrap_or(&"".to_string()))
+            .env("HG_ATTEMPT_ID", attempt.attempt_number.to_string())
+            .env("HG_RUN_ID", attempt.run_id.to_string())
+            .env("HG_ATTEMPT_STATUS", status);
+        // Définir les variables d'environnement du run pour l'exécution de post-run-script
+        for udv in attempt.user_defined_vars.iter() {
+            cmd.env(udv.0, udv.1);
+        }
+        cmd
+    }
+    .output()
+    {
+        Ok(output) => {
+            if output.status.success() {
+                info!("Script post-run exécuté avec succès.")
+            } else {
+                error!(
+                    "Le script post-run a rencontré une erreur (code {}), message:\n{}",
+                    output.status.code().unwrap_or_default(),
+                    String::from_utf8(
+                        output
+                            .stdout
+                            .into_iter()
+                            .chain(output.stderr.into_iter())
+                            .collect()
+                    )
+                    .unwrap_or("Impossible de capturer la sortie, non UTF-8 !".to_string())
+                )
+            }
+        }
+        Err(e) => {
+            error!("Erreur lors de l'exécution du script post-run:\n{e}")
+        }
+    }
+}
+
 async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     let config = get_mercure_config();
 
@@ -657,9 +697,10 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
         }
         if fails_paths.len() == 1 {
             info!(
-                "La tentative {} du run {} s'est terminée avec une erreur.",
+                "La tentative {} du run {} s'est terminée avec une erreur. Exécution du script post-run...",
                 attempt.attempt_number, attempt.run_id
             );
+            post_run_command(&attempt, &fails_paths[0], "FAILED");
             //Renommer le dossier de sortie avec le suffixe `-failed-{run_id}-{attempt_id}`
             if let Some(outdir) = attempt.outdir.as_ref() {
                 let dest = format!(
@@ -667,6 +708,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                     attempt.run_id, attempt.attempt_number
                 );
                 if !std::path::PathBuf::from(&dest).exists() {
+                    info!("Renommage de `{}` vers `{}`", outdir, dest);
                     std::fs::rename(outdir, dest)?;
                 }
             }
@@ -694,9 +736,10 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
         }
         if done_paths.len() == 1 {
             info!(
-                "La tentative {} du run {} s'est terminée avec succès.",
+                "La tentative {} du run {} s'est terminée avec succès. Exécution du script post-run...",
                 attempt.attempt_number, attempt.run_id
             );
+            post_run_command(&attempt, &done_paths[0], "SUCCESS");
             analysis::complete_success(attempt.run_id, pool).await?;
         }
         Ok(())
