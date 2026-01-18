@@ -28,6 +28,14 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
+    {% if is_pipeline_archived %}
+    <div class="error-msg" style="display:block; margin-bottom: 20px;">
+        <strong>⚠️ Pipeline archivé</strong><br>
+        Ce pipeline a été archivé. Il n'est plus possible de relancer l'analyse.
+        Veuillez contacter votre administrateur pour plus d'informations.
+    </div>
+    {% endif %}
+
     <h2>L'analyse s'est terminée avec succès</h2>
     <p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.
     </p>
@@ -37,6 +45,8 @@
         {% if run.status in ("Idle","Pending","Running") %}
         <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
             actuelle</a>
+        {% elif is_pipeline_archived %}
+        <span id="analysis-retry" class="btn btn-primary" style="background-color: #ccc; cursor: not-allowed; opacity: 0.6;" title="Pipeline archivé - relance impossible">Relancer l'analyse (désactivé)</span>
         {% else %}
         <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
             l'analyse</a>

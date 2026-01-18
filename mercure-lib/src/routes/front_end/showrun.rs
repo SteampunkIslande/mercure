@@ -93,16 +93,6 @@ pub async fn show_run_get(
 
         // Vérifier si le pipeline est archivé
         let pipeline_is_archived = is_pipeline_archived(form_def);
-        if pipeline_is_archived {
-            return Template::render(
-                "common/error",
-                context! {
-                    title: "Pipeline archivé",
-                    h2: "Pipeline archivé",
-                    message: format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
-                },
-            );
-        }
 
         // Récupérer l'historique des tentatives pour la navigation
         let history = HgAttempt::list_attempts_for_run(run_id, pool)
@@ -117,6 +107,17 @@ pub async fn show_run_get(
             };
         // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
+            if pipeline_is_archived {
+                return Template::render(
+                    "common/error",
+                    context! {
+                        title: "Pipeline archivé",
+                        h2: "Pipeline archivé",
+                        message: format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
+                    },
+                );
+            }
+
             let sequenceurs_folder = config.sequencers_dir;
 
             let attempt = HgAttempt::get_hypothetic_attempt(&run);
@@ -221,6 +222,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        is_pipeline_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Running => Template::render(
@@ -235,6 +237,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        is_pipeline_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Success => Template::render(
@@ -249,6 +252,7 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        is_pipeline_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
@@ -264,6 +268,7 @@ pub async fn show_run_get(
                         fail_reason: fail_reason,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
+                        is_pipeline_archived: pipeline_is_archived,
                     },
                 ),
                 RunStatus::Idle => Template::render(
