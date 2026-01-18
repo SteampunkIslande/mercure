@@ -73,7 +73,7 @@ impl HgAttempt {
     /// Pratique pour l'API, uniformise l'environnement jinja2.
     pub fn get_hypothetic_attempt(run: &HgRun) -> HgAttempt {
         HgAttempt {
-            attempt_number: run.attempt_count as i64,
+            attempt_number: (run.attempt_count + 1) as i64,
             run_id: run.run_id,
             attempt_date: OffsetDateTime::now_utc().to_string(),
             user_defined_vars: run.user_defined_vars.clone(),
