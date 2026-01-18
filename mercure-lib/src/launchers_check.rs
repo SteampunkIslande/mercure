@@ -84,7 +84,7 @@ pub fn get_current_launcher_revision_for_form(
     get_current_revision(&launcher_path)
 }
 
-pub async fn check_launcher_exists(pipeline_name: &str, launcher_name: &str) -> bool {
+pub async fn exists_launcher(pipeline_name: &str, launcher_name: &str) -> bool {
     let config = config::get_mercure_config();
     let launcher_path = Path::new(&config.pipeline_dir)
         .join(pipeline_name)

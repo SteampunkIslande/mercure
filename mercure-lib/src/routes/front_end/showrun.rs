@@ -10,7 +10,7 @@ use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::{check_launcher_exists, is_pipeline_archived};
+use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
@@ -78,7 +78,7 @@ pub async fn show_run_get(
     if can_see_run {
         let form_def = &run.form;
 
-        if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
+        if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
             // Désactiver le formulaire si ce n'était pas déjà fait
             HgFormDef::disable_form(pool, form_def.form_id).await.ok();
             return Template::render(
@@ -93,15 +93,16 @@ pub async fn show_run_get(
 
         // Vérifier si le pipeline est archivé
         let pipeline_is_archived = is_pipeline_archived(form_def);
-
-        // Si le pipeline est archivé, rechercher des formulaires compatibles
-        let compatible_forms = if pipeline_is_archived {
-            HgFormDef::find_compatible_forms(form_def, pool)
-                .await
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        if pipeline_is_archived {
+            return Template::render(
+                "common/error",
+                context! {
+                    title: "Pipeline archivé",
+                    h2: "Pipeline archivé",
+                    message: format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
+                },
+            );
+        }
 
         // Récupérer l'historique des tentatives pour la navigation
         let history = HgAttempt::list_attempts_for_run(run_id, pool)
@@ -165,8 +166,6 @@ pub async fn show_run_get(
                     metadata_static_name: metadata_static_name,
                     user_defined_vars_json: &user_defined_vars_json,
                     user: auth.user,
-                    pipeline_is_archived: pipeline_is_archived,
-                    compatible_forms: &compatible_forms,
                 },
             )
         } else {
@@ -222,8 +221,6 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
-                        pipeline_is_archived: pipeline_is_archived,
-                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Running => Template::render(
@@ -238,8 +235,6 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
-                        pipeline_is_archived: pipeline_is_archived,
-                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Success => Template::render(
@@ -254,8 +249,6 @@ pub async fn show_run_get(
                         metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
-                        pipeline_is_archived: pipeline_is_archived,
-                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
@@ -271,8 +264,6 @@ pub async fn show_run_get(
                         fail_reason: fail_reason,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
-                        pipeline_is_archived: pipeline_is_archived,
-                        compatible_forms: &compatible_forms,
                     },
                 ),
                 RunStatus::Idle => Template::render(

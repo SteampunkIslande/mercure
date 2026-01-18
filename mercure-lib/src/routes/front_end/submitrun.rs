@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::{check_launcher_exists, is_pipeline_archived};
+use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 use crate::models::{HgFormDef, HgRun};
 use std::fs::read_dir;
 
@@ -30,7 +30,7 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
     };
 
     // Si le fichier de launcher n'existe plus, afficher une erreur
-    if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
+    if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
         return Template::render(
             "common/error",
             context! {
@@ -100,7 +100,6 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             user_defined_vars_json,
             indir_type: &form_def.indir_type,
             form: &form_def,
-            pipeline_is_archived: pipeline_is_archived,
         },
     )
 }

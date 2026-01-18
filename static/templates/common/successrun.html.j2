@@ -28,29 +28,6 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-    <!-- Avertissement pour pipeline archivé -->
-    {% if pipeline_is_archived %}
-    <div class="warning-msg">
-        ⚠️ Attention: Ce run utilise une version archivée du pipeline.
-        Pour relancer l'analyse, vous pouvez choisir un autre formulaire dans la liste ci-dessous.
-        {% if compatible_forms %}
-        <br><br><strong>Formulaires compatibles disponibles :</strong>
-        <ul>
-            {% for form in compatible_forms %}
-            <li>
-                <strong>{{ form.form_name }}</strong> (version {{ form.version }})
-                <button onclick="migrateToForm({{ form.form_id }})" class="btn btn-small btn-primary">
-                    Créer un nouveau run avec cette version
-                </button>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <br><br><em>Aucun formulaire compatible trouvé.</em>
-        {% endif %}
-    </div>
-    {% endif %}
-
     <h2>L'analyse s'est terminée avec succès</h2>
     <p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.
     </p>
@@ -60,9 +37,6 @@
         {% if run.status in ("Idle","Pending","Running") %}
         <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
             actuelle</a>
-        {% elif pipeline_is_archived %}
-        <span class="btn btn-primary disabled" title="Impossible de relancer: pipeline archivé"
-            style="cursor: not-allowed; opacity: 0.6;">Relancer l'analyse</span>
         {% else %}
         <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
             l'analyse</a>
@@ -152,37 +126,8 @@
             console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
             // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
         }
-
-
         });
 
-        // Fonction pour migrer vers un formulaire compatible
-        async function migrateToForm(targetFormId) {
-            if (!confirm("Créer un nouveau run à partir de ce formulaire compatible ? Cela créera une copie de ce run avec le nouveau formulaire.")) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/migrate/run?from_run_id={{ run.run_id }}&to_form_id=${targetFormId}`, {
-                    method: 'GET'
-                    });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${result.data.new_run_id}` +
-                        `&title=${encodeURIComponent("Migration réussie")}` +
-                        `&message=${encodeURIComponent(result.data.message)}` +
-                        `&seconds=3`;
-                    window.location.href = redirectUrl;
-                } else {
-                    alert('Erreur lors de la migration: ' + result.message);
-                }
-            } catch (error) {
-                console.error('Erreur lors de la migration:', error);
-                alert('Erreur lors de la migration: ' + error.message);
-            }
-        }
 
     </script>
 </body>

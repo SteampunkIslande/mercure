@@ -28,29 +28,6 @@
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
 
-    <!-- Avertissement pour pipeline archivé -->
-    {% if pipeline_is_archived %}
-    <div class="warning-msg">
-        ⚠️ Attention: Ce pipeline utilise une version archivée. Vous ne pourrez pas valider ce run.
-        Pour lancer une analyse avec les mêmes paramètres, vous pouvez choisir un autre formulaire dans la liste ci-dessous.
-        {% if compatible_forms %}
-        <br><br><strong>Formulaires compatibles disponibles :</strong>
-        <ul>
-            {% for form in compatible_forms %}
-            <li>
-                <strong>{{ form.form_name }}</strong> (version {{ form.version }})
-                <button onclick="migrateToForm({{ form.form_id }})" class="btn btn-small btn-primary">
-                    Créer un nouveau run avec cette version
-                </button>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <br><br><em>Aucun formulaire compatible trouvé.</em>
-        {% endif %}
-    </div>
-    {% endif %}
-
     {% include 'common/runinfo' %}
 
     <div class="tab">
@@ -88,16 +65,8 @@
 
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-        {% if pipeline_is_archived %}
-        <span class="btn btn-primary disabled" title="Impossible d'éditer: pipeline archivé"
-            style="cursor: not-allowed; opacity: 0.6;">Editer</span>
-        <span class="btn btn-primary disabled" title="Impossible de valider: pipeline archivé"
-            style="cursor: not-allowed; opacity: 0.6;">Valider</span>
-        <span>Vous devriez pouvoir choisir un autre formulaire dans la liste ci-dessous. TODO!!!!</span>
-        {% else %}
         <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
         <a id="validate-btn" class="btn btn-primary">Valider</a>
-        {% endif %}
     </div>
 
     <script>

@@ -13,7 +13,7 @@ use crate::config::get_mercure_config;
 use crate::models::Group;
 use crate::models::{HgFormDef, HgRun, RunStatus};
 
-use crate::launchers_check::{check_launcher_exists, is_pipeline_archived};
+use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -75,7 +75,7 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 let form_def = &run.form;
 
                 // Si le fichier de launcher n'existe plus, afficher une erreur
-                if !check_launcher_exists(&form_def.pipeline_name, &form_def.launcher_name).await {
+                if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
                     // Désactiver le formulaire si ce n'était pas déjà fait
                     HgFormDef::disable_form(pool, form_def.form_id).await.ok();
                     return Template::render(
