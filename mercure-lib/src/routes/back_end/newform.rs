@@ -60,9 +60,7 @@ pub async fn parse_launcher_endpoint(
                 )));
             }
         };
-        match parse_launcher(&launcher_text)
-            .and_then(|vars| serde_json::to_value(&vars).map_err(|e| e.to_string()))
-        {
+        match serde_json::to_value(parse_launcher(&launcher_text)) {
             Ok(vars) => Json(ApiResponse::success(vars)),
             Err(e) => Json(ApiResponse::error(format!(
                 "Erreur lors de l'analyse du launcher {}: {}",

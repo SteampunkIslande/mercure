@@ -69,7 +69,9 @@ async fn rocket() -> _ {
                 routes::frontend::show_forms_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
-                routes::frontend::edit_groups_get
+                routes::frontend::edit_groups_get,
+                // Route pour gérer les mises à jour des formulaires
+                routes::frontend::forms_list_updates_get,
             ],
         )
         .mount(
@@ -116,6 +118,10 @@ async fn rocket() -> _ {
                 routes::backend::redirect_post,
                 // Route pour relancer un run (une fois terminé)
                 routes::backend::retry_run_get,
+                // Route pour mettre à jour la révision d'un formulaire
+                routes::backend::forms_list_updates_get,
+                // Route pour obtenir le statut de tous les formulaires
+                routes::backend::forms_update_status_get
             ],
         )
         .manage(pool)

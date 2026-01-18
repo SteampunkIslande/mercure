@@ -15,6 +15,7 @@ mod prettify;
 mod redirect;
 mod samplesheet;
 mod submitrun;
+mod updateform;
 mod upload;
 
 pub use directory_listing::*;
@@ -34,4 +35,5 @@ pub use prettify::*;
 pub use redirect::*;
 pub use samplesheet::*;
 pub use submitrun::*;
+pub use updateform::*;
 pub use upload::*;

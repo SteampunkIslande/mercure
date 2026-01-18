@@ -177,7 +177,7 @@ pub fn format_french_date(date_str: &str) -> String {
 
 static VAR_REGEX: Lazy<Regex> = lazy_regex!(r"(?m)^##\s*(\S+)\s+(.+)$");
 
-pub fn parse_launcher(launcher_content: &str) -> Result<HashMap<String, String>, String> {
+pub fn parse_launcher(launcher_content: &str) -> HashMap<String, String> {
     // In the launcher content, look for lines starting with ## VAR_NAME description
     let mut vars: HashMap<String, String> = HashMap::new();
 
@@ -188,7 +188,7 @@ pub fn parse_launcher(launcher_content: &str) -> Result<HashMap<String, String>,
         }
     }
 
-    Ok(vars)
+    vars
 }
 
 /// Convertit le nom d'un fichier local en un nom servi par la route statique
@@ -220,7 +220,7 @@ Some other content
 ## VAR3 Description of var3
         "#;
 
-        let vars = parse_launcher(launcher_content).unwrap();
+        let vars = parse_launcher(launcher_content);
         assert_eq!(vars.get("VAR1"), Some(&"Description of var1".to_string()));
         assert_eq!(vars.get("VAR2"), Some(&"Description of var2".to_string()));
         assert_eq!(vars.get("VAR3"), Some(&"Description of var3".to_string()));

@@ -1,8 +1,12 @@
+use crate::config::get_mercure_config;
+use crate::launchers_check::get_current_launcher_revision_for_form;
 use crate::launchers_check::get_current_revision;
+use crate::utils::parse_launcher;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::config;
@@ -35,6 +39,14 @@ pub enum UserDefinedVar {
     #[default]
     RunDefined,
     Invalid,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FormStatusInfo {
+    pub form_name: String,
+    pub version: i64,
+    pub form_id: i64,
+    pub status: String,
 }
 
 /// Struct used when submitting a new form definition
@@ -420,6 +432,104 @@ impl HgFormDef {
         );
 
         Ok(def)
+    }
+
+    pub async fn list_forms_archive_status(
+        pool: &SqlitePool,
+    ) -> Result<Vec<FormStatusInfo>, super::ModelError> {
+        let rows = sqlx::query(
+            r#"
+        SELECT form_id,form_name,version,latest_launcher_revision FROM Formdef
+        "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let mut status_list = Vec::new();
+
+        for row in rows {
+            let form_id: i64 = row.try_get("form_id")?;
+            let form_name: String = row.try_get("form_name")?;
+            let version: i64 = row.try_get("version")?;
+            let latest_launcher_revision: Option<String> =
+                row.try_get("latest_launcher_revision")?;
+
+            let status = match latest_launcher_revision {
+                Some(rev) => {
+                    let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
+                    match get_current_launcher_revision_for_form(&form) {
+                        Ok(current_rev) => {
+                            if current_rev == rev {
+                                "uptodate".to_string()
+                            } else {
+                                "archived".to_string()
+                            }
+                        }
+                        Err(e) => format!("Impossible d'obtenir la révision actuelle: {e}"),
+                    }
+                }
+                None => "La dernière révision n'a jamais été enregistrée dans la base".to_string(),
+            };
+
+            status_list.push(FormStatusInfo {
+                form_id,
+                form_name,
+                version,
+                status,
+            });
+        }
+
+        Ok(status_list)
+    }
+
+    pub async fn update_latest_launcher_revision(
+        pool: &SqlitePool,
+        form_id: i64,
+        new_revision: String,
+    ) -> Result<(), ModelError> {
+        // Before updating, make sure that the udv names are exactly the same as before
+
+        let udv_before = sqlx::query(
+            r#"
+        SELECT varname FROM UDV WHERE form_id = ?
+        "#,
+        )
+        .bind(form_id)
+        .fetch_all(pool)
+        .await?
+        .iter()
+        .filter_map(|row| row.try_get::<String, &str>("varname").ok())
+        .collect::<HashSet<String>>();
+
+        let udv_after = parse_launcher(&std::fs::read_to_string({
+            let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
+            let config = get_mercure_config();
+            let launcher_path = Path::new(&config.pipeline_dir)
+                .join(&form.pipeline_name)
+                .join("launchers")
+                .join(&form.launcher_name);
+            launcher_path
+        })?)
+        .into_keys()
+        .collect::<HashSet<String>>();
+
+        if udv_after != udv_before {
+            return Err(ModelError::FormError(
+                "Les variables définies dans le launcher ont changé. Ce formulaire ne pourra jamais être mis à jour."
+                    .to_string(),
+            ));
+        }
+
+        sqlx::query(
+            r#"
+        UPDATE Formdef SET latest_launcher_revision = ? WHERE form_id = ?
+        "#,
+        )
+        .bind(new_revision)
+        .bind(form_id)
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 }
 

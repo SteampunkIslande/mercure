@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire de mise à jour des formulaires</title>
+    <link rel="stylesheet" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+
+    <script src="/static/scripts/show_message.js"></script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">Gestionnaire de mise à jour des formulaires</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+    
+    <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+        <div id="search-forms" style="display: flex; gap: 0.5em; align-items: center;">
+            <input type="text" id="form-search" placeholder="Rechercher un formulaire..."
+                style="padding: 0.5em; width: 250px; border-radius: 4px; border: 1px solid #bbb;"
+                oninput="filterForms()">
+        </div>
+    </div>
+
+    <table id="forms-update-table">
+        <thead>
+            <tr>
+                <th class="content-column">Nom du formulaire</th>
+                <th class="numeric-column padding-x centered">Statut</th>
+                <th class="numeric-column padding-x centered">Action</th>
+            </tr>
+        </thead>
+        <tbody id="forms-table-body">
+            <!-- Les lignes seront ajoutées dynamiquement par JavaScript -->
+        </tbody>
+    </table>
+
+
+    <style>
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-uptodate {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-archived {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-unknown {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+
+    <script>
+        let formsData = [];
+
+        async function loadFormStatus() {
+            const tableBody = document.getElementById('forms-table-body');
+            
+            tableBody.innerHTML = '';
+
+            try {
+                // Route à implémenter : GET /mercure/api/update-form-status
+                const response = await fetch('/mercure/api/update-form-status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    formsData = data.data;
+                    displayForms(formsData);
+                } else {
+                    showMessage('error', data.message || 'Erreur lors du chargement des formulaires');
+                }
+            } catch (error) {
+                showMessage('error', `Erreur: ${error.message}`);
+            }
+        }
+
+        function displayForms(forms) {
+            const tableBody = document.getElementById('forms-table-body');
+            tableBody.innerHTML = '';
+
+            forms.forEach(form => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="content-column">
+                        <strong>${form.form_name}</strong><br>
+                        <small>Version ${form.version} • ID: ${form.form_id}</small>
+                    </td>
+                    <td class="numeric-column centered">
+                        <span class="status-badge ${getStatusClass(form.status)}">
+                            ${getStatusText(form.status)}
+                        </span>
+                    </td>
+                    <td class="numeric-column centered">
+                        <a class="btn btn-primary" onclick="updateForm('${form.form_id}', '${form.form_name}')">
+                            Mettre à jour
+                        </a>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'uptodate':
+                    return 'status-uptodate';
+                case 'archived':
+                    return 'status-archived';
+                default:
+                    return 'status-unknown';
+            }
+        }
+
+        function getStatusText(status) {
+            switch (status) {
+                case 'uptodate':
+                    return 'À jour';
+                case 'archived':
+                    return 'Archivé';
+                default:
+                    return status;
+            }
+        }
+
+        async function updateForm(formId, formName) {
+            if (!confirm(`Êtes-vous sûr de vouloir actualiser le formulaire "${formName}" ?`)) {
+                return;
+            }
+
+            try {
+                
+                const response = await fetch(`/mercure/api/update-form/${formId}`);
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('success', `Formulaire "${formName}" actualisé avec succès`);
+                    // Recharger la liste pour voir les changements
+                    await loadFormStatus();
+                } else {
+                    showMessage('error', data.message || 'Erreur lors de la mise à jour du formulaire');
+                }
+            } catch (error) {
+                showMessage('error', `Erreur de connexion: ${error.message}`);
+            }
+        }
+
+        function filterForms() {
+            const query = document.getElementById('form-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#forms-table-body tr');
+            
+            rows.forEach(row => {
+                const formName = row.querySelector('td').textContent.toLowerCase();
+                if (formName.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        // Charger les données au chargement de la page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFormStatus();
+        });
+    </script>
+
+    <div style="margin-top: 20px;">
+        <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+        <a href="/mercure/admin/show/forms" class="btn btn-secondary">Liste des formulaires</a>
+    </div>
+</body>
+
+</html>

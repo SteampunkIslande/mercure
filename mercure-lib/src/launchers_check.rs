@@ -33,9 +33,27 @@ pub enum LauncherCheckError {
 ///
 /// - Option<String>: Latest git revision as a String, or None if not tracked or error
 pub fn get_current_revision(launcher_path: &Path) -> Result<String, LauncherCheckError> {
+    if !launcher_path.exists() {
+        return Err(LauncherCheckError::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "Le fichier launcher spécifié n'existe pas: {}",
+                launcher_path.display()
+            ),
+        )));
+    }
     let config = config::get_mercure_config();
 
     let pipelines_dir = Path::new(&config.pipeline_dir);
+    if !pipelines_dir.exists() {
+        return Err(LauncherCheckError::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "Le répertoire des pipelines spécifié n'existe pas: {}",
+                pipelines_dir.display()
+            ),
+        )));
+    }
 
     // Ensure the path is tracked by git
     let file_status = Command::new("git")
