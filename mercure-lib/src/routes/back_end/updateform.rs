@@ -47,7 +47,7 @@ pub async fn forms_update_status_paginated_get(
             let total_pages = if per_page == 0 {
                 0
             } else {
-                (total_count + per_page - 1) / per_page
+                (total_count + per_page - 1).div_ceil(per_page)
             };
 
             let pagination_info = PaginationInfo {

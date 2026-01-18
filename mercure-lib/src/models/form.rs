@@ -519,11 +519,11 @@ impl HgFormDef {
         let udv_after = parse_launcher(&std::fs::read_to_string({
             let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
             let config = get_mercure_config();
-            let launcher_path = Path::new(&config.pipeline_dir)
+            
+            Path::new(&config.pipeline_dir)
                 .join(&form.pipeline_name)
                 .join("launchers")
-                .join(&form.launcher_name);
-            launcher_path
+                .join(&form.launcher_name)
         })?)
         .into_keys()
         .collect::<HashSet<String>>();
