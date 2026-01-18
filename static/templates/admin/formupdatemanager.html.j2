@@ -48,6 +48,37 @@
         </tbody>
     </table>
 
+    <!-- Contrôles de pagination -->
+    <div id="pagination-controls"
+        style="margin: 10px 0; text-align: center; display: none; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem;">
+        <button id="first-page-btn" class="pagination-btn" onclick="firstPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">first_page</span>
+        </button>
+
+        <button id="prev-page-btn" class="pagination-btn" onclick="loadPreviousPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+        </button>
+
+        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem;">
+            <span>Page</span>
+            <input id="page-input" type="number" min="1" class="pagination-input" onchange="onPageInputChange()"
+                onkeypress="if(event.key==='Enter') onPageInputChange()">
+            <span id="page-info">/ 1</span>
+        </div>
+
+        <button id="next-page-btn" class="pagination-btn" onclick="loadNextPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+        </button>
+
+        <button id="last-page-btn" class="pagination-btn" onclick="lastPage()" disabled>
+            <span class="material-icons" style="font-size: 16px;">last_page</span>
+        </button>
+
+        <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; margin-left: 15px;">
+            <input id="per-page-select" class="pagination-select" onchange="changePageSize()" type="number" min="1" max="100" value="10">
+            <span>par page</span>
+        </div>
+    </div>
 
     <style>
 
@@ -75,24 +106,92 @@
             color: #856404;
             border: 1px solid #ffeaa7;
         }
+
+        /* Styles de pagination */
+        .pagination-btn {
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: background-color 0.2s ease;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background-color: #5a6268;
+        }
+
+        .pagination-btn:disabled {
+            background-color: #d6d8db;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .pagination-input {
+            width: 45px;
+            padding: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .pagination-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .pagination-select {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background-color: white;
+            min-width: 50px;
+        }
+
+        .pagination-select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
     </style>
 
     <script>
         let formsData = [];
+        let currentPage = 1;
+        let perPage = 10;
+        let totalPages = 1;
+        let allFormsData = []; // Pour le filtrage local
 
-        async function loadFormStatus() {
+        async function loadFormStatus(page = 1, pageSize = 10) {
             const tableBody = document.getElementById('forms-table-body');
+            const paginationContainer = document.getElementById('pagination-controls');
             
             tableBody.innerHTML = '';
+            paginationContainer.style.display = 'none';
 
             try {
-                // Route à implémenter : GET /mercure/api/update-form-status
-                const response = await fetch('/mercure/api/update-form-status');
+                // Utiliser la nouvelle route paginée
+                const response = await fetch(`/mercure/api/update-form-status?page=${page}&per_page=${pageSize}`);
                 const data = await response.json();
                 
-                if (data.success) {
-                    formsData = data.data;
+                if (data.success && data.data) {
+                    formsData = data.data.items;
+                    allFormsData = [...formsData]; // Copie pour le filtrage
+                    
+                    // Mettre à jour les variables de pagination
+                    currentPage = data.data.pagination.current_page;
+                    perPage = data.data.pagination.per_page;
+                    totalPages = data.data.pagination.total_pages;
+                    
                     displayForms(formsData);
+                    updatePaginationControls(data.data.pagination);
+                    paginationContainer.style.display = 'flex';
                 } else {
                     showMessage('error', data.message || 'Erreur lors du chargement des formulaires');
                 }
@@ -149,6 +248,79 @@
             }
         }
 
+        function updatePaginationControls(pagination) {
+            const firstBtn = document.getElementById("first-page-btn");
+            const prevBtn = document.getElementById("prev-page-btn");
+            const nextBtn = document.getElementById("next-page-btn");
+            const lastBtn = document.getElementById("last-page-btn");
+            const pageInput = document.getElementById("page-input");
+            const pageInfo = document.getElementById("page-info");
+            const perPageSelect = document.getElementById('per-page-select');
+
+            // Mise à jour des boutons de navigation
+            firstBtn.disabled = pagination.current_page <= 1;
+            prevBtn.disabled = !pagination.has_previous_page;
+            nextBtn.disabled = !pagination.has_next_page;
+            lastBtn.disabled = pagination.current_page >= pagination.total_pages;
+            
+            // Mise à jour du champ de saisie de page et des informations
+            pageInput.value = pagination.current_page;
+            pageInfo.textContent = `/ ${pagination.total_pages}`;
+            
+            // Mise à jour de la sélection de la taille de page
+            perPageSelect.value = pagination.per_page;
+
+            // Mettre à jour les variables globales
+            currentPage = pagination.current_page;
+            totalPages = pagination.total_pages;
+        }
+
+        async function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                await loadFormStatus(page, perPage);
+            }
+        }
+
+        function loadPage(page) {
+            goToPage(page);
+        }
+
+        async function loadPreviousPage() {
+            if (currentPage > 1) {
+                await goToPage(currentPage - 1);
+            }
+        }
+
+        async function loadNextPage() {
+            if (currentPage < totalPages) {
+                await goToPage(currentPage + 1);
+            }
+        }
+
+        async function firstPage() {
+            await goToPage(1);
+        }
+
+        async function lastPage() {
+            await goToPage(totalPages);
+        }
+
+        async function onPageInputChange() {
+            const pageInput = document.getElementById("page-input");
+            const page = parseInt(pageInput.value);
+            if (page >= 1 && page <= totalPages) {
+                await goToPage(page);
+            } else {
+                pageInput.value = currentPage;
+            }
+        }
+
+        function changePageSize() {
+            const newPerPage = parseInt(document.getElementById('per-page-select').value);
+            perPage = newPerPage;
+            loadFormStatus(1, newPerPage); // Retourner à la page 1 lors du changement de taille
+        }
+
         async function updateForm(formId, formName) {
             if (!confirm(`Êtes-vous sûr de vouloir actualiser le formulaire "${formName}" ?`)) {
                 return;
@@ -163,7 +335,7 @@
                 if (data.success) {
                     showMessage('success', `Formulaire "${formName}" actualisé avec succès`);
                     // Recharger la liste pour voir les changements
-                    await loadFormStatus();
+                    await loadFormStatus(currentPage, perPage);
                 } else {
                     showMessage('error', data.message || 'Erreur lors de la mise à jour du formulaire');
                 }
@@ -174,16 +346,19 @@
 
         function filterForms() {
             const query = document.getElementById('form-search').value.toLowerCase();
-            const rows = document.querySelectorAll('#forms-table-body tr');
             
-            rows.forEach(row => {
-                const formName = row.querySelector('td').textContent.toLowerCase();
-                if (formName.includes(query)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+            if (query.trim() === '') {
+                // Si pas de recherche, afficher tous les formulaires de la page courante
+                displayForms(formsData);
+            } else {
+                // Filtrer les formulaires de la page courante
+                const filteredForms = formsData.filter(form =>
+                    form.form_name.toLowerCase().includes(query) ||
+                    form.status.toLowerCase().includes(query) ||
+                    form.form_id.toString().includes(query)
+                );
+                displayForms(filteredForms);
+            }
         }
         // Charger les données au chargement de la page
         document.addEventListener('DOMContentLoaded', () => {

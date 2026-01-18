@@ -120,8 +120,8 @@ async fn rocket() -> _ {
                 routes::backend::retry_run_get,
                 // Route pour mettre à jour la révision d'un formulaire
                 routes::backend::forms_list_updates_get,
-                // Route pour obtenir le statut de tous les formulaires
-                routes::backend::forms_update_status_get
+                // Route pour obtenir le statut de tous les formulaires avec pagination
+                routes::backend::forms_update_status_paginated_get
             ],
         )
         .manage(pool)

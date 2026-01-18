@@ -434,14 +434,29 @@ impl HgFormDef {
         Ok(def)
     }
 
-    pub async fn list_forms_archive_status(
+    pub async fn list_forms_archive_status_paginated(
         pool: &SqlitePool,
-    ) -> Result<Vec<FormStatusInfo>, super::ModelError> {
+        page: u64,
+        per_page: u64,
+    ) -> Result<(Vec<FormStatusInfo>, u64), super::ModelError> {
+        // D'abord, récupérer le nombre total d'éléments
+        let total_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*) FROM Formdef"#)
+            .fetch_one(pool)
+            .await?;
+
+        // Calculer l'offset
+        let offset = (page - 1) * per_page;
+
+        // Récupérer les données paginées
         let rows = sqlx::query(
             r#"
         SELECT form_id,form_name,version,latest_launcher_revision FROM Formdef
+        ORDER BY form_name, version
+        LIMIT ? OFFSET ?
         "#,
         )
+        .bind(per_page as i64)
+        .bind(offset as i64)
         .fetch_all(pool)
         .await?;
 
@@ -479,7 +494,7 @@ impl HgFormDef {
             });
         }
 
-        Ok(status_list)
+        Ok((status_list, total_count as u64))
     }
 
     pub async fn update_latest_launcher_revision(
