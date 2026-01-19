@@ -32,12 +32,13 @@ pub fn list_directory(base_path: &str) -> Result<Vec<DirectoryInfo>, ModelError>
         let path = entry.path();
         if path.is_dir()
             && let Some(name) = path.file_name()
-                && let Some(name_str) = name.to_str() {
-                    directories.push(DirectoryInfo {
-                        name: name_str.to_string(),
-                        path: path.to_string_lossy().to_string(),
-                    });
-                }
+            && let Some(name_str) = name.to_str()
+        {
+            directories.push(DirectoryInfo {
+                name: name_str.to_string(),
+                path: path.to_string_lossy().to_string(),
+            });
+        }
     }
 
     // Trier par nom pour une présentation cohérente

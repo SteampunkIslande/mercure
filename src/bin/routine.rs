@@ -94,9 +94,10 @@ fn git_pull(pipeline_dir: &std::path::Path) {
         }
         Ok(output) => {
             if let Some(code) = output.status.code()
-                && code != 0 {
-                    error!("{}", String::from_utf8_lossy(output.stdout.as_ref()));
-                }
+                && code != 0
+            {
+                error!("{}", String::from_utf8_lossy(output.stdout.as_ref()));
+            }
         }
     }
 }
@@ -123,13 +124,14 @@ fn set_read_write(pipeline_dir: &std::path::Path) {
         }
         Ok(output) => {
             if let Some(code) = output.status.code()
-                && code != 0 {
-                    error!(
-                        "`chmod -R a-w {}`:\n{}",
-                        pipeline_dir.display(),
-                        String::from_utf8_lossy(output.stdout.as_ref())
-                    );
-                }
+                && code != 0
+            {
+                error!(
+                    "`chmod -R a-w {}`:\n{}",
+                    pipeline_dir.display(),
+                    String::from_utf8_lossy(output.stdout.as_ref())
+                );
+            }
         }
     }
 }
@@ -156,13 +158,14 @@ fn set_read_only(pipeline_dir: &std::path::Path) {
         }
         Ok(output) => {
             if let Some(code) = output.status.code()
-                && code != 0 {
-                    error!(
-                        "`chmod -R a-w {}`:\n{}",
-                        pipeline_dir.display(),
-                        String::from_utf8_lossy(output.stdout.as_ref())
-                    );
-                }
+                && code != 0
+            {
+                error!(
+                    "`chmod -R a-w {}`:\n{}",
+                    pipeline_dir.display(),
+                    String::from_utf8_lossy(output.stdout.as_ref())
+                );
+            }
         }
     }
 }
