@@ -224,7 +224,18 @@ async fn run_routine_loop(pool: sqlx::SqlitePool, mut shutdown_rx: watch::Receiv
                 .fetch_one(&pool)
                 .await
                 .unwrap_or(0);
-        if pending_count == 0 {
+
+        // Deuxième sécurité: s'assurer que plus aucun fichier ne se situe dans /OPT/JOBS/TODO.
+        let todo_count = std::fs::read_dir(format!("{}/TODO", get_mercure_config().jobs_dir))
+            .map(|entries| entries.filter(Result::is_ok).count())
+            .unwrap_or(0);
+        // Troisième sécurité: attendre 1 minute avant de mettre à jour les pipelines, pour être sûr que la commande `git rev-list` (situé dans le cronjob),
+        // dont le rôle est de stocker la dernière révision du dossier des pipelines au lancement du script, se soit bien terminée.
+        tokio::time::sleep(Duration::from_secs(60)).await;
+
+        let can_update_pipelines = todo_count == 0 && pending_count == 0;
+
+        if can_update_pipelines {
             let config = get_mercure_config();
             let pipeline_dir = Path::new(&config.pipeline_dir);
             let rev_before = get_last_rev(pipeline_dir);
