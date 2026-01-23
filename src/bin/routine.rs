@@ -647,11 +647,16 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     Ok(())
 }
 
-fn post_run_command(attempt: &HgAttempt, log_file_name: &PathBuf, status: &str) {
+fn post_run_command(
+    attempt: &HgAttempt,
+    script_file_name: &PathBuf,
+    log_file_name: &PathBuf,
+    status: &str,
+) {
     let config = get_mercure_config();
     match {
         let mut cmd = Command::new(&config.post_run_script);
-        cmd.env("HG_LOG_FILE", log_file_name.with_extension("log"))
+        cmd.env("HG_LOG_FILE", log_file_name)
             .env("OUTDIR", attempt.outdir.as_ref().unwrap_or(&"".to_string()))
             .env("INDIR", attempt.indir.as_ref().unwrap_or(&"".to_string()))
             .env("HG_ATTEMPT_ID", attempt.attempt_number.to_string())
@@ -695,6 +700,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
     let running_dir = format!("{}/RUNNING", config.jobs_dir);
     let fails_dir = format!("{}/FAILS", config.jobs_dir);
     let done_dir = format!("{}/DONE", config.jobs_dir);
+    let logs_dir = config.logs_dir;
 
     let file_pattern = format!("job-{}-{}.sh", attempt.run_id, attempt.attempt_number);
 
@@ -707,7 +713,6 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                 .unwrap_or(false)
         })
         .collect();
-
     let done_paths: Vec<PathBuf> = std::fs::read_dir(&done_dir)?
         .map(|entry| entry.map(|e| e.path()))
         .filter_map(Result::ok)
@@ -733,6 +738,31 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
             attempt.attempt_number, attempt.run_id
         )))
     } else {
+        let script_basename = if running_paths.len() == 1 {
+            running_paths[0]
+                .file_name()
+                .ok_or(RoutineError::CustomParse(
+                    "Le chemin du script est invalide".into(),
+                ))?
+                .to_string_lossy()
+        } else if fails_paths.len() == 1 {
+            fails_paths[0]
+                .file_name()
+                .ok_or(RoutineError::CustomParse(
+                    "Le chemin du script est invalide".into(),
+                ))?
+                .to_string_lossy()
+        } else if done_paths.len() == 1 {
+            done_paths[0]
+                .file_name()
+                .ok_or(RoutineError::CustomParse(
+                    "Le chemin du script est invalide".into(),
+                ))?
+                .to_string_lossy()
+        } else {
+            "".to_string().into()
+        };
+
         if running_paths.len() == 1 {
             // Le run est toujours en cours d'analyse
             // info!(
@@ -745,7 +775,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                 "La tentative {} du run {} s'est terminée avec une erreur. Exécution du script post-run...",
                 attempt.attempt_number, attempt.run_id
             );
-            post_run_command(&attempt, &fails_paths[0], "FAILED");
+            post_run_command(&attempt, &fails_paths[0], &fails_paths[0], "FAILED");
             //Renommer le dossier de sortie avec le suffixe `-failed-{run_id}-{attempt_id}`
             if let Some(outdir) = attempt.outdir.as_ref() {
                 let dest = format!(
