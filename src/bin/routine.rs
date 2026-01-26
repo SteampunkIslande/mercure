@@ -6,7 +6,9 @@ use mercure_lib::config::get_mercure_config;
 use mercure_lib::models::analysis;
 use std::io::Error as IoError;
 use std::process::Command;
+use std::time::Duration;
 use tokio::task::JoinError as TokioJoinError;
+use tokio::time::sleep;
 
 use sqlx::SqlitePool;
 use std::fs::{Permissions, create_dir_all, exists};
@@ -35,8 +37,6 @@ enum RoutineError {
     AnalysisStateMachine(#[from] AnalysisStateMachineError),
     #[error(transparent)]
     DateParse(#[from] ParseError),
-    #[error("{0}")]
-    CustomParse(String),
     #[error(transparent)]
     Model(#[from] ModelError),
     #[error(transparent)]
@@ -503,7 +503,7 @@ async fn generate_script(
     }
 
     let script_path = format!(
-        "{jobs_dir}/TODO/job-{run_id}-{attempt_number}.sh",
+        "{jobs_dir}/TODO/job-{run_id:010}-{attempt_number:010}.sh",
         jobs_dir = config.jobs_dir,
         run_id = attempt.run_id,
         attempt_number = attempt.attempt_number
@@ -554,12 +554,38 @@ source /etc/profile
 
 {udv}
 
+launcher()(
 {launcher_content}
+)
+
+# Exécuter launcher (s'exécute dans un subshell, le code de retour est celui du launcher)
+launcher
+# Récupérer le code de retour du launcher
+res=$?
+
+if [[ $res -eq 0 ]];then
+    export HG_STATUS=SUCCESS
+else
+    export HG_STATUS=FAILED
+fi
+
+export HG_LOG_FILE="{log_file_name}"
+export HG_ATTEMPT_ID="{attempt_number}"
+export HG_RUN_ID="{run_id}"
+
+# On quitte le job script avec le code de retour du launcher
+exit $res
 
 "#,
         pipeline_dir = pipeline_base_dir.display(),
         pipeline_name = run.form.pipeline_name,
-        udv = exported_vars
+        udv = exported_vars,
+        log_file_name = format!(
+            "{}/job-{:010}-{:010}.log",
+            config.logs_dir, attempt.run_id, attempt.attempt_number
+        ),
+        attempt_number = attempt.attempt_number,
+        run_id = attempt.run_id,
     )?;
 
     Ok(())
@@ -647,139 +673,75 @@ async fn treat_pending(attempt: &HgAttempt, pool: &sqlx::SqlitePool) -> Result<(
     Ok(())
 }
 
-fn post_run_command(
-    attempt: &HgAttempt,
-    script_file_name: &PathBuf,
-    log_file_name: &PathBuf,
-    status: &str,
-) {
-    let config = get_mercure_config();
-    match {
-        let mut cmd = Command::new(&config.post_run_script);
-        cmd.env("HG_LOG_FILE", log_file_name)
-            .env("OUTDIR", attempt.outdir.as_ref().unwrap_or(&"".to_string()))
-            .env("INDIR", attempt.indir.as_ref().unwrap_or(&"".to_string()))
-            .env("HG_ATTEMPT_ID", attempt.attempt_number.to_string())
-            .env("HG_RUN_ID", attempt.run_id.to_string())
-            .env("HG_ATTEMPT_STATUS", status);
-        // Définir les variables d'environnement du run pour l'exécution de post-run-script
-        for udv in attempt.user_defined_vars.iter() {
-            cmd.env(udv.0, udv.1);
-        }
-        cmd
-    }
-    .output()
-    {
-        Ok(output) => {
-            if output.status.success() {
-                info!("Script post-run exécuté avec succès.")
-            } else {
-                error!(
-                    "Le script post-run a rencontré une erreur (code {}), message:\n{}",
-                    output.status.code().unwrap_or_default(),
-                    String::from_utf8(
-                        output
-                            .stdout
-                            .into_iter()
-                            .chain(output.stderr.into_iter())
-                            .collect()
-                    )
-                    .unwrap_or("Impossible de capturer la sortie, non UTF-8 !".to_string())
-                )
-            }
-        }
-        Err(e) => {
-            error!("Erreur lors de l'exécution du script post-run:\n{e}")
-        }
-    }
+enum JobStatus {
+    Running,
+    Done,
+    Failed,
+    NotFound,
 }
 
 async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<(), RoutineError> {
     let config = get_mercure_config();
 
-    let running_dir = format!("{}/RUNNING", config.jobs_dir);
-    let fails_dir = format!("{}/FAILS", config.jobs_dir);
-    let done_dir = format!("{}/DONE", config.jobs_dir);
-    let logs_dir = config.logs_dir;
+    let running_script_path = format!(
+        "{}/RUNNING/job-{runid:010}-{attempt:010}.sh",
+        config.jobs_dir,
+        runid = attempt.run_id,
+        attempt = attempt.attempt_number
+    );
+    let done_script_path = format!(
+        "{}/DONE/job-{runid:010}-{attempt:010}.sh",
+        config.jobs_dir,
+        runid = attempt.run_id,
+        attempt = attempt.attempt_number
+    );
+    let failed_script_path = format!(
+        "{}/FAILS/job-{runid:010}-{attempt:010}.sh",
+        config.jobs_dir,
+        runid = attempt.run_id,
+        attempt = attempt.attempt_number
+    );
+    let log_file_name = format!(
+        "{}/LOGS/job-{runid:010}-{attempt:010}.log",
+        config.jobs_dir,
+        runid = attempt.run_id,
+        attempt = attempt.attempt_number
+    );
 
-    let file_pattern = format!("job-{}-{}.sh", attempt.run_id, attempt.attempt_number);
+    let mut job_status = JobStatus::NotFound;
+    let mut tries = 0;
 
-    let fails_paths: Vec<PathBuf> = std::fs::read_dir(&fails_dir)?
-        .map(|entry| entry.map(|e| e.path()))
-        .filter_map(Result::ok)
-        .filter(|path| {
-            path.file_name()
-                .map(|name| name.display().to_string().ends_with(&file_pattern))
-                .unwrap_or(false)
-        })
-        .collect();
-    let done_paths: Vec<PathBuf> = std::fs::read_dir(&done_dir)?
-        .map(|entry| entry.map(|e| e.path()))
-        .filter_map(Result::ok)
-        .filter(|path| {
-            path.file_name()
-                .map(|name| name.display().to_string().ends_with(&file_pattern))
-                .unwrap_or(false)
-        })
-        .collect();
-    let running_paths: Vec<PathBuf> = std::fs::read_dir(&running_dir)?
-        .map(|entry| entry.map(|e| e.path()))
-        .filter_map(Result::ok)
-        .filter(|path| {
-            path.file_name()
-                .map(|name| name.display().to_string().ends_with(&file_pattern))
-                .unwrap_or(false)
-        })
-        .collect();
-
-    if running_paths.len() + fails_paths.len() + done_paths.len() > 1 {
-        Err(RoutineError::CustomParse(format!(
-            "La tentative {} pour le run {} apparaît dans plusieurs états à la fois",
-            attempt.attempt_number, attempt.run_id
-        )))
-    } else {
-        let script_basename = if running_paths.len() == 1 {
-            running_paths[0]
-                .file_name()
-                .ok_or(RoutineError::CustomParse(
-                    "Le chemin du script est invalide".into(),
-                ))?
-                .to_string_lossy()
-        } else if fails_paths.len() == 1 {
-            fails_paths[0]
-                .file_name()
-                .ok_or(RoutineError::CustomParse(
-                    "Le chemin du script est invalide".into(),
-                ))?
-                .to_string_lossy()
-        } else if done_paths.len() == 1 {
-            done_paths[0]
-                .file_name()
-                .ok_or(RoutineError::CustomParse(
-                    "Le chemin du script est invalide".into(),
-                ))?
-                .to_string_lossy()
-        } else {
-            "".to_string().into()
-        };
-
-        if running_paths.len() == 1 {
-            // Le run est toujours en cours d'analyse
-            // info!(
-            //     "La tentative {} du run {} n'est pas encore terminée.",
-            //     attempt.attempt_number, attempt.run_id
-            // );
+    // It is possible that during a file move operation, because of the underlying NFS filesystem, the script file shows in neither of running or fails/done folders.
+    while tries < 3 {
+        if Path::new(&running_script_path).exists() {
+            job_status = JobStatus::Running;
+            break;
         }
-        if fails_paths.len() == 1 {
+        if Path::new(&done_script_path).exists() {
+            job_status = JobStatus::Done;
+            break;
+        }
+        if Path::new(&failed_script_path).exists() {
+            job_status = JobStatus::Failed;
+            break;
+        }
+        tries += 1;
+        sleep(Duration::from_secs(10)).await;
+    }
+
+    match job_status {
+        JobStatus::Running => {
+            //Nothing to do
+        }
+        JobStatus::Failed => {
             info!(
-                "La tentative {} du run {} s'est terminée avec une erreur. Exécution du script post-run...",
+                "La tentative {} du run {} s'est terminée avec une erreur.",
                 attempt.attempt_number, attempt.run_id
             );
-            post_run_command(&attempt, &fails_paths[0], &fails_paths[0], "FAILED");
             //Renommer le dossier de sortie avec le suffixe `-failed-{run_id}-{attempt_id}`
             if let Some(outdir) = attempt.outdir.as_ref() {
                 let dest = format!(
-                    "{outdir}-failed-{}-{}",
+                    "{outdir}-failed-{:010}-{:010}",
                     attempt.run_id, attempt.attempt_number
                 );
                 if !std::path::PathBuf::from(&dest).exists() {
@@ -788,14 +750,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                 }
             }
             // grep '## ERROR' dans le fichier de log principal pour obtenir la raison de l'échec
-
-            let error_list = find_errors(
-                attempt.run_id,
-                attempt.attempt_number,
-                PathBuf::from(&config.logs_dir),
-            )
-            .await
-            .unwrap_or_default();
+            let error_list = find_errors(&log_file_name).await.unwrap_or_default();
 
             let error_reason = error_list.last().cloned().unwrap_or_else(|| {
                 "Erreur inconnue lors de l'analyse. Voir les logs pour plus de détails.".to_string()
@@ -809,16 +764,21 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
             )
             .await?;
         }
-        if done_paths.len() == 1 {
+        JobStatus::Done => {
             info!(
-                "La tentative {} du run {} s'est terminée avec succès. Exécution du script post-run...",
+                "La tentative {} du run {} s'est terminée avec succès.",
                 attempt.attempt_number, attempt.run_id
             );
-            post_run_command(&attempt, &done_paths[0], "SUCCESS");
             analysis::complete_success(attempt.run_id, pool).await?;
         }
-        Ok(())
+        JobStatus::NotFound => {
+            error!(
+                "La tentative {} du run {} est introuvable.",
+                attempt.attempt_number, attempt.run_id
+            );
+        }
     }
+    Ok(())
 }
 
 // Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr

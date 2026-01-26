@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use reqwest::get;
@@ -26,7 +26,7 @@ pub struct RTJobInfo {
 ///
 /// Pour que la lecture en temps réel fonctionne correctement,
 /// le fichier de log doit être écrit ligne par ligne avec un flush après chaque écriture (`stdbuf -oL snakemake`).
-///
+///&) -> R
 /// Les informations renvoyées comprennent:
 /// - current_step_string: la dernière étape en cours. C'est le script launcher qui doit écrire une ligne "## STEP <nom_de_l_etape>" dans stdout.
 /// - current_progress: le pourcentage de progression dans l'étape actuelle. Issu de snakemake, format "X of Y steps (Z%) done".
@@ -36,23 +36,12 @@ pub async fn watch_log(
     attempt_number: i64,
     logs_folder: PathBuf,
 ) -> Result<RTJobInfo> {
-    // Recherche du fichier
-    let log_pattern = format!(r"^\d+-job-{}-{}\.log$", job_id, attempt_number);
-    let re_logfile = Regex::new(&log_pattern).unwrap();
-    let entries = std::fs::read_dir(&logs_folder)?;
-    let mut log_path = None;
-    for entry in entries {
-        let path = entry?.path();
-        if let Some(name) = path.file_name().and_then(|s| s.to_str())
-            && re_logfile.is_match(name)
-        {
-            log_path = Some(path);
-            break;
-        }
-    }
-
-    let log_path = log_path.ok_or_else(|| anyhow::anyhow!("Aucun fichier log trouvé"))?;
-    let file = File::open(&log_path)?;
+    let file = File::open(&format!(
+        "{}/job-{:010}-{:010}.log",
+        logs_folder.display(),
+        job_id,
+        attempt_number
+    ))?;
     let reader = BufReader::new(file).lines();
 
     let re_step = Regex::new(r"^##\s+STEP\s+(.+)$").unwrap();
@@ -110,35 +99,18 @@ pub async fn watch_log(
     })
 }
 
-pub async fn find_errors(
-    job_id: i64,
-    attempt_number: i64,
-    logs_folder: PathBuf,
-) -> Result<Vec<String>> {
-    // Recherche du fichier
-    let log_pattern = format!(r"^\d+-job-{}-{}\.log$", job_id, attempt_number);
-    let re_logfile = Regex::new(&log_pattern).unwrap();
-    let entries = std::fs::read_dir(&logs_folder)?;
-    let mut log_path = None;
-    for entry in entries {
-        let path = entry?.path();
-        if let Some(name) = path.file_name().and_then(|s| s.to_str())
-            && re_logfile.is_match(name)
-        {
-            log_path = Some(path);
-            break;
-        }
-    }
-
-    let log_path = log_path.ok_or_else(|| anyhow::anyhow!("Aucun fichier log trouvé"))?;
+pub async fn find_errors<T>(log_path: T) -> Result<Vec<String>>
+where
+    T: AsRef<Path>,
+{
     let file = File::open(&log_path)?;
     let reader = BufReader::new(file).lines();
 
-    let re_step = Regex::new(r"^##\s+ERROR\s+(.+)$").unwrap();
+    let re_error = Regex::new(r"^##\s+ERROR\s+(.+)$").unwrap();
     let mut errors: Vec<String> = Vec::new();
     for line in reader {
         let line = line?;
-        if let Some(cap) = re_step.captures(&line) {
+        if let Some(cap) = re_error.captures(&line) {
             errors.push(cap[1].trim().to_string());
         }
     }
