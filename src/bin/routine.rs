@@ -552,11 +552,11 @@ export PIPELINE_NAME="{pipeline_name}"
 export PATH=/usr/bin:$PATH
 source /etc/profile
 
-{udv}
+{exported_vars}
 
 launcher()(
 {launcher_content}
-)
+) > "{log_file_name}"
 
 # Exécuter launcher (s'exécute dans un subshell, le code de retour est celui du launcher)
 launcher
@@ -573,19 +573,22 @@ export HG_LOG_FILE="{log_file_name}"
 export HG_ATTEMPT_ID="{attempt_number}"
 export HG_RUN_ID="{run_id}"
 
+# Exécuter le script post-run (qui aura accès aux variables HG_STATUS, HG_LOG_FILE, HG_ATTEMPT_ID, HG_RUN_ID, en plus des UDV, de INDIR et de OUTDIR)
+"{post_run_script}"
+
 # On quitte le job script avec le code de retour du launcher
 exit $res
 
 "#,
         pipeline_dir = pipeline_base_dir.display(),
         pipeline_name = run.form.pipeline_name,
-        udv = exported_vars,
         log_file_name = format!(
             "{}/job-{:010}-{:010}.log",
             config.logs_dir, attempt.run_id, attempt.attempt_number
         ),
         attempt_number = attempt.attempt_number,
         run_id = attempt.run_id,
+        post_run_script = config.post_run_script
     )?;
 
     Ok(())
@@ -744,7 +747,7 @@ async fn treat_running(attempt: HgAttempt, pool: &sqlx::SqlitePool) -> Result<()
                     "{outdir}-failed-{:010}-{:010}",
                     attempt.run_id, attempt.attempt_number
                 );
-                if !std::path::PathBuf::from(&dest).exists() {
+                if !std::path::PathBuf::from(&dest).exists() && PathBuf::from(&outdir).exists() {
                     info!("Renommage de `{}` vers `{}`", outdir, dest);
                     std::fs::rename(outdir, dest)?;
                 }

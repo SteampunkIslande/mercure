@@ -24,3 +24,4 @@ Nettoyage de `utils.rs`.
 ## Rafraîchissements
 
 - [ ] Revoir la route `/home` (front_end/home.rs)
+- [ ] Remanier le modèle HgRun pour toujours utiliser les champs indir et outdir (même pour les dossiers BCL).
