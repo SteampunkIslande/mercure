@@ -2,7 +2,41 @@
 
 Ce document explique comment développer des pipelines pour Mercure, en détaillant les structures, les bonnes pratiques et les exemples concrets.
 
----
+Dans cette première partie, l'objectif est de présenter les différents concepts inhérents au développement d'un pipeline pour Mercure.
+La seconde partie est dédiée à la présentation d'exemples concrets.
+
+## Utilisation
+
+## Organisation d'un dossier de pipeline
+
+Un dossier de pipeline doit suivre la structure ci-dessous:
+
+```
+nom-du-pipeline
+├── actions
+│   ├── smaug-1.0.0.md
+│   └── smaug-1.0.0.sh
+├── config-1.0.0.yaml
+├── helper-1.0.0.sh
+├── helper-1.0.1.sh
+├── launchers
+│   ├── default_launcher.sh
+│   └── tests-smaug-dev.sh
+├── profiles
+│   └── default
+│       └── config.yaml
+├── Snakefile-1.0.0
+└── Snakefile-1.0.1
+```
+
+Pour être reconnu par Mercure, il faut au minimum un dossier `launchers` avec au moins un fichier `.sh`.
+Tout le reste sert pour l'exécution du launcher.
+
+### Dossier `actions`
+
+Dans ce dossier, la personne qui développe le pipeline peut, si elle le souhaite, mettre certaines étapes à la disposition des autres bio-informaticiens. Comme il s'agit de fichiers à usage partagé, il est impossible de garantir qu'une modification dans un script d'action sera prise en compte par tous les utilisateurs du script. Ainsi, 
+
+# Quelques exemples
 
 ## Pipeline de copie
 
