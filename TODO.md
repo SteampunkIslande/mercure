@@ -2,7 +2,7 @@
 
 ## Routes
 
-- [ ] Déplacer back_end/redirect.rs dans frontend (et renommer la route correspondante de post en get)
+- [x] Déplacer back_end/redirect.rs dans frontend (et renommer la route correspondante de post en get)
 
 ## Scripts
 

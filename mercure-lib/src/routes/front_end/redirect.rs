@@ -13,7 +13,7 @@ pub struct RedirectForm {
 }
 
 #[get("/redirect?<message>&<title>&<target_url>&<seconds>")]
-pub async fn redirect_post(
+pub async fn redirect_get(
     message: String,
     title: String,
     target_url: String,

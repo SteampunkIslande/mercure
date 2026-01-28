@@ -7,6 +7,7 @@ mod formslistupdates;
 mod generics;
 mod home;
 mod newform;
+mod redirect;
 mod showrun;
 mod submitrun;
 
@@ -19,5 +20,6 @@ pub use formslistupdates::*;
 pub use generics::*;
 pub use home::*;
 pub use newform::*;
+pub use redirect::*;
 pub use showrun::*;
 pub use submitrun::*;

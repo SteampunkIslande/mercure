@@ -115,7 +115,7 @@ async fn rocket() -> _ {
                 // Routes pour lister les dossiers selon le type
                 routes::backend::list_directories_by_type,
                 // Route pour toutes les redirections
-                routes::backend::redirect_post,
+                routes::frontend::redirect_get,
                 // Route pour relancer un run (une fois terminé)
                 routes::backend::retry_run_get,
                 // Route pour mettre à jour la révision d'un formulaire
