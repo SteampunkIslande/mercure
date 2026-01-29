@@ -549,6 +549,9 @@ async fn generate_script(
 
 export PIPELINE_DIR="{pipeline_dir}"
 export PIPELINE_NAME="{pipeline_name}"
+export HG_ATTEMPT_ID="{attempt_number}"
+export HG_RUN_ID="{run_id}"
+
 # snakemake est dans /usr/local/bin, mais PATH ne contient pas ce dossier car ce script est lancé par cron...
 export PATH=/usr/bin:/usr/local/bin:$PATH
 source /etc/profile
@@ -571,8 +574,6 @@ else
 fi
 
 export HG_LOG_FILE="{log_file_name}"
-export HG_ATTEMPT_ID="{attempt_number}"
-export HG_RUN_ID="{run_id}"
 
 # Exécuter le script post-run (qui aura accès aux variables HG_STATUS, HG_LOG_FILE, HG_ATTEMPT_ID, HG_RUN_ID, en plus des UDV, de INDIR et de OUTDIR)
 # Rediriger la sortie de ce script vers /dev/null pour éviter d'écrire dans $HG_LOG_FILE (étant donné que post_run_script doit lire ce fichier, risque de boucle infinie).
