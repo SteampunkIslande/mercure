@@ -15,7 +15,6 @@ use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
 use crate::models::{Group, HgFormDef};
-use crate::utils::filename_to_static_served_name;
 
 #[get("/show/run/<run_id>?<attempt_number>")]
 pub async fn show_run_get(
@@ -147,9 +146,6 @@ pub async fn show_run_get(
                     attempt: &attempt,
                     history: history,
                     sequenceurs_list: sequenceurs_list,
-                    samplesheet_adn_static_name: samplesheet_adn_static_name,
-                    samplesheet_arn_static_name: samplesheet_arn_static_name,
-                    metadata_static_name: metadata_static_name,
                     user_defined_vars_json: &user_defined_vars_json,
                     user: auth.user,
                 },
@@ -175,24 +171,6 @@ pub async fn show_run_get(
                 }
             };
 
-            let samplesheet_adn_static_name = filename_to_static_served_name(
-                &attempt.sample_sheet_adn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let samplesheet_arn_static_name = filename_to_static_served_name(
-                &attempt.sample_sheet_arn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let metadata_static_name = filename_to_static_served_name(
-                &attempt.metadata_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {
                 RunStatus::Pending => Template::render(
@@ -202,9 +180,6 @@ pub async fn show_run_get(
                         form: &run.form,
                         attempt: &attempt,
                         history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         is_pipeline_archived: pipeline_is_archived,
@@ -217,9 +192,6 @@ pub async fn show_run_get(
                         form: &run.form,
                         attempt: &attempt,
                         history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         is_pipeline_archived: pipeline_is_archived,
@@ -232,9 +204,6 @@ pub async fn show_run_get(
                         form: &run.form,
                         attempt: &attempt,
                         history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,
                         is_pipeline_archived: pipeline_is_archived,
@@ -247,9 +216,6 @@ pub async fn show_run_get(
                         attempt: &attempt,
                         form: &run.form,
                         history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
                         fail_reason: fail_reason,
                         user_defined_vars_json: &user_defined_vars_json,
                         user: auth.user,

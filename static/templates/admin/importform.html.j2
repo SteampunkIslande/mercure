@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <title>{{ title }}</title>
+    <script src="/static/scripts/newform_addgroup.js"></script>
+    <script src="/static/scripts/show_message.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            await load_groups();
+            await load_pipelines();
+        });
+
+        async function load_pipelines() {
+            try {
+                const response = await fetch("/mercure/api/pipelines");
+                if (!response.ok) throw new Error("Erreur lors du chargement des pipelines");
+                const data = await response.json();
+                if (!data.success) {
+                    showMessage("error", data.message);
+                    return;
+                }
+                const pipelines = data.data || [];
+                const select = document.getElementById("pipeline_name");
+                pipelines.forEach(p => {
+                    const opt = document.createElement("option");
+                    opt.value = p.pipeline_name;
+                    opt.textContent = p.pipeline_name;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                showMessage("error", `Erreur: ${e.message}`);
+            }
+        }
+
+        function updateFormsList() {
+            const pipelineName = document.getElementById("pipeline_name").value;
+            const formSelect = document.getElementById("form_name");
+            formSelect.innerHTML = '<option value="">-- Sélectionnez un formulaire --</option>';
+            document.getElementById("form-details").style.display = "none";
+
+            if (!pipelineName) return;
+
+            fetch("/mercure/api/pipelines")
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const pipeline = (data.data || []).find(p => p.pipeline_name === pipelineName);
+                    if (!pipeline) return;
+
+                    pipeline.forms.forEach(f => {
+                        const opt = document.createElement("option");
+                        opt.value = f.name;
+                        opt.textContent = f.name;
+                        formSelect.appendChild(opt);
+                    });
+                });
+        }
+
+        function showFormDetails() {
+            const pipelineName = document.getElementById("pipeline_name").value;
+            const formName = document.getElementById("form_name").value;
+            if (!pipelineName || !formName) {
+                document.getElementById("form-details").style.display = "none";
+                return;
+            }
+
+            fetch("/mercure/api/pipelines")
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const pipeline = (data.data || []).find(p => p.pipeline_name === pipelineName);
+                    if (!pipeline) return;
+                    const form = pipeline.forms.find(f => f.name === formName);
+                    if (!form) return;
+
+                    const details = document.getElementById("form-details");
+                    details.style.display = "block";
+
+                    document.getElementById("detail-template").textContent = form.template || "N/A";
+                    document.getElementById("detail-devmode").textContent = form.dev_mode ? "Oui" : "Non";
+                    document.getElementById("detail-devbranch").textContent = form.dev_branch || "N/A";
+
+                    const varsList = document.getElementById("detail-variables");
+                    varsList.innerHTML = "";
+                    if (form.variables && form.variables.length > 0) {
+                        form.variables.forEach(v => {
+                            const li = document.createElement("li");
+                            let typeDesc = v.type;
+                            if (v.type === "choice" && v.choices) {
+                                typeDesc = `choice: ${v.choices.join(", ")}`;
+                            } else if (v.type === "constant" && v.value) {
+                                typeDesc = `constant: ${v.value}`;
+                            }
+                            li.textContent = `${v.name} (${typeDesc})`;
+                            varsList.appendChild(li);
+                        });
+                    } else {
+                        varsList.innerHTML = "<li>Aucune variable</li>";
+                    }
+
+                    getVersion(formName);
+                });
+        }
+
+        async function getVersion(formName) {
+            try {
+                const response = await fetch(`/mercure/api/nextversion?formname=${encodeURIComponent(formName)}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                const v = data.data || 1;
+                document.getElementById("version").value = v;
+                document.getElementById("version_display").textContent = v;
+            } catch (e) {
+                document.getElementById("version").value = 1;
+                document.getElementById("version_display").textContent = 1;
+            }
+        }
+
+        async function submitImport() {
+            const pipelineName = document.getElementById("pipeline_name").value;
+            const formName = document.getElementById("form_name").value;
+            const version = parseInt(document.getElementById("version").value) || 1;
+
+            if (!pipelineName || !formName) {
+                showMessage("error", "Veuillez sélectionner un pipeline et un formulaire.");
+                return;
+            }
+
+            const selectedGroups = Array.from(
+                document.querySelectorAll('input[name="selected_groups"]:checked')
+            ).map(input => {
+                const groupId = parseInt(input.value);
+                const groupName = input.nextElementSibling?.textContent?.trim() || "Nom inconnu";
+                return { id: groupId, name: groupName };
+            });
+
+            const commitHash = document.getElementById("commit_hash").value.trim() || null;
+
+            try {
+                const response = await fetch("/mercure/api/importform", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        pipeline_name: pipelineName,
+                        form_name: formName,
+                        version: version,
+                        groups: selectedGroups,
+                        commit_hash: commitHash,
+                    }),
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+                window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
+                    "&title=" + encodeURIComponent("Succès") +
+                    "&message=" + encodeURIComponent(data.data) +
+                    "&seconds=5";
+            } catch (error) {
+                showMessage("error", `Erreur lors de l'import: ${error.message}`);
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text">{{ title }}</span>
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="error-message" style="display: none;" class="error-msg"></div>
+
+    <form>
+        <div style="width: 50%;">
+            <label for="pipeline_name">Pipeline :</label>
+            <select id="pipeline_name" name="pipeline_name" onchange="updateFormsList()" required
+                style="float:right;width:50%;">
+                <option value="">-- Sélectionnez un pipeline --</option>
+            </select>
+        </div>
+
+        <div style="width: 50%;">
+            <label for="form_name">Formulaire :</label>
+            <select id="form_name" name="form_name" onchange="showFormDetails()" required
+                style="float:right;width:50%;">
+                <option value="">-- Sélectionnez un formulaire --</option>
+            </select>
+        </div>
+
+        <div id="form-details" style="display:none; margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+            <h3>Détails du formulaire</h3>
+            <p><strong>Template :</strong> <span id="detail-template"></span></p>
+            <p><strong>Mode dev :</strong> <span id="detail-devmode"></span></p>
+            <p><strong>Branche dev :</strong> <span id="detail-devbranch"></span></p>
+            <p><strong>Variables :</strong></p>
+            <ul id="detail-variables"></ul>
+        </div>
+
+        <div style="width: 50%;">
+            <label>Version :</label>
+            <strong id="version_display" style="float:right"></strong>
+            <input type="hidden" id="version" name="version">
+        </div>
+
+        <div style="width: 50%;">
+            <label for="commit_hash">Commit hash (optionnel) :</label>
+            <input type="text" id="commit_hash" name="commit_hash" placeholder="Laisser vide pour la dernière révision"
+                style="float:right;width:50%;">
+        </div>
+
+        <fieldset>
+            <legend>Groupes</legend>
+            <div id="groups-container"></div>
+            <div>
+                <label for="new_group_name">Créer un nouveau groupe :</label>
+                <input type="text" id="new_group_name" name="new_group_name" placeholder="Nom du nouveau groupe">
+                <button type="button" onclick="addNewGroup()">Ajouter</button>
+            </div>
+        </fieldset>
+    </form>
+
+    <div style="text-align: left; margin-top: 20px;">
+        <a class="btn btn-secondary" href="/mercure/admin/show/forms">Retour à la liste des formulaires</a>
+        <a class="btn btn-primary" onclick="submitImport()">Importer le formulaire</a>
+    </div>
+</body>
+
+</html>

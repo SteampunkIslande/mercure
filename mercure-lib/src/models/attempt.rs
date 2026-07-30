@@ -1,11 +1,11 @@
 use crate::models::{HgRun, ModelError, RunStatus};
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::str::FromStr;
+use time::OffsetDateTime;
 
 /// Created every time we attempt to analyze an HgRun.
 ///
@@ -16,13 +16,13 @@ use std::str::FromStr;
 pub struct HgAttempt {
     pub attempt_number: i64,
     pub run_id: i64,
-    pub attempt_date: NaiveDateTime,
+    pub attempt_date: String,
     pub user_defined_vars: HashMap<String, String>,
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
 
-    pub pipeline_dir_hash: String,
+    pub pipeline_dir_hash: Option<String>,
 
     pub indir: Option<String>,
     pub outdir: Option<String>,

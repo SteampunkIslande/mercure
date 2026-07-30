@@ -15,6 +15,7 @@ pub struct MercureConfig {
     pub ont_dir: String,
     pub check_run_completed: String,
     pub post_run_script: String,
+    pub pipelines_repo_url: String,
 }
 
 impl Default for MercureConfig {
@@ -31,6 +32,7 @@ impl Default for MercureConfig {
             ont_dir: "/home/charles/mercure/ont".into(),
             check_run_completed: "/home/charles/mercure/check-run-completed.sh".into(),
             post_run_script: "/home/charles/mercure/post-run.sh".into(),
+            pipelines_repo_url: "http://127.0.0.1:3000/mercure/pipelines.git".into(),
         }
     }
 }

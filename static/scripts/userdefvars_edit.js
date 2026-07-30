@@ -14,9 +14,10 @@ function addUserVar() {
                 <label for="var_type_${userVarCounter}">Type :</label>
                 <select id="var_type_${userVarCounter}" name="user_defined_vars[${userVarCounter}][type]" onchange="updateVarType(${userVarCounter})" required>
                     <option value="">-- Sélectionnez un type de variable --</option>
-                    <option value="FromValuesList">Liste de valeurs autorisées</option>
+                    <option value="File">Fichier (upload)</option>
+                    <option value="Choice">Liste de valeurs autorisées</option>
                     <option value="Constant">Constante</option>
-                    <option value="RunDefined">Défini à l'exécution (libre)</option>
+                    <option value="Value">Texte libre (défini à l'exécution)</option>
                 </select>
                 
                 <div id="var_values_${userVarCounter}" style="display:none;">
@@ -43,13 +44,13 @@ function updateVarType(index) {
     valuesDiv.style.display = "block";
     contentLabel.style.display = "inline";
 
-    if (typeSelect.value === "FromValuesList") {
+    if (typeSelect.value === "Choice") {
       textarea.style.display = "inline";
       textarea.placeholder = "Entrez une valeur par ligne";
     } else if (typeSelect.value === "Constant") {
       textarea.style.display = "inline";
       textarea.placeholder = "Entrez la valeur constante";
-    } else if (typeSelect.value === "RunDefined") {
+    } else if (typeSelect.value === "File" || typeSelect.value === "Value") {
       textarea.style.display = "none";
       contentLabel.style.display = "none";
     }

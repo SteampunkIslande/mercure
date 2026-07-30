@@ -38,7 +38,7 @@ pub async fn validate_run_post(
     // Vérifier d'abord si le pipeline est archivé
     match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => {
-            if is_pipeline_archived(&run.form) {
+            if run.form.template_path.is_none() && is_pipeline_archived(&run.form) {
                 return Json(ApiResponse::error(
                     "Impossible de valider ce run: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire.".to_string()
                 ));
@@ -68,7 +68,7 @@ pub async fn retry_run_get(
     // Vérifier d'abord si le pipeline est archivé
     match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => {
-            if is_pipeline_archived(&run.form) {
+            if run.form.template_path.is_none() && is_pipeline_archived(&run.form) {
                 return Json(ApiResponse::error(
                     "Impossible de relancer ce run: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire.".to_string()
                 ));
@@ -99,7 +99,7 @@ pub async fn editrun_post(
     // Vérifier d'abord si le pipeline est archivé
     match HgRun::get_run_from_id(run_id, pool).await {
         Ok(run) => {
-            if is_pipeline_archived(&run.form) {
+            if run.form.template_path.is_none() && is_pipeline_archived(&run.form) {
                 return Json(ApiResponse::error(
                     "Impossible de modifier ce run: le pipeline utilise une version archivée. La révision git du launcher a changé depuis la création du formulaire.".to_string()
                 ));

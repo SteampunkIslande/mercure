@@ -65,6 +65,7 @@ async fn rocket() -> _ {
                 routes::frontend::register_get,
                 routes::frontend::admin_dashboard_get,
                 routes::frontend::newform_get,
+                routes::frontend::importform_get,
                 routes::frontend::editform_get,
                 routes::frontend::show_forms_get,
                 routes::frontend::edit_users,
@@ -121,7 +122,11 @@ async fn rocket() -> _ {
                 // Route pour mettre à jour la révision d'un formulaire
                 routes::backend::forms_list_updates_get,
                 // Route pour obtenir le statut de tous les formulaires avec pagination
-                routes::backend::forms_update_status_paginated_get
+                routes::backend::forms_update_status_paginated_get,
+                // Route pour lister les pipelines et leurs formulaires YAML
+                routes::backend::list_pipelines,
+                // Route pour importer un formulaire depuis YAML
+                routes::backend::import_form,
             ],
         )
         .manage(pool)

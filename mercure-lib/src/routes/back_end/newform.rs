@@ -13,6 +13,7 @@ use crate::auth::Authenticated;
 
 use crate::models::ModelError;
 use crate::models::{HgFormDef, HgFormDefSubmission};
+use crate::models::form_yaml;
 
 #[get("/nextversion?<formname>")]
 pub async fn get_nextversion(
@@ -37,7 +38,6 @@ pub async fn parse_launcher_endpoint(
     pipeline: String,
     launcher: String,
 ) -> Json<ApiResponse<Value>> {
-    // On vérifie que le pipeline et le launcher sont valides
     let config: crate::config::MercureConfig = crate::config::get_mercure_config();
 
     let launcher_abs_path = std::path::Path::new(&config.pipeline_dir)
@@ -68,6 +68,94 @@ pub async fn parse_launcher_endpoint(
                 e
             ))),
         }
+    }
+}
+
+/// Route: /mercure/api/pipelines
+/// Lists all pipeline directories with their available forms from forms.yaml
+#[get("/pipelines")]
+pub async fn list_pipelines(auth: Authenticated) -> Json<ApiResponse<Value>> {
+    if !auth.user.is_admin {
+        return Json(ApiResponse::error(
+            "Accès refusé : seuls les administrateurs peuvent lister les pipelines.".to_string(),
+        ));
+    }
+
+    let config = crate::config::get_mercure_config();
+    let pipelines_dir = std::path::Path::new(&config.pipeline_dir);
+
+    let pipelines = form_yaml::list_pipelines_with_forms(pipelines_dir);
+
+    match serde_json::to_value(&pipelines) {
+        Ok(v) => Json(ApiResponse::success(v)),
+        Err(e) => Json(ApiResponse::error(format!(
+            "Erreur lors de la sérialisation des pipelines: {e}"
+        ))),
+    }
+}
+
+/// Request body for importing a form from YAML
+#[derive(rocket::serde::Deserialize)]
+pub struct ImportFormRequest {
+    pub pipeline_name: String,
+    pub form_name: String,
+    pub version: i32,
+    pub groups: Vec<crate::models::Group>,
+    pub commit_hash: Option<String>,
+}
+
+/// Route: /mercure/api/importform
+/// Creates a form definition in the DB from a YAML form definition
+#[post("/importform", data = "<req>")]
+pub async fn import_form(
+    auth: Authenticated,
+    pool: &State<SqlitePool>,
+    req: Json<ImportFormRequest>,
+) -> Json<ApiResponse<String>> {
+    if !auth.user.is_admin {
+        return Json(ApiResponse::error(
+            "Accès refusé : seuls les administrateurs peuvent importer des formulaires."
+                .to_string(),
+        ));
+    }
+
+    let config = crate::config::get_mercure_config();
+    let pipelines_dir = std::path::Path::new(&config.pipeline_dir);
+
+    let forms_yaml_path = pipelines_dir.join(&req.pipeline_name).join("forms.yaml");
+    let yaml_file = match form_yaml::FormYamlFile::from_file(&forms_yaml_path) {
+        Ok(f) => f,
+        Err(e) => {
+            return Json(ApiResponse::error(format!(
+                "Erreur lors de la lecture du fichier forms.yaml: {e}"
+            )))
+        }
+    };
+
+    let form_yaml = match yaml_file.forms.iter().find(|f| f.name == req.form_name) {
+        Some(f) => f,
+        None => {
+            return Json(ApiResponse::error(format!(
+                "Le formulaire '{}' n'existe pas dans le pipeline '{}'",
+                req.form_name, req.pipeline_name
+            )))
+        }
+    };
+
+    let mut submission =
+        form_yaml::form_yaml_to_submission(form_yaml, &req.pipeline_name, req.version, req.commit_hash.clone());
+    submission.groups = req.groups.clone();
+
+    match HgFormDef::new_form_def(submission, pool).await {
+        Ok(()) => Json(ApiResponse::success(
+            "Formulaire importé avec succès!".to_string(),
+        )),
+        Err(e) => match e {
+            ModelError::LauncherCheckError(e) => Json(ApiResponse::error(format!(
+                "{e}\nVeuillez valider ou annuler ces modifications avant de créer un nouveau formulaire."
+            ))),
+            e => Json(ApiResponse::error(format!("{e}"))),
+        },
     }
 }
 

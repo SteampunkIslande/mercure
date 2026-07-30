@@ -74,32 +74,39 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 let sequenceurs_folder = config.sequencers_dir;
                 let form_def = &run.form;
 
-                // Si le fichier de launcher n'existe plus, afficher une erreur
-                if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
-                    // Désactiver le formulaire si ce n'était pas déjà fait
-                    HgFormDef::disable_form(pool, form_def.form_id).await.ok();
-                    return Template::render(
-                        "common/error",
-                        context! {
-                            title:"Launcher manquant",
-                            h2:"Launcher manquant",
-                            message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
-                        },
-                    );
+                // For YAML-based forms (template_path present), skip launcher checks
+                let is_yaml_form = form_def.template_path.is_some();
+
+                if !is_yaml_form {
+                    // Si le fichier de launcher n'existe plus, afficher une erreur
+                    if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
+                        // Désactiver le formulaire si ce n'était pas déjà fait
+                        HgFormDef::disable_form(pool, form_def.form_id).await.ok();
+                        return Template::render(
+                            "common/error",
+                            context! {
+                                title:"Launcher manquant",
+                                h2:"Launcher manquant",
+                                message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                            },
+                        );
+                    }
+
+                    // Vérifier si le pipeline est archivé (révision git différente)
+                    let pipeline_is_archived = is_pipeline_archived(form_def);
+                    if pipeline_is_archived {
+                        return Template::render(
+                            "common/error",
+                            context! {
+                                title: "Pipeline archivé",
+                                h2: "Pipeline archivé",
+                                message: format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
+                            },
+                        );
+                    }
                 }
 
-                // Vérifier si le pipeline est archivé (révision git différente)
-                let pipeline_is_archived = is_pipeline_archived(form_def);
-                if pipeline_is_archived {
-                    return Template::render(
-                        "common/error",
-                        context! {
-                            title: "Pipeline archivé",
-                            h2: "Pipeline archivé",
-                            message: format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
-                        },
-                    );
-                }
+                let pipeline_is_archived = if is_yaml_form { false } else { is_pipeline_archived(form_def) };
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
                     .ok()
                     .map(|entries| {

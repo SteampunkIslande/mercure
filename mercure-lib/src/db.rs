@@ -49,7 +49,12 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             enabled BOOLEAN NOT NULL DEFAULT 1,
             version INTEGER NOT NULL DEFAULT 1,
             indir_type TEXT NOT NULL DEFAULT 'BCL_DIR' CHECK (indir_type IN ('BCL_DIR', 'ANALYSIS_DIR', 'ONT_DIR')),
-            latest_launcher_revision TEXT
+            latest_launcher_revision TEXT,
+            pipeline_dir_hash TEXT,
+            template_path TEXT,
+            dev_mode BOOLEAN NOT NULL DEFAULT 0,
+            dev_branch TEXT,
+            commit_hash TEXT
         )
         "#,
     )
@@ -91,7 +96,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             form_id INTEGER NOT NULL,
             varname TEXT NOT NULL,
             default_values TEXT,
-            type TEXT NOT NULL CHECK (type IN ('FromValuesList', 'Constant', 'RunDefined')),
+            type TEXT NOT NULL CHECK (type IN ('File', 'Choice', 'Constant', 'Value', 'FromValuesList', 'RunDefined')),
             FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE
         )
         "#,
@@ -110,9 +115,6 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             creation_date TEXT NOT NULL,
             run_sequencer TEXT NOT NULL,
             run_flowcellid TEXT NOT NULL,
-            sample_sheet_adn_path TEXT NOT NULL,
-            sample_sheet_arn_path TEXT NOT NULL,
-            metadata_path TEXT NOT NULL,
             status TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
             attempt_count INTEGER NOT NULL DEFAULT 0,
@@ -136,9 +138,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             run_date TEXT NOT NULL,
             run_sequencer TEXT NOT NULL,
             run_flowcellid TEXT NOT NULL,
-            sample_sheet_adn_path TEXT NOT NULL,
-            sample_sheet_arn_path TEXT NOT NULL,
-            metadata_path TEXT NOT NULL,
+            pipeline_dir_hash TEXT,
             indir TEXT,
             outdir TEXT,
             status TEXT NOT NULL,
@@ -160,6 +160,91 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     )
     .execute(pool)
     .await?;
+
+    // Migrations for existing databases: add new columns if they don't exist
+    // Formdef: add pipeline_dir_hash
+    let has_pipeline_dir_hash = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Formdef') WHERE name = 'pipeline_dir_hash'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_pipeline_dir_hash == 0 {
+        sqlx::query("ALTER TABLE Formdef ADD COLUMN pipeline_dir_hash TEXT")
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    // Formdef: add template_path
+    let has_template_path = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Formdef') WHERE name = 'template_path'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_template_path == 0 {
+        sqlx::query("ALTER TABLE Formdef ADD COLUMN template_path TEXT")
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    // Formdef: add dev_mode
+    let has_dev_mode = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Formdef') WHERE name = 'dev_mode'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_dev_mode == 0 {
+        sqlx::query("ALTER TABLE Formdef ADD COLUMN dev_mode BOOLEAN NOT NULL DEFAULT 0")
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    // Formdef: add dev_branch
+    let has_dev_branch = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Formdef') WHERE name = 'dev_branch'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_dev_branch == 0 {
+        sqlx::query("ALTER TABLE Formdef ADD COLUMN dev_branch TEXT")
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    // Formdef: add commit_hash
+    let has_commit_hash = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Formdef') WHERE name = 'commit_hash'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_commit_hash == 0 {
+        sqlx::query("ALTER TABLE Formdef ADD COLUMN commit_hash TEXT")
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    // Attempts: add pipeline_dir_hash
+    let has_attempt_pipeline_dir_hash = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM pragma_table_info('Attempts') WHERE name = 'pipeline_dir_hash'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    if has_attempt_pipeline_dir_hash == 0 {
+        sqlx::query("ALTER TABLE Attempts ADD COLUMN pipeline_dir_hash TEXT")
+            .execute(pool)
+            .await
+            .ok();
+    }
 
     Ok(())
 }

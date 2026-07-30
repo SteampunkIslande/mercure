@@ -29,29 +29,34 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
         }
     };
 
-    // Si le fichier de launcher n'existe plus, afficher une erreur
-    if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
-        return Template::render(
-            "common/error",
-            context! {
-                title:"Launcher manquant",
-                h2:"Launcher manquant",
-                message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
-            },
-        );
-    }
+    // For YAML-based forms (template_path present), skip launcher checks
+    let is_yaml_form = form_def.template_path.is_some();
 
-    // Vérifier si le pipeline est archivé (révision git différente)
-    let pipeline_is_archived = is_pipeline_archived(&form_def);
-    if pipeline_is_archived {
-        return Template::render(
-            "common/error",
-            context! {
-                title: "Pipeline archivé",
-                h2: "Pipeline archivé",
-                message: format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
-            },
-        );
+    if !is_yaml_form {
+        // Si le fichier de launcher n'existe plus, afficher une erreur
+        if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
+            return Template::render(
+                "common/error",
+                context! {
+                    title:"Launcher manquant",
+                    h2:"Launcher manquant",
+                    message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
+                },
+            );
+        }
+
+        // Vérifier si le pipeline est archivé (révision git différente)
+        let pipeline_is_archived = is_pipeline_archived(&form_def);
+        if pipeline_is_archived {
+            return Template::render(
+                "common/error",
+                context! {
+                    title: "Pipeline archivé",
+                    h2: "Pipeline archivé",
+                    message: format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
+                },
+            );
+        }
     }
 
     // List directories at the top level of sequencers_folder

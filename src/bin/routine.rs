@@ -11,9 +11,9 @@ use tokio::task::JoinError as TokioJoinError;
 use tokio::time::sleep;
 
 use sqlx::SqlitePool;
-use std::fs::{Permissions, create_dir_all, exists};
+use std::fs::{create_dir_all, exists};
 use std::io::Write;
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -28,6 +28,7 @@ use tokio::sync::watch;
 use mercure_lib::models::HgAttempt;
 use mercure_lib::models::RunStatus;
 use mercure_lib::pipeline_exec::find_errors;
+use mercure_lib::template_render::{render_template_from_file, TemplateRenderError};
 
 #[derive(Error, Debug)]
 enum RoutineError {
@@ -45,12 +46,16 @@ enum RoutineError {
     TokioJoin(#[from] TokioJoinError),
     #[error(transparent)]
     InvalidRegex(#[from] RegexError),
+    #[error(transparent)]
+    TemplateRender(#[from] TemplateRenderError),
     #[error("Le dossier d'entrée {0} est introuvable")]
     IndirNotFound(String),
     #[error("Aucun dossier d'entrée spécifié")]
     NoIndir,
     #[error("Impossible de déterminer si le run est terminé: {0}")]
     CheckRunCompletedError(String),
+    #[error("Erreur lors du clone du dépôt de pipelines: {0}")]
+    GitCloneError(String),
 }
 
 /// Fonction de gestion du dossier des pipelines.
@@ -327,21 +332,84 @@ fn get_indir_outdir_for_illumina(
     Ok((raw_dir.join(bcl_dir_base), output_dir))
 }
 
+/// Clone the pipelines repo into the output directory and checkout the appropriate commit/branch.
+///
+/// Returns the path to the cloned pipelines directory.
+fn clone_pipelines_repo(
+    output_dir: &Path,
+    form: &HgFormDef,
+) -> Result<PathBuf, RoutineError> {
+    let config = get_mercure_config();
+    let pipelines_dest = output_dir.join("pipelines");
+
+    if pipelines_dest.exists() {
+        std::fs::remove_dir_all(&pipelines_dest)?;
+    }
+
+    let clone_output = Command::new("git")
+        .arg("clone")
+        .arg(&config.pipelines_repo_url)
+        .arg(&pipelines_dest)
+        .output()
+        .map_err(|e| RoutineError::GitCloneError(format!("git clone failed: {e}")))?;
+
+    if !clone_output.status.success() {
+        return Err(RoutineError::GitCloneError(format!(
+            "git clone failed: {}",
+            String::from_utf8_lossy(&clone_output.stderr)
+        )));
+    }
+
+    // Checkout the appropriate commit/branch
+    if form.dev_mode {
+        if let Some(ref branch) = form.dev_branch {
+            let checkout_output = Command::new("git")
+                .current_dir(&pipelines_dest)
+                .arg("checkout")
+                .arg(branch)
+                .output()
+                .map_err(|e| RoutineError::GitCloneError(format!("git checkout {branch} failed: {e}")))?;
+
+            if !checkout_output.status.success() {
+                return Err(RoutineError::GitCloneError(format!(
+                    "git checkout {branch} failed: {}",
+                    String::from_utf8_lossy(&checkout_output.stderr)
+                )));
+            }
+            info!("Pipelines repo checked out branch: {}", branch);
+        }
+    } else if let Some(ref commit) = form.commit_hash {
+        let checkout_output = Command::new("git")
+            .current_dir(&pipelines_dest)
+            .arg("checkout")
+            .arg(commit)
+            .output()
+            .map_err(|e| RoutineError::GitCloneError(format!("git checkout {commit} failed: {e}")))?;
+
+        if !checkout_output.status.success() {
+            return Err(RoutineError::GitCloneError(format!(
+                "git checkout {commit} failed: {}",
+                String::from_utf8_lossy(&checkout_output.stderr)
+            )));
+        }
+        info!("Pipelines repo checked out commit: {}", commit);
+    }
+
+    Ok(pipelines_dest)
+}
+
 /// Cette fonction crée un fichier tel que spécifié dans le formulaire
-/// C'est HgRun qui a un membre dédié
 async fn start_analysis(
     attempt: &HgAttempt,
-    _form: &HgFormDef,
+    form: &HgFormDef,
     input_dir: &Path,
     output_dir: &Path,
     pool: &sqlx::SqlitePool,
 ) -> Result<(), RoutineError> {
     let config = get_mercure_config();
 
-    // En mode reproduction, le dossier de pipeline sera cloné dans un dossier temporaire avec le commit préalablement enregistré dans la tentative
     let pipeline_base_dir = Path::new(&config.pipeline_dir);
 
-    // Création du dossier d'analyse si nécessaire, *avant* de copier les fichiers!
     if !output_dir.exists() {
         if let Err(e) = create_dir_all(output_dir) {
             error!("Erreur lors de la création du dossier d'analyse: {}", e);
@@ -350,45 +418,24 @@ async fn start_analysis(
         info!("Dossier d'analyse créé: {}", output_dir.display());
     }
 
-    //Copie des fichiers adn.csv, arn.csv et metadata si présents
-    if std::path::Path::new(&attempt.sample_sheet_adn_path).exists() {
-        let dest_adn_path = input_dir.join("adn.csv");
-        std::fs::copy(&attempt.sample_sheet_adn_path, &dest_adn_path)?;
-        std::fs::set_permissions(&dest_adn_path, Permissions::from_mode(0o644))?;
+    // Clone pipelines repo into outdir for the new template-based approach
+    let cloned_pipelines_dir = if form.template_path.is_some() {
+        Some(clone_pipelines_repo(output_dir, form)?)
+    } else {
+        None
+    };
 
-        info!(
-            "Fichier ADN copié de {} vers {}",
-            &attempt.sample_sheet_adn_path,
-            dest_adn_path.display()
-        );
-    }
-    if std::path::Path::new(&attempt.sample_sheet_arn_path).exists() {
-        let dest_arn_path = input_dir.join("arn.csv");
-        std::fs::copy(&attempt.sample_sheet_arn_path, &dest_arn_path)?;
-        std::fs::set_permissions(&dest_arn_path, Permissions::from_mode(0o644))?;
-
-        info!(
-            "Fichier ARN copié de {} vers {}",
-            &attempt.sample_sheet_arn_path,
-            dest_arn_path.display()
-        );
-    }
-    if std::path::Path::new(&attempt.metadata_path).exists()
-        && let Some(src_metadata_filename) =
-            std::path::Path::new(&attempt.metadata_path).file_name()
-    {
-        let dest_metadata_path = input_dir.join(src_metadata_filename);
-        std::fs::copy(&attempt.metadata_path, &dest_metadata_path)?;
-        std::fs::set_permissions(&dest_metadata_path, Permissions::from_mode(0o644))?;
-
-        info!(
-            "Fichier Metadata copié de {} vers {}",
-            &attempt.metadata_path,
-            dest_metadata_path.display()
-        );
-    }
     // Génération du script d'analyse
-    generate_script(input_dir, output_dir, pipeline_base_dir, attempt, pool).await?;
+    generate_script(
+        input_dir,
+        output_dir,
+        pipeline_base_dir,
+        attempt,
+        form,
+        pool,
+        cloned_pipelines_dir.as_deref(),
+    )
+    .await?;
 
     Ok(())
 }
@@ -480,27 +527,13 @@ async fn generate_script(
     output_dir: &Path,
     pipeline_base_dir: &Path,
     attempt: &HgAttempt,
+    form: &HgFormDef,
     pool: &SqlitePool,
+    cloned_pipelines_dir: Option<&Path>,
 ) -> Result<(), RoutineError> {
     let config = mercure_lib::config::get_mercure_config();
 
-    // Obtention des informations sur le pipeline et le launcher choisis
     let run: HgRun = HgRun::get_run_from_id(attempt.run_id, pool).await?;
-
-    // Le chemin du launcher doit être absolu. C'est ce chemin qui va se trouver dans le script généré
-    let launcher_abs_path = format!(
-        "{base}/{pipeline}/launchers/{launcher}",
-        base = pipeline_base_dir.display(),
-        pipeline = run.form.pipeline_name,
-        launcher = run.form.launcher_name
-    );
-    if !exists(&launcher_abs_path)? {
-        return Err(IoError::new(
-            std::io::ErrorKind::NotFound,
-            format!("Le launcher {} est introuvable!", &launcher_abs_path),
-        )
-        .into());
-    }
 
     let script_path = format!(
         "{jobs_dir}/TODO/job-{run_id:010}-{attempt_number:010}.sh",
@@ -516,17 +549,81 @@ async fn generate_script(
         .into());
     }
 
-    let exported_vars = attempt
-        .user_defined_vars
-        .iter()
-        .map(|(k, v)| format!(r#"export {k}="{v}""#))
-        .chain([
-            format!(r#"export INDIR="{}""#, input_dir.display()),
-            format!(r#"export OUTDIR="{}""#, output_dir.display()),
-            format!(r#"export RUN_NAME="{}""#, &run.run_name),
-        ])
-        .collect::<Vec<_>>()
-        .join("\n");
+    let log_file_name = format!(
+        "{}/job-{:010}-{:010}.log",
+        config.logs_dir, attempt.run_id, attempt.attempt_number
+    );
+
+    // Determine which approach to use: new minijinja template or old launcher
+    let core_content = if let (Some(template_path), Some(cloned_dir)) =
+        (form.template_path.as_ref(), cloned_pipelines_dir)
+    {
+        // New approach: render minijinja template from cloned pipelines repo
+        let pipelines_dir_str = cloned_dir.display().to_string();
+        render_template_from_file(
+            cloned_dir,
+            &form.pipeline_name,
+            template_path,
+            &attempt.user_defined_vars,
+            &input_dir.display().to_string(),
+            &output_dir.display().to_string(),
+            &run.run_name,
+            attempt.run_id,
+            attempt.attempt_number,
+            &pipelines_dir_str,
+        )?
+    } else {
+        // Old approach: read launcher and strip shebang
+        let launcher_abs_path = format!(
+            "{base}/{pipeline}/launchers/{launcher}",
+            base = pipeline_base_dir.display(),
+            pipeline = form.pipeline_name,
+            launcher = form.launcher_name
+        );
+        if !exists(&launcher_abs_path)? {
+            return Err(IoError::new(
+                std::io::ErrorKind::NotFound,
+                format!("Le launcher {} est introuvable!", &launcher_abs_path),
+            )
+            .into());
+        }
+
+        let launcher_content = std::fs::read_to_string(&launcher_abs_path)?
+            .split('\n')
+            .filter(|s| !s.starts_with("#!"))
+            .collect::<Vec<&str>>()
+            .join("\n");
+
+        let exported_vars = attempt
+            .user_defined_vars
+            .iter()
+            .map(|(k, v)| format!(r#"export {k}="{v}""#))
+            .chain([
+                format!(r#"export INDIR="{}""#, input_dir.display()),
+                format!(r#"export OUTDIR="{}""#, output_dir.display()),
+                format!(r#"export RUN_NAME="{}""#, &run.run_name),
+            ])
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            r#"{exported_vars}
+
+launcher()(
+{launcher_content}
+)
+
+# Exécuter launcher (s'exécute dans un subshell, le code de retour est celui du launcher)
+launcher
+res=$?"#,
+            exported_vars = exported_vars,
+            launcher_content = launcher_content,
+        )
+    };
+
+    let pipeline_dir_for_script = cloned_pipelines_dir
+        .map(|d| d.display().to_string())
+        .unwrap_or_else(|| pipeline_base_dir.display().to_string());
 
     let mut script_file = std::fs::OpenOptions::new()
         .mode(0o775)
@@ -534,14 +631,6 @@ async fn generate_script(
         .create(true)
         .truncate(true)
         .open(&script_path)?;
-
-    // Un launcher peut contenir une ligne shebang (#!). Cette ligne n'est pertinente qu'en standalone.
-    // Dans notre cas, on veut exécuter le launcher dans le contexte du script généré, donc on ignore cette ligne.
-    let launcher_content = std::fs::read_to_string(&launcher_abs_path)?
-        .split('\n')
-        .filter(|s| !s.starts_with("#!"))
-        .collect::<Vec<&str>>()
-        .join("\n");
 
     write!(
         &mut script_file,
@@ -556,16 +645,7 @@ export HG_RUN_ID="{run_id}"
 export PATH=/usr/bin:/usr/local/bin:$PATH
 source /etc/profile
 
-{exported_vars}
-
-launcher()(
-{launcher_content}
-)
-
-# Exécuter launcher (s'exécute dans un subshell, le code de retour est celui du launcher)
-launcher
-# Récupérer le code de retour du launcher
-res=$?
+{core_content}
 
 if [[ $res -eq 0 ]];then
     export HG_STATUS=SUCCESS
@@ -579,19 +659,17 @@ export HG_LOG_FILE="{log_file_name}"
 # Rediriger la sortie de ce script vers /dev/null pour éviter d'écrire dans $HG_LOG_FILE (étant donné que post_run_script doit lire ce fichier, risque de boucle infinie).
 "{post_run_script}" 2>&1 > /dev/null
 
-# On quitte le job script avec le code de retour du launcher
+# On quitte le job script avec le code de retour
 exit $res
 
 "#,
-        pipeline_dir = pipeline_base_dir.display(),
-        pipeline_name = run.form.pipeline_name,
-        log_file_name = format!(
-            "{}/job-{:010}-{:010}.log",
-            config.logs_dir, attempt.run_id, attempt.attempt_number
-        ),
+        pipeline_dir = pipeline_dir_for_script,
+        pipeline_name = form.pipeline_name,
+        log_file_name = log_file_name,
         attempt_number = attempt.attempt_number,
         run_id = attempt.run_id,
-        post_run_script = config.post_run_script
+        post_run_script = config.post_run_script,
+        core_content = core_content,
     )?;
 
     Ok(())

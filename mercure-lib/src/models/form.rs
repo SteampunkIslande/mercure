@@ -32,13 +32,13 @@ pub struct HgFormListItem {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum UserDefinedVar {
-    FromValuesList {
-        allowed: Vec<String>,
+    #[default]
+    File,
+    Choice {
+        choices: Vec<String>,
     },
     Constant(String),
-    #[default]
-    RunDefined,
-    Invalid,
+    Value,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,7 +51,6 @@ pub struct FormStatusInfo {
 
 /// Struct used when submitting a new form definition
 /// Only used when sending data from the browser to the server
-/// See editform.html.jinja2 for more info
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgFormDefSubmission {
     pub pipeline_name: String,
@@ -62,11 +61,13 @@ pub struct HgFormDefSubmission {
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
     pub indir_type: IndirType,
+    pub template_path: Option<String>,
+    pub dev_mode: bool,
+    pub dev_branch: Option<String>,
+    pub commit_hash: Option<String>,
 }
 
 /// Struct used to define a form template
-/// Only read from JSON, defined within the browser
-/// See editform.html.jinja2 for more info
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct HgFormDef {
     pub form_id: i64,
@@ -79,6 +80,11 @@ pub struct HgFormDef {
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
     pub indir_type: IndirType,
     pub latest_launcher_revision: Option<String>,
+    pub pipeline_dir_hash: Option<String>,
+    pub template_path: Option<String>,
+    pub dev_mode: bool,
+    pub dev_branch: Option<String>,
+    pub commit_hash: Option<String>,
 }
 
 /// This type helps admin users define a form
@@ -118,7 +124,8 @@ impl HgFormDef {
                 "Pas de pipeline défini",
             )));
         }
-        if new_formdef.launcher_name.is_empty() {
+        let is_yaml_form = new_formdef.template_path.is_some();
+        if !is_yaml_form && new_formdef.launcher_name.is_empty() {
             return Err(ModelError::FormError(String::from(
                 "Pas de launcher défini",
             )));
@@ -140,19 +147,21 @@ impl HgFormDef {
             )));
         }
 
-        let current_launcher_revision = {
+        let current_launcher_revision = if is_yaml_form {
+            None
+        } else {
             let config = config::get_mercure_config();
             let launcher_path = Path::new(&config.pipeline_dir)
                 .join(&new_formdef.pipeline_name)
                 .join("launchers")
                 .join(&new_formdef.launcher_name);
-            get_current_revision(&launcher_path)?
+            Some(get_current_revision(&launcher_path)?)
         };
 
         let form_id: i64 = sqlx::query(
             r#"
-            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version, indir_type,latest_launcher_revision)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Formdef (pipeline_name, launcher_name, form_name, enabled, version, indir_type, latest_launcher_revision, template_path, dev_mode, dev_branch, commit_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING form_id
             "#,
         )
@@ -166,7 +175,11 @@ impl HgFormDef {
             IndirType::AnalysisDir => "ANALYSIS_DIR",
             IndirType::OntDir => "ONT_DIR",
         })
-        .bind(current_launcher_revision)
+        .bind(&current_launcher_revision)
+        .bind(&new_formdef.template_path)
+        .bind(new_formdef.dev_mode)
+        .bind(&new_formdef.dev_branch)
+        .bind(&new_formdef.commit_hash)
         .fetch_one(pool)
         .await?
         .try_get(0usize)?;
@@ -174,12 +187,12 @@ impl HgFormDef {
         // Insert user_defined_vars into UDV table
         for (varname, udv) in new_formdef.user_defined_vars.unwrap_or_default() {
             match udv {
-                UserDefinedVar::FromValuesList { allowed } => {
-                    let values = allowed.join("\n");
+                UserDefinedVar::Choice { choices } => {
+                    let values = choices.join("\n");
                     sqlx::query(
                         r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
-                        VALUES (?, ?, ?, 'FromValuesList')
+                        VALUES (?, ?, ?, 'Choice')
                         "#,
                     )
                     .bind(form_id)
@@ -201,11 +214,11 @@ impl HgFormDef {
                     .execute(pool)
                     .await?;
                 }
-                UserDefinedVar::RunDefined => {
+                UserDefinedVar::File => {
                     sqlx::query(
                         r#"
                         INSERT INTO UDV (form_id, varname, default_values, type)
-                        VALUES (?, ?, NULL, 'RunDefined')
+                        VALUES (?, ?, NULL, 'File')
                         "#,
                     )
                     .bind(form_id)
@@ -213,8 +226,17 @@ impl HgFormDef {
                     .execute(pool)
                     .await?;
                 }
-                _ => {
-                    eprintln!("Should be unreachable");
+                UserDefinedVar::Value => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO UDV (form_id, varname, default_values, type)
+                        VALUES (?, ?, NULL, 'Value')
+                        "#,
+                    )
+                    .bind(form_id)
+                    .bind(varname)
+                    .execute(pool)
+                    .await?;
                 }
             }
         }
@@ -385,6 +407,11 @@ impl HgFormDef {
             _ => IndirType::BclDir,
         };
         def.latest_launcher_revision = row.try_get("latest_launcher_revision")?;
+        def.pipeline_dir_hash = row.try_get("pipeline_dir_hash").ok();
+        def.template_path = row.try_get("template_path").ok();
+        def.dev_mode = row.try_get("dev_mode").unwrap_or(false);
+        def.dev_branch = row.try_get("dev_branch").ok();
+        def.commit_hash = row.try_get("commit_hash").ok();
 
         def.groups = sqlx::query(
             r#"SELECT g.group_id,g.group_name FROM Groups g JOIN FormdefHasGroup fg ON g.group_id=fg.group_id WHERE fg.form_id = ? "#,
@@ -406,10 +433,10 @@ impl HgFormDef {
                 .iter()
                 .filter_map(|row| {
                     let udv = match row.try_get("type").ok()? {
-                        "FromValuesList" => (
+                        "Choice" => (
                             row.try_get("varname").ok()?,
-                            UserDefinedVar::FromValuesList {
-                                allowed: row
+                            UserDefinedVar::Choice {
+                                choices: row
                                     .try_get::<String, &str>("default_values")
                                     .ok()?
                                     .split("\n")
@@ -417,11 +444,25 @@ impl HgFormDef {
                                     .collect(),
                             },
                         ),
-                        "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::RunDefined),
+                        "File" => (row.try_get("varname").ok()?, UserDefinedVar::File),
+                        "Value" => (row.try_get("varname").ok()?, UserDefinedVar::Value),
                         "Constant" => (
                             row.try_get("varname").ok()?,
                             UserDefinedVar::Constant(row.try_get("default_values").ok()?),
                         ),
+                        // Backward compat: old type names
+                        "FromValuesList" => (
+                            row.try_get("varname").ok()?,
+                            UserDefinedVar::Choice {
+                                choices: row
+                                    .try_get::<String, &str>("default_values")
+                                    .ok()?
+                                    .split("\n")
+                                    .map(String::from)
+                                    .collect(),
+                            },
+                        ),
+                        "RunDefined" => (row.try_get("varname").ok()?, UserDefinedVar::Value),
                         _ => {
                             return None;
                         }
@@ -502,8 +543,23 @@ impl HgFormDef {
         form_id: i64,
         new_revision: String,
     ) -> Result<(), ModelError> {
-        // Before updating, make sure that the udv names are exactly the same as before
+        let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
 
+        // For YAML-based forms (template_path present), simply update the revision
+        if form.template_path.is_some() {
+            sqlx::query(
+                r#"
+            UPDATE Formdef SET latest_launcher_revision = ? WHERE form_id = ?
+            "#,
+            )
+            .bind(new_revision)
+            .bind(form_id)
+            .execute(pool)
+            .await?;
+            return Ok(());
+        }
+
+        // For launcher-based forms, verify UDV names haven't changed before updating
         let udv_before = sqlx::query(
             r#"
         SELECT varname FROM UDV WHERE form_id = ?
@@ -517,7 +573,6 @@ impl HgFormDef {
         .collect::<HashSet<String>>();
 
         let udv_after = parse_launcher(&std::fs::read_to_string({
-            let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
             let config = get_mercure_config();
 
             Path::new(&config.pipeline_dir)
@@ -557,15 +612,16 @@ mod tests {
         let mut user_defined_vars = HashMap::new();
         user_defined_vars.insert(
             "species".to_string(),
-            UserDefinedVar::FromValuesList {
-                allowed: vec!["human".to_string(), "mouse".to_string()],
+            UserDefinedVar::Choice {
+                choices: vec!["human".to_string(), "mouse".to_string()],
             },
         );
         user_defined_vars.insert(
             "project".to_string(),
             UserDefinedVar::Constant("CancerStudy".to_string()),
         );
-        user_defined_vars.insert("batch".to_string(), UserDefinedVar::RunDefined);
+        user_defined_vars.insert("batch".to_string(), UserDefinedVar::Value);
+        user_defined_vars.insert("samplesheet".to_string(), UserDefinedVar::File);
 
         let form_def = HgFormDef {
             pipeline_name: "RNASeq".to_string(),
@@ -578,14 +634,18 @@ mod tests {
             indir_type: IndirType::BclDir,
             form_id: 0,
             latest_launcher_revision: None,
+            pipeline_dir_hash: None,
+            template_path: None,
+            dev_mode: false,
+            dev_branch: None,
+            commit_hash: None,
         };
 
         let json = serde_json::to_string_pretty(&form_def).unwrap();
         println!("{json}");
-        // Optionally, assert that JSON contains expected fields
         assert!(json.contains("RNASeqForm"));
         assert!(json.contains("species"));
-        assert!(json.contains("FromValuesList"));
+        assert!(json.contains("Choice"));
 
         let roundtrip_test: HgFormDef = serde_json::from_str(&json).unwrap();
         assert_eq!(roundtrip_test, form_def);

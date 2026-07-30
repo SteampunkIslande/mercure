@@ -67,12 +67,24 @@
                             document.getElementById(`var_type_${index}`).value = "Constant";
                             document.getElementById(`var_values_${index}`).style.display = "block";
                             document.getElementById(`var_content_${index}`).value = original.Constant;
+                        } else if (original.Choice) {
+                            document.getElementById(`var_type_${index}`).value = "Choice";
+                            document.getElementById(`var_values_${index}`).style.display = "block";
+                            document.getElementById(`var_content_${index}`).value = original.Choice.choices.join("\n");
                         } else if (original.FromValuesList) {
-                            document.getElementById(`var_type_${index}`).value = "FromValuesList";
+                            document.getElementById(`var_type_${index}`).value = "Choice";
                             document.getElementById(`var_values_${index}`).style.display = "block";
                             document.getElementById(`var_content_${index}`).value = original.FromValuesList.allowed.join("\n");
+                        } else if (original.Value) {
+                            document.getElementById(`var_type_${index}`).value = "Value";
+                            document.getElementById(`var_content_${index}`).style.display = "none";
+                            document.getElementById(`var_content_label_${index}`).style.display = "none";
                         } else if (original.RunDefined) {
-                            document.getElementById(`var_type_${index}`).value = "RunDefined";
+                            document.getElementById(`var_type_${index}`).value = "Value";
+                            document.getElementById(`var_content_${index}`).style.display = "none";
+                            document.getElementById(`var_content_label_${index}`).style.display = "none";
+                        } else if (original.File) {
+                            document.getElementById(`var_type_${index}`).value = "File";
                             document.getElementById(`var_content_${index}`).style.display = "none";
                             document.getElementById(`var_content_label_${index}`).style.display = "none";
                         }
@@ -259,10 +271,13 @@
                 const varContent = item.querySelector("textarea")?.value || null;
 
                 userVars[varName] = {};
-                if (varType === "FromValuesList") {
-                    userVars[varName][varType] = { allowed: varContent.split("\n") };
+                if (varType === "Choice") {
+                    userVars[varName][varType] = { choices: varContent.split("\n") };
                 }
-                if (varType === "RunDefined") {
+                if (varType === "Value") {
+                    userVars[varName][varType] = null;
+                }
+                if (varType === "File") {
                     userVars[varName][varType] = null;
                 }
                 if (varType === "Constant") {
@@ -322,6 +337,10 @@
                 enabled: true,
                 version: parseInt(version) || 1,
                 indir_type: indirType,
+                template_path: null,
+                dev_mode: false,
+                dev_branch: null,
+                commit_hash: null,
             };
 
             try {

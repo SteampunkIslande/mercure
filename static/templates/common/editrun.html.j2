@@ -225,7 +225,8 @@
                     hidden.id = 'udv_' + key;
                     hidden.value = value.Constant;
                     container.appendChild(hidden);
-                } else if (typeof value === 'object' && value.FromValuesList) {
+                } else if (typeof value === 'object' && (value.Choice || value.FromValuesList)) {
+                    const choices = value.Choice ? value.Choice.choices : value.FromValuesList.allowed;
                     const div = document.createElement('div');
                     const label = document.createElement('label');
                     label.for = 'udv_' + key;
@@ -234,7 +235,7 @@
                     div.appendChild(document.createTextNode(' '));
                     const select = document.createElement('select');
                     select.id = 'udv_' + key;
-                    value.FromValuesList.allowed.forEach(val => {
+                    choices.forEach(val => {
                         const option = document.createElement('option');
                         option.value = val;
                         option.textContent = val;
@@ -248,7 +249,7 @@
                     select.appendChild(emptyOption);
                     div.appendChild(select);
                     container.appendChild(div);
-                } else if (value === 'RunDefined') {
+                } else if (value === 'Value' || value === 'RunDefined') {
                     const div = document.createElement('div');
                     const label = document.createElement('label');
                     label.for = 'udv_' + key;
@@ -257,6 +258,18 @@
                     div.appendChild(document.createTextNode(' '));
                     const input = document.createElement('input');
                     input.type = 'text';
+                    input.id = 'udv_' + key;
+                    div.appendChild(input);
+                    container.appendChild(div);
+                } else if (value === 'File') {
+                    const div = document.createElement('div');
+                    const label = document.createElement('label');
+                    label.for = 'udv_' + key;
+                    label.textContent = key + ':';
+                    div.appendChild(label);
+                    div.appendChild(document.createTextNode(' '));
+                    const input = document.createElement('input');
+                    input.type = 'file';
                     input.id = 'udv_' + key;
                     div.appendChild(input);
                     container.appendChild(div);
@@ -471,12 +484,23 @@
             // Collect user_defined_vars
             const userDefinedVars = {};
             const udvElements = document.querySelectorAll('[id^="udv_"]');
-            udvElements.forEach(el => {
-                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+            for (const el of udvElements) {
+                if (el.tagName === 'INPUT' && el.type === 'file') {
+                    const key = el.id.replace('udv_', '');
+                    if (el.files.length > 0) {
+                        try {
+                            const path = await uploadFile(el.files[0]);
+                            userDefinedVars[key] = path;
+                        } catch (error) {
+                            showMessage("error", `Erreur upload ${key}: ${error.message}`);
+                            return;
+                        }
+                    }
+                } else if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
                     const key = el.id.replace('udv_', '');
                     userDefinedVars[key] = el.value;
                 }
-            });
+            }
 
             const run_date = document.getElementById('run_date').value;
             if (!run_date) {

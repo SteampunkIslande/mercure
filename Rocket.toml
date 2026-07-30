@@ -28,6 +28,7 @@ ont_dir = "/home/charles/mercure-arena/data/raw/sequenceurs/GRIDION/output"
 
 check_run_completed = "/home/charles/mercure/scripts/run-completed.sh"
 post_run_script = "/home/charles/mercure/scripts/post-run-script.sh"
+pipelines_repo_url = "http://127.0.0.1:3000/mercure/pipelines.git"
 
 cli_colors = true
 
@@ -49,3 +50,4 @@ ont_dir = "/data/raw/sequenceurs/GRIDION/output"
 
 check_run_completed = "/OPT/mercure/run-completed.sh"
 post_run_script = "/OPT/mercure/post-run-script.sh"
+pipelines_repo_url = "http://gitea:3000/mercure/pipelines.git"

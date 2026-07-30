@@ -1,4 +1,3 @@
-use crate::models::IndirType;
 use crate::models::User;
 
 use super::form::HgFormDef;
@@ -151,7 +150,7 @@ impl HgRun {
         let creation_date = OffsetDateTime::now_utc().to_string();
 
         // Obtenir les informations du formulaire
-        let form = HgFormDef::get_formdef_from_id(pool, run_submission.form_id).await?;
+        let _form = HgFormDef::get_formdef_from_id(pool, run_submission.form_id).await?;
 
         // Insérer dans la table Runs
         let user_defined_vars_json = serde_json::to_string(&run_submission.user_defined_vars)
@@ -186,7 +185,7 @@ impl HgRun {
     pub async fn edit_run(run_edit: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
         eprintln!("Received run edit {:?}", run_edit);
 
-        let form = HgFormDef::get_formdef_from_id(pool, run_edit.form_id).await?;
+        let _form = HgFormDef::get_formdef_from_id(pool, run_edit.form_id).await?;
 
         let user_defined_vars_json = serde_json::to_string(&run_edit.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
