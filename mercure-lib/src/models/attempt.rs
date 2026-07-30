@@ -1,11 +1,11 @@
 use crate::models::{HgRun, ModelError, RunStatus};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::str::FromStr;
-use time::OffsetDateTime;
 
 /// Created every time we attempt to analyze an HgRun.
 ///
@@ -16,14 +16,14 @@ use time::OffsetDateTime;
 pub struct HgAttempt {
     pub attempt_number: i64,
     pub run_id: i64,
-    pub attempt_date: String,
+    pub attempt_date: NaiveDateTime,
     pub user_defined_vars: HashMap<String, String>,
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
+
+    pub pipeline_dir_hash: String,
+
     pub indir: Option<String>,
     pub outdir: Option<String>,
 
@@ -44,8 +44,8 @@ impl HgAttempt {
 
         sqlx::query(
             r#"
-            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir, status, comment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, indir, outdir, status, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
             "#,
         )
         .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
@@ -55,9 +55,6 @@ impl HgAttempt {
         .bind(&run.run_date)
         .bind(&run.run_sequencer)
         .bind(&run.run_flowcellid)
-        .bind(&run.sample_sheet_adn_path)
-        .bind(&run.sample_sheet_arn_path)
-        .bind(&run.metadata_path)
         .bind(&run.indir)
         .bind(&run.outdir)
         .bind(run.status.to_string())
@@ -80,9 +77,7 @@ impl HgAttempt {
             run_date: run.run_date.clone(),
             run_sequencer: run.run_sequencer.clone(),
             run_flowcellid: run.run_flowcellid.clone(),
-            sample_sheet_adn_path: run.sample_sheet_adn_path.clone(),
-            sample_sheet_arn_path: run.sample_sheet_arn_path.clone(),
-            metadata_path: run.metadata_path.clone(),
+            pipeline_dir_hash: run.form.pipeline_dir_hash.clone(),
             indir: run.indir.clone(),
             outdir: run.outdir.clone(),
             status: RunStatus::Idle,
@@ -125,11 +120,9 @@ impl HgAttempt {
             run_date: row.try_get("run_date")?,
             run_sequencer: row.try_get("run_sequencer")?,
             run_flowcellid: row.try_get("run_flowcellid")?,
-            sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
-            sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
-            metadata_path: row.try_get("metadata_path")?,
             indir: row.try_get("indir").ok(),
             outdir: row.try_get("outdir").ok(),
+            pipeline_dir_hash: row.try_get("pipeline_dir_hash")?,
             status,
             comment: row.try_get("comment")?,
         };
@@ -174,9 +167,7 @@ impl HgAttempt {
                     run_date: row.try_get("run_date").ok()?,
                     run_sequencer: row.try_get("run_sequencer").ok()?,
                     run_flowcellid: row.try_get("run_flowcellid").ok()?,
-                    sample_sheet_adn_path: row.try_get("sample_sheet_adn_path").ok()?,
-                    sample_sheet_arn_path: row.try_get("sample_sheet_arn_path").ok()?,
-                    metadata_path: row.try_get("metadata_path").ok()?,
+                    pipeline_dir_hash: row.try_get("pipeline_dir_hash").ok()?,
                     indir: row.try_get("indir").ok(),
                     outdir: row.try_get("outdir").ok(),
                     status,

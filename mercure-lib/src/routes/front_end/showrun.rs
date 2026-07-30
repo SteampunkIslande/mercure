@@ -139,21 +139,6 @@ pub async fn show_run_get(
                 })
                 .unwrap_or_default();
 
-            let samplesheet_adn_static_name = filename_to_static_served_name(
-                &run.sample_sheet_adn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let samplesheet_arn_static_name = filename_to_static_served_name(
-                &run.sample_sheet_arn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let metadata_static_name =
-                filename_to_static_served_name(&run.metadata_path, &config.upload_dir, "/uploads");
-
             Template::render(
                 "common/idlerun",
                 context! {

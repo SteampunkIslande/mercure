@@ -76,10 +76,6 @@ pub struct HgRunEdit {
     pub run_sequencer: String,
     pub run_flowcellid: String,
 
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
     pub user_defined_vars: HashMap<String, String>,
     pub indir: Option<String>,
     pub outdir: Option<String>,
@@ -90,15 +86,12 @@ pub struct HgRunEdit {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HgRunSubmission {
     pub form_id: i64,
+
     pub user_id: i64,
     pub run_name: String,
     pub run_date: String,
     pub run_sequencer: String,
     pub run_flowcellid: String,
-
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
 
     pub user_defined_vars: HashMap<String, String>,
     pub indir: Option<String>,
@@ -137,11 +130,6 @@ pub struct HgRun {
     /// Date of creation of this run in the database. Not modifiable with new attempts.
     pub creation_date: String,
 
-    /// Paths to the SampleSheets and metadata file, as defined by the user. Can be modified with new attempts.
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
     /// Input and output directories for the run, determined based on form's indir_type
     pub indir: Option<String>,
     pub outdir: Option<String>,
@@ -169,19 +157,10 @@ impl HgRun {
         let user_defined_vars_json = serde_json::to_string(&run_submission.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_submission.sample_sheet_adn_path.is_empty()
-            && run_submission.sample_sheet_arn_path.is_empty()
-            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
-        {
-            return Err(ModelError::FormError(
-                "Erreur de soumission d'un run: au moins une SampleSheet est requise (à moins que vous ne partiez d'un dossier d'analyse)".to_string(),
-            ));
-        }
-
         let run_id=sqlx::query(
             r#"
-            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, attempt_count, indir, outdir)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Runs (form_id, user_id, run_name, run_date, run_sequencer, run_flowcellid, status, user_defined_vars, attempt_count, creation_date, indir, outdir)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING run_id
             "#,
         )
@@ -189,15 +168,12 @@ impl HgRun {
         .bind(run_submission.user_id)
         .bind(&run_submission.run_name)
         .bind(&run_submission.run_date)
-        .bind(&creation_date)
         .bind(&run_submission.run_sequencer)
         .bind(&run_submission.run_flowcellid)
-        .bind(&run_submission.sample_sheet_adn_path)
-        .bind(&run_submission.sample_sheet_arn_path)
-        .bind(&run_submission.metadata_path)
         .bind("Idle")
         .bind(&user_defined_vars_json)
         .bind(0)
+        .bind(&creation_date)
         .bind(&run_submission.indir)
         .bind(&run_submission.outdir)
         .fetch_one(pool)
@@ -215,15 +191,6 @@ impl HgRun {
         let user_defined_vars_json = serde_json::to_string(&run_edit.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_edit.sample_sheet_adn_path.is_empty()
-            && run_edit.sample_sheet_arn_path.is_empty()
-            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
-        {
-            return Err(ModelError::FormError(
-                "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
-            ));
-        }
-
         let run: HgRun = Self::get_run_from_id(run_edit.run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
             return Err(ModelError::FormError(
@@ -234,9 +201,9 @@ impl HgRun {
         sqlx::query(
             r#"
             UPDATE Runs SET
-            (user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir)
+            (user_defined_vars, run_date, run_sequencer, run_flowcellid, indir, outdir)
             =
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?)
             WHERE run_id = ?
             "#,
         )
@@ -244,13 +211,11 @@ impl HgRun {
         .bind(&run_edit.run_date)
         .bind(&run_edit.run_sequencer)
         .bind(&run_edit.run_flowcellid)
-        .bind(&run_edit.sample_sheet_adn_path)
-        .bind(&run_edit.sample_sheet_arn_path)
-        .bind(&run_edit.metadata_path)
         .bind(&run_edit.indir)
         .bind(&run_edit.outdir)
         .bind(run_edit.run_id)
-        .execute(pool).await?;
+        .execute(pool)
+        .await?;
 
         Ok(run_edit.run_id)
     }
@@ -273,16 +238,9 @@ impl HgRun {
         let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
 
         // Récupérer l'utilisateur
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
-            FROM Users WHERE id = ?
-            "#,
-        )
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(ModelError::FormError("Utilisateur non trouvé".to_string()))?;
+        let user = User::find_by_id(user_id, pool)
+            .await?
+            .ok_or(ModelError::FormError("Utilisateur non trouvé".to_string()))?;
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars_json: String = row.try_get("user_defined_vars")?;
@@ -305,9 +263,6 @@ impl HgRun {
             creation_date: row.try_get("creation_date")?,
             run_sequencer: row.try_get("run_sequencer")?,
             run_flowcellid: row.try_get("run_flowcellid")?,
-            sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
-            sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
-            metadata_path: row.try_get("metadata_path")?,
             indir: row.try_get("indir").ok(),
             outdir: row.try_get("outdir").ok(),
             status,

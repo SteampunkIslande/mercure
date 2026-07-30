@@ -3,11 +3,6 @@
 # /OPT/JOBS en production
 JOBS_DIR=/home/charles/mercure-arena/OPT/JOBS
 
-# /OPT/mercure/reproducibility-script.sh en production
-REPRODUCIBILITY_SCRIPT_TEMPLATE="/home/charles/mercure/scripts/reproducibility-script-template.sh"
-
-[[ -f $REPRODUCIBILITY_SCRIPT_TEMPLATE ]] || { echo "Erreur: le script de reproductibilité $REPRODUCIBILITY_SCRIPT_TEMPLATE est introuvable, impossible de lancer l'analyse"; exit 1; }
-
 cd "$JOBS_DIR/TODO"
 
 job=$(find . -maxdepth 1 -name '*.sh' | head -n1)
