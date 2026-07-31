@@ -25,7 +25,7 @@ pub enum ModelError {
     #[error(transparent)]
     InvalidRunStatusError(#[from] hgrun::InvalidRunStatusError),
     #[error(transparent)]
-    LauncherCheckError(#[from] crate::launchers_check::LauncherCheckError),
+    LauncherCheckError(#[from] crate::templates_check::TemplateCheckError),
     #[error(transparent)]
     AuthError(#[from] crate::auth::AuthError),
     #[error(transparent)]

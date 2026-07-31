@@ -13,7 +13,7 @@ use crate::config::get_mercure_config;
 use crate::models::Group;
 use crate::models::{HgFormDef, HgRun, RunStatus};
 
-use crate::launchers_check::{exists_launcher, is_pipeline_archived};
+use crate::templates_check::exists_launcher;
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -79,7 +79,7 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
 
                 if !is_yaml_form {
                     // Si le fichier de launcher n'existe plus, afficher une erreur
-                    if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
+                    if !exists_launcher(&form_def.pipeline_name, &form_def.template_name).await {
                         // Désactiver le formulaire si ce n'était pas déjà fait
                         HgFormDef::disable_form(pool, form_def.form_id).await.ok();
                         return Template::render(
@@ -87,26 +87,11 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                             context! {
                                 title:"Launcher manquant",
                                 h2:"Launcher manquant",
-                                message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
-                            },
-                        );
-                    }
-
-                    // Vérifier si le pipeline est archivé (révision git différente)
-                    let pipeline_is_archived = is_pipeline_archived(form_def);
-                    if pipeline_is_archived {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title: "Pipeline archivé",
-                                h2: "Pipeline archivé",
-                                message: format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
+                                message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.template_name)
                             },
                         );
                     }
                 }
-
-                let pipeline_is_archived = if is_yaml_form { false } else { is_pipeline_archived(form_def) };
                 let sequenceurs_list = read_dir(&sequenceurs_folder)
                     .ok()
                     .map(|entries| {
@@ -152,7 +137,6 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         user_defined_vars_json,
                         indir_type: &run.form.indir_type,
                         form: &run.form,
-                        pipeline_is_archived: pipeline_is_archived,
                     },
                 )
             }

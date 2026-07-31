@@ -5,7 +5,6 @@ use sqlx::SqlitePool;
 
 use super::super::ApiResponse;
 use crate::auth::Authenticated;
-use crate::launchers_check::is_pipeline_archived;
 
 use crate::models::HgRun;
 use crate::models::HgRunEdit;

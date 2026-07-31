@@ -5,8 +5,8 @@ use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 use crate::models::{HgFormDef, HgRun};
+use crate::templates_check::exists_launcher;
 use std::fs::read_dir;
 
 #[get("/runs/submit/<form_id>")]
@@ -34,19 +34,20 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
 
     if !is_yaml_form {
         // Si le fichier de launcher n'existe plus, afficher une erreur
-        if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
+        if !exists_launcher(&form_def.pipeline_name, &form_def.template_name).await {
             return Template::render(
                 "common/error",
                 context! {
                     title:"Launcher manquant",
                     h2:"Launcher manquant",
-                    message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
+                    message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.template_name)
                 },
             );
         }
 
         // Vérifier si le pipeline est archivé (révision git différente)
-        let pipeline_is_archived = is_pipeline_archived(&form_def);
+        // Si form_def fait référence, ou bien à un commit non existant (dans le cas d'un pipeline en production), ou bien que la branche de développement n'existe plus (dans le cas d'un pipeline en développement),
+        let pipeline_is_archived = false;
         if pipeline_is_archived {
             return Template::render(
                 "common/error",

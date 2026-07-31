@@ -1,16 +1,8 @@
-use crate::config::get_mercure_config;
-use crate::launchers_check::get_current_launcher_revision_for_form;
-use crate::launchers_check::get_current_revision;
-use crate::utils::parse_launcher;
+use crate::models::ModelError;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
-use std::collections::HashSet;
-use std::path::Path;
-
-use crate::config;
-use crate::models::ModelError;
 
 use super::groups::Group;
 
@@ -30,15 +22,27 @@ pub struct HgFormListItem {
     pub version: i64,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Default, Deserialize, Clone, PartialEq)]
 pub enum UserDefinedVar {
-    #[default]
     File,
     Choice {
         choices: Vec<String>,
     },
     Constant(String),
+    #[default]
     Value,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub enum FormVersionning {
+    #[default]
+    NoVersionning,
+    Development {
+        branch_name: String,
+    },
+    Production {
+        commit_hash: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -56,15 +60,17 @@ pub struct HgFormDefSubmission {
     pub pipeline_name: String,
     pub launcher_name: String,
     pub form_name: String,
+
     pub enabled: bool,
-    pub version: i32,
+
     pub groups: Vec<Group>,
+
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
+
     pub indir_type: IndirType,
     pub template_path: Option<String>,
     pub dev_mode: bool,
-    pub dev_branch: Option<String>,
-    pub commit_hash: Option<String>,
+    pub versionning_type: FormVersionning,
 }
 
 /// Struct used to define a form template
@@ -72,19 +78,14 @@ pub struct HgFormDefSubmission {
 pub struct HgFormDef {
     pub form_id: i64,
     pub pipeline_name: String,
-    pub launcher_name: String,
+    pub template_name: String,
     pub form_name: String,
     pub enabled: bool,
-    pub version: i32,
     pub groups: Vec<Group>,
     pub user_defined_vars: Option<HashMap<String, UserDefinedVar>>,
     pub indir_type: IndirType,
-    pub latest_launcher_revision: Option<String>,
-    pub pipeline_dir_hash: Option<String>,
     pub template_path: Option<String>,
-    pub dev_mode: bool,
-    pub dev_branch: Option<String>,
-    pub commit_hash: Option<String>,
+    pub versionning_type: FormVersionning,
 }
 
 /// This type helps admin users define a form
@@ -146,17 +147,6 @@ impl HgFormDef {
                 "Un formulaire avec le même nom et la même version existe déjà. Abandon.",
             )));
         }
-
-        let current_launcher_revision = if is_yaml_form {
-            None
-        } else {
-            let config = config::get_mercure_config();
-            let launcher_path = Path::new(&config.pipeline_dir)
-                .join(&new_formdef.pipeline_name)
-                .join("launchers")
-                .join(&new_formdef.launcher_name);
-            Some(get_current_revision(&launcher_path)?)
-        };
 
         let form_id: i64 = sqlx::query(
             r#"
@@ -396,7 +386,7 @@ impl HgFormDef {
 
         def.form_id = form_id;
         def.pipeline_name = row.try_get("pipeline_name")?;
-        def.launcher_name = row.try_get("launcher_name")?;
+        def.template_name = row.try_get("launcher_name")?;
         def.form_name = row.try_get("form_name")?;
         def.enabled = row.try_get("enabled")?;
         def.version = row.try_get("version")?;
@@ -407,7 +397,7 @@ impl HgFormDef {
             _ => IndirType::BclDir,
         };
         def.latest_launcher_revision = row.try_get("latest_launcher_revision")?;
-        def.pipeline_dir_hash = row.try_get("pipeline_dir_hash").ok();
+        def.pipeline_dir_hash = row.try_get("pipeline_dir_hash")?;
         def.template_path = row.try_get("template_path").ok();
         def.dev_mode = row.try_get("dev_mode").unwrap_or(false);
         def.dev_branch = row.try_get("dev_branch").ok();
@@ -474,133 +464,6 @@ impl HgFormDef {
 
         Ok(def)
     }
-
-    pub async fn list_forms_archive_status_paginated(
-        pool: &SqlitePool,
-        page: u64,
-        per_page: u64,
-    ) -> Result<(Vec<FormStatusInfo>, u64), super::ModelError> {
-        // D'abord, récupérer le nombre total d'éléments
-        let total_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*) FROM Formdef"#)
-            .fetch_one(pool)
-            .await?;
-
-        // Calculer l'offset
-        let offset = (page - 1) * per_page;
-
-        // Récupérer les données paginées
-        let rows = sqlx::query(
-            r#"
-        SELECT form_id,form_name,version,latest_launcher_revision FROM Formdef
-        ORDER BY form_name, version
-        LIMIT ? OFFSET ?
-        "#,
-        )
-        .bind(per_page as i64)
-        .bind(offset as i64)
-        .fetch_all(pool)
-        .await?;
-
-        let mut status_list = Vec::new();
-
-        for row in rows {
-            let form_id: i64 = row.try_get("form_id")?;
-            let form_name: String = row.try_get("form_name")?;
-            let version: i64 = row.try_get("version")?;
-            let latest_launcher_revision: Option<String> =
-                row.try_get("latest_launcher_revision")?;
-
-            let status = match latest_launcher_revision {
-                Some(rev) => {
-                    let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
-                    match get_current_launcher_revision_for_form(&form) {
-                        Ok(current_rev) => {
-                            if current_rev == rev {
-                                "uptodate".to_string()
-                            } else {
-                                "archived".to_string()
-                            }
-                        }
-                        Err(e) => format!("Impossible d'obtenir la révision actuelle: {e}"),
-                    }
-                }
-                None => "La dernière révision n'a jamais été enregistrée dans la base".to_string(),
-            };
-
-            status_list.push(FormStatusInfo {
-                form_id,
-                form_name,
-                version,
-                status,
-            });
-        }
-
-        Ok((status_list, total_count as u64))
-    }
-
-    pub async fn update_latest_launcher_revision(
-        pool: &SqlitePool,
-        form_id: i64,
-        new_revision: String,
-    ) -> Result<(), ModelError> {
-        let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
-
-        // For YAML-based forms (template_path present), simply update the revision
-        if form.template_path.is_some() {
-            sqlx::query(
-                r#"
-            UPDATE Formdef SET latest_launcher_revision = ? WHERE form_id = ?
-            "#,
-            )
-            .bind(new_revision)
-            .bind(form_id)
-            .execute(pool)
-            .await?;
-            return Ok(());
-        }
-
-        // For launcher-based forms, verify UDV names haven't changed before updating
-        let udv_before = sqlx::query(
-            r#"
-        SELECT varname FROM UDV WHERE form_id = ?
-        "#,
-        )
-        .bind(form_id)
-        .fetch_all(pool)
-        .await?
-        .iter()
-        .filter_map(|row| row.try_get::<String, &str>("varname").ok())
-        .collect::<HashSet<String>>();
-
-        let udv_after = parse_launcher(&std::fs::read_to_string({
-            let config = get_mercure_config();
-
-            Path::new(&config.pipeline_dir)
-                .join(&form.pipeline_name)
-                .join("launchers")
-                .join(&form.launcher_name)
-        })?)
-        .into_keys()
-        .collect::<HashSet<String>>();
-
-        if udv_after != udv_before {
-            return Err(ModelError::FormError(
-                "Les variables définies dans le launcher ont changé. Ce formulaire ne pourra jamais être mis à jour."
-                    .to_string(),
-            ));
-        }
-
-        sqlx::query(
-            r#"
-        UPDATE Formdef SET latest_launcher_revision = ? WHERE form_id = ?
-        "#,
-        )
-        .bind(new_revision)
-        .bind(form_id)
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -625,7 +488,7 @@ mod tests {
 
         let form_def = HgFormDef {
             pipeline_name: "RNASeq".to_string(),
-            launcher_name: "Nextflow".to_string(),
+            template_name: "Nextflow".to_string(),
             form_name: "RNASeqForm".to_string(),
             enabled: true,
             version: 1,
@@ -634,7 +497,7 @@ mod tests {
             indir_type: IndirType::BclDir,
             form_id: 0,
             latest_launcher_revision: None,
-            pipeline_dir_hash: None,
+            pipeline_dir_hash: "...".to_string(),
             template_path: None,
             dev_mode: false,
             dev_branch: None,

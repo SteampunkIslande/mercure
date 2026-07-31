@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use crate::utils::parse_launcher;
 use rocket::State;
 use rocket::serde::json::Json;
 use rocket::{get, post};
@@ -12,8 +11,8 @@ use super::super::ApiResponse;
 use crate::auth::Authenticated;
 
 use crate::models::ModelError;
-use crate::models::{HgFormDef, HgFormDefSubmission};
 use crate::models::form_yaml;
+use crate::models::{HgFormDef, HgFormDefSubmission};
 
 #[get("/nextversion?<formname>")]
 pub async fn get_nextversion(
@@ -31,44 +30,6 @@ pub async fn get_nextversion(
             Err(_) => Value::from(1),
         },
     ))
-}
-
-#[get("/parselauncher?<pipeline>&<launcher>")]
-pub async fn parse_launcher_endpoint(
-    pipeline: String,
-    launcher: String,
-) -> Json<ApiResponse<Value>> {
-    let config: crate::config::MercureConfig = crate::config::get_mercure_config();
-
-    let launcher_abs_path = std::path::Path::new(&config.pipeline_dir)
-        .join(&pipeline)
-        .join("launchers")
-        .join(&launcher);
-    if !launcher_abs_path.exists() {
-        Json(ApiResponse::error(format!(
-            "Le launcher spécifié n'existe pas: {}",
-            launcher_abs_path.display()
-        )))
-    } else {
-        let launcher_text = match std::fs::read_to_string(&launcher_abs_path) {
-            Ok(s) => s,
-            Err(e) => {
-                return Json(ApiResponse::error(format!(
-                    "Erreur lors de la lecture du launcher {}: {}",
-                    launcher_abs_path.display(),
-                    e
-                )));
-            }
-        };
-        match serde_json::to_value(parse_launcher(&launcher_text)) {
-            Ok(vars) => Json(ApiResponse::success(vars)),
-            Err(e) => Json(ApiResponse::error(format!(
-                "Erreur lors de l'analyse du launcher {}: {}",
-                launcher_abs_path.display(),
-                e
-            ))),
-        }
-    }
 }
 
 /// Route: /mercure/api/pipelines
@@ -128,7 +89,7 @@ pub async fn import_form(
         Err(e) => {
             return Json(ApiResponse::error(format!(
                 "Erreur lors de la lecture du fichier forms.yaml: {e}"
-            )))
+            )));
         }
     };
 
@@ -138,12 +99,16 @@ pub async fn import_form(
             return Json(ApiResponse::error(format!(
                 "Le formulaire '{}' n'existe pas dans le pipeline '{}'",
                 req.form_name, req.pipeline_name
-            )))
+            )));
         }
     };
 
-    let mut submission =
-        form_yaml::form_yaml_to_submission(form_yaml, &req.pipeline_name, req.version, req.commit_hash.clone());
+    let mut submission = form_yaml::form_yaml_to_submission(
+        form_yaml,
+        &req.pipeline_name,
+        req.version,
+        req.commit_hash.clone(),
+    );
     submission.groups = req.groups.clone();
 
     match HgFormDef::new_form_def(submission, pool).await {

@@ -14,7 +14,6 @@ mod passedit;
 mod prettify;
 mod samplesheet;
 mod submitrun;
-mod updateform;
 mod upload;
 
 pub use directory_listing::*;
@@ -33,5 +32,4 @@ pub use passedit::*;
 pub use prettify::*;
 pub use samplesheet::*;
 pub use submitrun::*;
-pub use updateform::*;
 pub use upload::*;

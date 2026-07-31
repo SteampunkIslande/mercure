@@ -1,3 +1,4 @@
+use crate::models::FormVersionning;
 use crate::models::{HgRun, ModelError, RunStatus};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -22,7 +23,7 @@ pub struct HgAttempt {
     pub run_sequencer: String,
     pub run_flowcellid: String,
 
-    pub pipeline_dir_hash: Option<String>,
+    pub pipeline_dir_hash: String,
 
     pub indir: Option<String>,
     pub outdir: Option<String>,
@@ -48,7 +49,7 @@ impl HgAttempt {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
             "#,
         )
-        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
+        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count` juste avant l'appel à cette fonction
         .bind(run.run_id)
         .bind(&attempt_date)
         .bind(&user_defined_vars_json)
@@ -77,7 +78,15 @@ impl HgAttempt {
             run_date: run.run_date.clone(),
             run_sequencer: run.run_sequencer.clone(),
             run_flowcellid: run.run_flowcellid.clone(),
-            pipeline_dir_hash: run.form.pipeline_dir_hash.clone(),
+            pipeline_dir_hash: match &run.form.versionning_type {
+                FormVersionning::Development { branch_name } => {
+                    todo!()
+                }
+                FormVersionning::NoVersionning => "Form versionning is ignored".to_string(),
+                FormVersionning::Production { commit_hash } => {
+                    todo!()
+                }
+            },
             indir: run.indir.clone(),
             outdir: run.outdir.clone(),
             status: RunStatus::Idle,

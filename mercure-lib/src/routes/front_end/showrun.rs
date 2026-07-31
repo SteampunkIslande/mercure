@@ -10,7 +10,6 @@ use rocket_dyn_templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 use crate::models::HgAttempt;
 use crate::models::HgRun;
 use crate::models::RunStatus;
@@ -77,7 +76,7 @@ pub async fn show_run_get(
     if can_see_run {
         let form_def = &run.form;
 
-        if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
+        if !exists_launcher(&form_def.pipeline_name, &form_def.template_name).await {
             // Désactiver le formulaire si ce n'était pas déjà fait
             HgFormDef::disable_form(pool, form_def.form_id).await.ok();
             return Template::render(
@@ -85,7 +84,7 @@ pub async fn show_run_get(
                 context! {
                     title:"Launcher manquant",
                     h2:"Launcher manquant",
-                    message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                    message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.template_name)
                 },
             );
         }

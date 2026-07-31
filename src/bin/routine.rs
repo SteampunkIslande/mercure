@@ -28,7 +28,7 @@ use tokio::sync::watch;
 use mercure_lib::models::HgAttempt;
 use mercure_lib::models::RunStatus;
 use mercure_lib::pipeline_exec::find_errors;
-use mercure_lib::template_render::{render_template_from_file, TemplateRenderError};
+use mercure_lib::template_render::{TemplateRenderError, render_template_from_file};
 
 #[derive(Error, Debug)]
 enum RoutineError {
@@ -335,10 +335,7 @@ fn get_indir_outdir_for_illumina(
 /// Clone the pipelines repo into the output directory and checkout the appropriate commit/branch.
 ///
 /// Returns the path to the cloned pipelines directory.
-fn clone_pipelines_repo(
-    output_dir: &Path,
-    form: &HgFormDef,
-) -> Result<PathBuf, RoutineError> {
+fn clone_pipelines_repo(output_dir: &Path, form: &HgFormDef) -> Result<PathBuf, RoutineError> {
     let config = get_mercure_config();
     let pipelines_dest = output_dir.join("pipelines");
 
@@ -368,7 +365,9 @@ fn clone_pipelines_repo(
                 .arg("checkout")
                 .arg(branch)
                 .output()
-                .map_err(|e| RoutineError::GitCloneError(format!("git checkout {branch} failed: {e}")))?;
+                .map_err(|e| {
+                    RoutineError::GitCloneError(format!("git checkout {branch} failed: {e}"))
+                })?;
 
             if !checkout_output.status.success() {
                 return Err(RoutineError::GitCloneError(format!(
@@ -384,7 +383,9 @@ fn clone_pipelines_repo(
             .arg("checkout")
             .arg(commit)
             .output()
-            .map_err(|e| RoutineError::GitCloneError(format!("git checkout {commit} failed: {e}")))?;
+            .map_err(|e| {
+                RoutineError::GitCloneError(format!("git checkout {commit} failed: {e}"))
+            })?;
 
         if !checkout_output.status.success() {
             return Err(RoutineError::GitCloneError(format!(
@@ -578,7 +579,7 @@ async fn generate_script(
             "{base}/{pipeline}/launchers/{launcher}",
             base = pipeline_base_dir.display(),
             pipeline = form.pipeline_name,
-            launcher = form.launcher_name
+            launcher = form.template_name
         );
         if !exists(&launcher_abs_path)? {
             return Err(IoError::new(

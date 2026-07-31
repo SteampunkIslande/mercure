@@ -207,19 +207,19 @@ A separate binary (`routine`) runs as a background service:
 
 Mercure is configured via `Rocket.toml` with a `MercureConfig` struct:
 
-| Key | Description |
-|---|---|
-| `mercure_db` | SQLite database path |
-| `pipeline_dir` | Path to the git-managed pipelines repository |
-| `jobs_dir` | Directory for generated scripts (subdirs: `TODO/`, `RUNNING/`, `DONE/`, `FAILS/`) |
-| `logs_dir` | Directory for log files |
-| `upload_dir` | Directory for user-uploaded files |
-| `static_dir` | Static web assets |
-| `sequencers_dir` | Raw sequencer output directory |
-| `analysis_dir` | Analysis output directory |
-| `ont_dir` | ONT sequencer output directory |
-| `check_run_completed` | Script to check if an Illumina run is complete |
-| `post_run_script` | Script executed after the main script completes |
+| Key                   | Description                                                                       |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `mercure_db`          | SQLite database path                                                              |
+| `pipeline_dir`        | Path to the git-managed pipelines repository                                      |
+| `jobs_dir`            | Directory for generated scripts (subdirs: `TODO/`, `RUNNING/`, `DONE/`, `FAILS/`) |
+| `logs_dir`            | Directory for log files                                                           |
+| `upload_dir`          | Directory for user-uploaded files                                                 |
+| `static_dir`          | Static web assets                                                                 |
+| `sequencers_dir`      | Raw sequencer output directory                                                    |
+| `analysis_dir`        | Analysis output directory                                                         |
+| `ont_dir`             | ONT sequencer output directory                                                    |
+| `check_run_completed` | Script to check if an Illumina run is complete                                    |
+| `post_run_script`     | Script executed after the main script completes                                   |
 
 ---
 
@@ -243,3 +243,74 @@ Mercure is configured via `Rocket.toml` with a `MercureConfig` struct:
 8. **Git-managed pipelines folder** with periodic `git pull` by the routine process (only when idle).
 9. **Run state machine** (Idle → Pending → Running → Success/Failure) with immutable attempt snapshots.
 10. **Group-based access control** for form visibility.
+
+# Choix des branches de travail
+
+Pour créer un nouveau formulaire, l'utilisateur peut choisir une branche parmi celles qui existent, et pour ce faire, mercure peut lui lister les branches existantes:
+
+```
+http://hostname/api/v1/repos/{owner}/pipelines/branches
+Retourne une liste d'objets, un par branche existante
+```
+
+```rust
+
+// Code snippet to parse existing branches (listed using the above method)
+
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
+use serde_json::Value;
+
+pub type BranchesList = Vec<BranchDef>;
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BranchDef {
+    pub name: String,
+    pub commit: Commit,
+    pub protected: bool,
+    pub required_approvals: i64,
+    pub enable_status_check: bool,
+    pub status_check_contexts: Vec<Value>,
+    pub user_can_push: bool,
+    pub user_can_merge: bool,
+    pub effective_branch_protection_name: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Commit {
+    pub id: String,
+    pub message: String,
+    pub url: String,
+    pub author: Author,
+    pub committer: Committer,
+    pub verification: Verification,
+    pub timestamp: String,
+    pub added: Value,
+    pub removed: Value,
+    pub modified: Value,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Author {
+    pub name: String,
+    pub email: String,
+    pub username: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Committer {
+    pub name: String,
+    pub email: String,
+    pub username: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Verification {
+    pub verified: bool,
+    pub reason: String,
+    pub signature: String,
+    pub signer: Value,
+    pub payload: String,
+}
+
+```

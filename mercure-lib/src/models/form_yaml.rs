@@ -59,7 +59,8 @@ impl FormYamlFile {
     /// Load and parse a YAML file from the filesystem.
     pub fn from_file(path: &Path) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path)?;
-        Self::from_str(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        Self::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -131,14 +132,11 @@ pub fn form_yaml_to_submission(
         launcher_name: String::new(),
         form_name: form_yaml.name.clone(),
         enabled: true,
-        version,
         groups: vec![],
         user_defined_vars: Some(user_defined_vars),
         indir_type: IndirType::BclDir,
         template_path: Some(form_yaml.template.clone()),
         dev_mode: form_yaml.dev_mode,
-        dev_branch: form_yaml.dev_branch.clone(),
-        commit_hash,
     }
 }
 
