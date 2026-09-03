@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Édition des groupes du formulaire</title>
-    <link rel="stylesheet" href="/static/styles/default.css" />
-    <link rel="stylesheet" href="/static/icon-font/material-icons.css" />
-    <script src="/static/scripts/show_message.js"></script>
+    <link rel="stylesheet" href="/mercure/static/styles/default.css" />
+    <link rel="stylesheet" href="/mercure/static/icon-font/material-icons.css" />
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -66,10 +66,10 @@
                 });
                 if (!response.ok) throw new Error('Erreur lors de la modification des groupes');
                 const data = await response.json();
-                if (!data.success) throw new Error(data.message);
+                if (!isApiSuccess(data)) throw new Error(getApiMessage(data));
                 window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
                     "&title=" + encodeURIComponent("Succès") +
-                    "&message=" + encodeURIComponent(data.data || 'Groupes modifiés') +
+                    "&message=" + encodeURIComponent(getApiData(data) || 'Groupes modifiés') +
                     "&seconds=5";
             } catch (error) {
                 console.error("Erreur:", error);

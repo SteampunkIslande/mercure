@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if run %}Editer un run{% else %}Nouveau Run{% endif %}</title>
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
 
-    <script src="/static/scripts/json_list.js"></script>
-    <script src="/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/json_list.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -283,8 +283,9 @@
                 const response = await fetch(`/mercure/api/directories/list?dirtype=${dirtype}`);
                 const result = await response.json();
                 const indirInput = document.getElementById('indir');
-                if (result.success && result.data.length > 0) {
-                    result.data.forEach((dir, index) => {
+                const dirs = getApiData(result);
+                if (isApiSuccess(result) && dirs.length > 0) {
+                    dirs.forEach((dir, index) => {
                         const option = document.createElement('option');
                         option.value = dir.path;
                         option.textContent = dir.name;
@@ -301,12 +302,12 @@
                         {% endif %}
                         select.appendChild(option);
                     });
-                    select.size = result.data.length;
-                } else if (result.success && result.data.length === 0) {
+                    select.size = dirs.length;
+                } else if (isApiSuccess(result) && dirs.length === 0) {
                     error_div.style.display = 'block';
                     select.style.display = 'none';
                 } else {
-                    error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + result.message;
+                    error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + getApiMessage(result);
                     select.style.display = 'none';
                 }
             } catch (e) {
@@ -367,10 +368,10 @@
             });
 
             const result = await response.json();
-            if (result.success) {
-                return result.data;
+            if (isApiSuccess(result)) {
+                return getApiData(result);
             } else {
-                throw new Error(result.message);
+                throw new Error(getApiMessage(result));
             }
         }
         // Function to check sample sheet
@@ -385,10 +386,10 @@
 
             const result = await response.json();
             try {
-                if (result.success) {
-                    return result.data;
+                if (isApiSuccess(result)) {
+                    return getApiData(result);
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(getApiMessage(result));
                 }
             }
             catch (e) {
@@ -561,18 +562,18 @@
                 if (response.status !== 200) {
                     throw new Error(response.statusText || 'Erreur lors de la sauvegarde du run.');
                 }
-                if (data.success) {
+                if (isApiSuccess(data)) {
                     {% if run %}
                     let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}";
                     {% else %}
-                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + data.data.run_id;
+                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + getApiData(data).run_id;
                     {% endif %}
                     new_url += "&title=" + encodeURIComponent("Succès") +
-                        "&message=" + encodeURIComponent(data.data.message) +
+                        "&message=" + encodeURIComponent(getApiData(data).message) +
                         "&seconds=5";
                     window.location.href = new_url;
                 } else {
-                    showMessage("error", data.message);
+                    showMessage("error", getApiMessage(data));
                 }
             } catch (error) {
                 showMessage("error", error);

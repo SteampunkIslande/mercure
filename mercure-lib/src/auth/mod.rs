@@ -34,31 +34,31 @@ impl<'r> Responder<'r, 'static> for AuthError {
         let body = match self {
             AuthError::InvalidCredentials => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<u8>::error("Mote de passe invalide".to_string())
+                ApiResponse::<()>::error("Mot de passe invalide".to_string())
             }
             AuthError::DatabaseError(e) => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<u8>::error(format!("Erreur de la base de données: {e}"))
+                ApiResponse::<()>::error(format!("Erreur de la base de données: {e}"))
             }
             AuthError::TokenError(e) => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<u8>::error(format!("Erreur de token: {e}"))
+                ApiResponse::<()>::error(format!("Erreur de token: {e}"))
             }
             AuthError::UnknownUser => {
                 response.status(Status::Unauthorized);
-                ApiResponse::<u8>::error("Utilisateur inconnu".to_string())
+                ApiResponse::<()>::error("Utilisateur inconnu".to_string())
             }
             AuthError::SqliteError(e) => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<u8>::error(e.to_string())
+                ApiResponse::<()>::error(e.to_string())
             }
             AuthError::BcryptError(e) => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<u8>::error(e.to_string())
+                ApiResponse::<()>::error(e.to_string())
             }
             AuthError::NoPassword => {
                 response.status(Status::BadRequest);
-                ApiResponse::<u8>::error(self.to_string())
+                ApiResponse::<()>::error(self.to_string())
             }
         };
 

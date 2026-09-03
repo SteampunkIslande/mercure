@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <title>Admin Landing Page</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
 
-    <script src="/static/scripts/json_table.js"></script>
-    <script src="/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/json_table.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
     <script>
 
         async function loadRuns(status, emptyMsg = "Aucune donnée à afficher.") {
@@ -18,22 +18,23 @@
                 // Permet d'afficher les dix premiers runs avec le statut `status`
                 const response = await fetch(`/mercure/api/listruns?page=1&page_size=10&status=${encodeURIComponent(status)}`);
                 const json = await response.json();
-                if (json.success) {
-                    if (json.data.table.length > 0) {
-                        generateJsonTable(json.data, `${status.toLowerCase()}-runs-table`);
+                if (isApiSuccess(json)) {
+                    const data = getApiData(json);
+                    if (data.table.length > 0) {
+                        generateJsonTable(data, `${status.toLowerCase()}-runs-table`);
                     } else {
                         document.getElementById(`${status.toLowerCase()}-runs-table`).innerHTML = `<p>${emptyMsg}</p>`;
                     }
 
-                    if (json.data.pagination) {
-                        const totalPages = json.data.pagination.total_pages;
+                    if (data.pagination) {
+                        const totalPages = data.pagination.total_pages;
                         if (totalPages > 1) {
                             const overflow_elem = document.getElementById(`${status.toLowerCase()}-runs-overflow`);
                             overflow_elem.style.display = "block";
                         }
                     }
                 } else {
-                    showMessage("error", json.message || "Erreur inconnue");
+                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
                 }
             } catch (e) {
                 showMessage(`error", "Erreur: ${e}`);

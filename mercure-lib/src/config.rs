@@ -24,7 +24,7 @@ impl Default for MercureConfig {
             sequencers_dir: "/home/charles/mercure/sequenceurs".into(),
             upload_dir: "/home/charles/mercure/uploads".into(),
             analysis_dir: "/home/charles/mercure/analysis".into(),
-            static_dir: "/home/charles/mercure/static".into(),
+            static_dir: "/home/charles/mercure/mercure/static".into(),
             pipeline_dir: "/home/charles/mercure/pipelines".into(),
             jobs_dir: "/home/charles/mercure/JOBS".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),

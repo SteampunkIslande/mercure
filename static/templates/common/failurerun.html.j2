@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Echec de l'analyse</title>
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/json_list.js"></script>
-    <script src="/static/scripts/show_message.js"></script>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/json_list.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -52,7 +52,9 @@
         <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
             actuelle</a>
         {% elif is_pipeline_archived %}
-        <span id="analysis-retry" class="btn btn-primary" style="background-color: #ccc; cursor: not-allowed; opacity: 0.6;" title="Pipeline archivé - relance impossible">Relancer l'analyse (désactivé)</span>
+        <span id="analysis-retry" class="btn btn-primary"
+            style="background-color: #ccc; cursor: not-allowed; opacity: 0.6;"
+            title="Pipeline archivé - relance impossible">Relancer l'analyse (désactivé)</span>
         {% else %}
         <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
             l'analyse</a>

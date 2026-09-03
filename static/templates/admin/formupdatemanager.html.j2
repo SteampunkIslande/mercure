@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestionnaire de mise à jour des formulaires</title>
-    <link rel="stylesheet" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
 
-    <script src="/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -26,7 +26,7 @@
     <div id="info-message" class="info-msg" style="display:none;"></div>
     <div id="error-message" class="error-msg" style="display:none;"></div>
     <div id="success-message" class="success-msg" style="display:none;"></div>
-    
+
     <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
         <div id="search-forms" style="display: flex; gap: 0.5em; align-items: center;">
             <input type="text" id="form-search" placeholder="Rechercher un formulaire..."
@@ -75,13 +75,13 @@
         </button>
 
         <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; margin-left: 15px;">
-            <input id="per-page-select" class="pagination-select" onchange="changePageSize()" type="number" min="1" max="100" value="10">
+            <input id="per-page-select" class="pagination-select" onchange="changePageSize()" type="number" min="1"
+                max="100" value="10">
             <span>par page</span>
         </div>
     </div>
 
     <style>
-
         .status-badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -171,7 +171,7 @@
         async function loadFormStatus(page = 1, pageSize = 10) {
             const tableBody = document.getElementById('forms-table-body');
             const paginationContainer = document.getElementById('pagination-controls');
-            
+
             tableBody.innerHTML = '';
             paginationContainer.style.display = 'none';
 
@@ -179,21 +179,22 @@
                 // Utiliser la nouvelle route paginée
                 const response = await fetch(`/mercure/api/update-form-status?page=${page}&per_page=${pageSize}`);
                 const data = await response.json();
-                
-                if (data.success && data.data) {
-                    formsData = data.data.items;
+
+                if (isApiSuccess(data) && getApiData(data)) {
+                    const payload = getApiData(data);
+                    formsData = payload.items;
                     allFormsData = [...formsData]; // Copie pour le filtrage
-                    
+
                     // Mettre à jour les variables de pagination
-                    currentPage = data.data.pagination.current_page;
-                    perPage = data.data.pagination.per_page;
-                    totalPages = data.data.pagination.total_pages;
-                    
+                    currentPage = payload.pagination.current_page;
+                    perPage = payload.pagination.per_page;
+                    totalPages = payload.pagination.total_pages;
+
                     displayForms(formsData);
-                    updatePaginationControls(data.data.pagination);
+                    updatePaginationControls(payload.pagination);
                     paginationContainer.style.display = 'flex';
                 } else {
-                    showMessage('error', data.message || 'Erreur lors du chargement des formulaires');
+                    showMessage('error', getApiMessage(data) || 'Erreur lors du chargement des formulaires');
                 }
             } catch (error) {
                 showMessage('error', `Erreur: ${error.message}`);
@@ -262,11 +263,11 @@
             prevBtn.disabled = !pagination.has_previous_page;
             nextBtn.disabled = !pagination.has_next_page;
             lastBtn.disabled = pagination.current_page >= pagination.total_pages;
-            
+
             // Mise à jour du champ de saisie de page et des informations
             pageInput.value = pagination.current_page;
             pageInfo.textContent = `/ ${pagination.total_pages}`;
-            
+
             // Mise à jour de la sélection de la taille de page
             perPageSelect.value = pagination.per_page;
 
@@ -327,17 +328,17 @@
             }
 
             try {
-                
+
                 const response = await fetch(`/mercure/api/update-form/${formId}`);
-                
+
                 const data = await response.json();
-                
-                if (data.success) {
+
+                if (isApiSuccess(data)) {
                     showMessage('success', `Formulaire "${formName}" actualisé avec succès`);
                     // Recharger la liste pour voir les changements
                     await loadFormStatus(currentPage, perPage);
                 } else {
-                    showMessage('error', data.message || 'Erreur lors de la mise à jour du formulaire');
+                    showMessage('error', getApiMessage(data) || 'Erreur lors de la mise à jour du formulaire');
                 }
             } catch (error) {
                 showMessage('error', `Erreur de connexion: ${error.message}`);
@@ -346,7 +347,7 @@
 
         function filterForms() {
             const query = document.getElementById('form-search').value.toLowerCase();
-            
+
             if (query.trim() === '') {
                 // Si pas de recherche, afficher tous les formulaires de la page courante
                 displayForms(formsData);

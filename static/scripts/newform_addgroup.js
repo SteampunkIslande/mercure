@@ -29,8 +29,8 @@ async function create_group(groupName) {
     throw new Error(`Erreur lors de la création du groupe : ${groupName}`);
   }
   const data = await response.json();
-  if (data.success && data.data) {
-    const { group_id, group_name } = data.data;
+  if (isApiSuccess(data) && getApiData(data)) {
+    const { group_id, group_name } = getApiData(data);
     if (group_id && group_name) {
       //A.O.K.
     } else {
@@ -52,8 +52,9 @@ async function load_groups() {
       throw new Error("Erreur lors du chargement des groupes.");
     }
     const data = await response.json();
-    if (data.success && Array.isArray(data.data)) {
-      data.data.forEach((group) => {
+    const groups = getApiData(data);
+    if (isApiSuccess(data) && Array.isArray(groups)) {
+      groups.forEach((group) => {
         const groupDiv = document.createElement("div");
         groupDiv.className = "group-checkbox";
         groupDiv.innerHTML = `

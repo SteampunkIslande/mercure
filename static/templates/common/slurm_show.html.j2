@@ -1,5 +1,5 @@
 <div>
-    <link rel="stylesheet" type="text/css" href="/static/styles/default-squeue.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default-squeue.css">
     <div class="container">
 
         <div id="error-container"></div>
@@ -131,7 +131,7 @@
         // Fonction pour charger les presets de champs depuis le JSON
         async function loadFieldPresets() {
             try {
-                const response = await fetch('/squeue/static/field_presets.json');
+                const response = await fetch('/squeue/mercure/static/field_presets.json');
                 if (!response.ok) {
                     throw new Error(`Erreur HTTP: ${response.status}`);
                 }

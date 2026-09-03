@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <title>Edition des groupes de {{ user.username }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/show_message.js"></script>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -52,8 +52,9 @@
                     throw new Error("Erreur lors du chargement des groupes.");
                 }
                 const data = await response.json();
-                if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-                    data.data.forEach((group) => {
+                const groups = getApiData(data);
+                if (isApiSuccess(data) && Array.isArray(groups) && groups.length > 0) {
+                    groups.forEach((group) => {
                         const groupDiv = document.createElement("div");
                         groupDiv.className = "group-checkbox";
                         groupDiv.innerHTML = `
@@ -63,13 +64,13 @@
                         groupsContainer.appendChild(groupDiv);
                     });
                 }
-                if (data.success && Array.isArray(data.data) && data.data.length == 0) {
+                if (isApiSuccess(data) && Array.isArray(groups) && groups.length == 0) {
                     groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
                 }
 
                 const userGroupsRes = await fetch(`/mercure/api/groups/list/${userId}`);
                 const userGroupsData = await userGroupsRes.json();
-                userGroupsData.data.forEach(userGroup => {
+                getApiData(userGroupsData).forEach(userGroup => {
                     const checkbox = document.getElementById(`group-${userGroup.id}`);
                     if (checkbox) checkbox.checked = true;
                 });
@@ -111,11 +112,11 @@
                 });
                 const data = await response.json();
                 await init(); // Re-initialize to reflect changes
-                if (!data.success) {
-                    showMessage('error', "Erreur lors de la mise à jour des groupes : " + data.message);
+                if (!isApiSuccess(data)) {
+                    showMessage('error', "Erreur lors de la mise à jour des groupes : " + getApiMessage(data));
                 }
                 else {
-                    showMessage('info', data.data);
+                    showMessage('info', getApiData(data));
                 }
             } catch (e) {
                 showMessage('error', e);

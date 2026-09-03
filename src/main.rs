@@ -31,10 +31,10 @@ async fn rocket() -> _ {
     let config = config::get_mercure_config();
 
     rocket::build()
-        .register("/", catchers![unauthorized])
-        .mount("/static", FileServer::from(config.static_dir))
-        .mount("/uploads", FileServer::from(config.upload_dir))
-        .mount("/logs", FileServer::from(config.logs_dir))
+        .register("/mercure", catchers![unauthorized])
+        .mount("/mercure/static", FileServer::from(config.static_dir))
+        .mount("/mercure/uploads", FileServer::from(config.upload_dir))
+        .mount("/mercure/logs", FileServer::from(config.logs_dir))
         .mount(
             "/mercure",
             routes![

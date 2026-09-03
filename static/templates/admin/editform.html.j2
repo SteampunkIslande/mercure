@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
     <title>{{ title }}</title>
-    <script src="/static/scripts/newform_addgroup.js"></script>
-    <script src="/static/scripts/userdefvars_edit.js"></script>
-    <script src="/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/newform_addgroup.js"></script>
+    <script src="/mercure/static/scripts/userdefvars_edit.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
 
     <script>
 
@@ -35,10 +35,10 @@
                     return;
                 }
                 const data = await response.json();
-                if (!data.success) {
-                    showMessage("error", `Erreur lors de la récupération des UDV du launcher:<br>${data.message}`);
+                if (!isApiSuccess(data)) {
+                    showMessage("error", `Erreur lors de la récupération des UDV du launcher:<br>${getApiMessage(data)}`);
                 }
-                let requiredVars = data.data || [];
+                let requiredVars = getApiData(data) || [];
 
                 // Normaliser les UDV requises
                 Object.entries(requiredVars).forEach(([varName, varDesc]) => {
@@ -157,7 +157,7 @@
                 }
 
                 const res = await response.json();
-                const formDefinition = res.data;
+                const formDefinition = getApiData(res);
 
                 // Définir le nom du formulaire
                 if (formDefinition.form_name) {
@@ -215,7 +215,7 @@
                     throw new Error("Erreur lors de la récupération des formulaires.");
                 }
                 const data = await response.json();
-                const nextVersion = data.data || [];
+                const nextVersion = getApiData(data) || [];
 
                 document.getElementById("version").value = nextVersion;
                 document.getElementById("version_display").textContent = nextVersion;
@@ -277,7 +277,7 @@
                 const response = await fetch(`/mercure/api/parselauncher?pipeline=${encodeURIComponent(pipelineName)}&launcher=${encodeURIComponent(launcherName)}`);
                 if (response.ok) {
                     const data = await response.json();
-                    let requiredVars = data.data || [];
+                    let requiredVars = getApiData(data) || [];
                     Object.keys(requiredVars).forEach((varName) => {
                         if (!userVars[varName]) {
                             missingVars.push(varName);
@@ -303,7 +303,7 @@
                 const response = await fetch(`/mercure/api/nextversion?formname=${formName}`);
                 if (response.ok) {
                     const data = await response.json();
-                    version = data.data || 1;
+                    version = getApiData(data) || 1;
                 }
             } catch (e) {
                 // Ignore l'erreur ici, on continue
@@ -336,10 +336,10 @@
                     throw new Error(`Erreur: ${response.statusText}`);
                 }
                 const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.message);
+                if (!isApiSuccess(data)) {
+                    throw new Error(getApiMessage(data));
                 }
-                const message = data.data;
+                const message = getApiData(data);
                 window.location = "/mercure/api/redirect?target_url=/mercure/admin/show/forms" +
                     "&title=" + encodeURIComponent("Succès") +
                     "&message=" + encodeURIComponent(message) +

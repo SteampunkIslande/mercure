@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Run en attente</title>
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/json_list.js"></script>
-    <script src="/static/scripts/show_message.js"></script>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/json_list.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -97,10 +97,10 @@
             });
             const result = await response.json();
             try {
-                if (result.success) {
-                    return result.data;
+                if (isApiSuccess(result)) {
+                    return getApiData(result);
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(getApiMessage(result));
                 }
             }
             catch (e) {
@@ -207,13 +207,13 @@
                         }
                     });
                     const data = await response.json();
-                    if (data.success) {
+                    if (isApiSuccess(data)) {
                         window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}" +
                             "&title=" + encodeURIComponent("Succès") +
-                            "&message=" + encodeURIComponent(data.data.message) +
+                            "&message=" + encodeURIComponent(getApiData(data).message) +
                             "&seconds=5";
                     } else {
-                        showMessage("error", data.message);
+                        showMessage("error", getApiMessage(data));
                     }
                 } catch (error) {
                     showMessage("error", "Erreur lors de la validation: " + error);
@@ -230,19 +230,19 @@
             try {
                 const response = await fetch(`/api/migrate/run?from_run_id={{ run.run_id }}&to_form_id=${targetFormId}`, {
                     method: 'GET'
-                    }
-                    );
+                }
+                );
 
                 const result = await response.json();
-                
-                if (result.success) {
-                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${result.data.new_run_id}` +
+
+                if (isApiSuccess(result)) {
+                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${getApiData(result).new_run_id}` +
                         `&title=${encodeURIComponent("Migration réussie")}` +
-                        `&message=${encodeURIComponent(result.data.message)}` +
+                        `&message=${encodeURIComponent(getApiData(result).message)}` +
                         `&seconds=3`;
                     window.location.href = redirectUrl;
                 } else {
-                    alert('Erreur lors de la migration: ' + result.message);
+                    alert('Erreur lors de la migration: ' + getApiMessage(result));
                 }
             } catch (error) {
                 console.error('Erreur lors de la migration:', error);

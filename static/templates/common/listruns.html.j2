@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <title>Liste des runs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
     <style>
         .pagination-btn {
             padding: 6px 10px;
@@ -47,7 +47,7 @@
             border-color: #007bff;
         }
     </style>
-    <script src="/static/scripts/json_table.js"></script>
+    <script src="/mercure/static/scripts/json_table.js"></script>
     <script>
         let currentPage = 1;
         let totalPages = 1;
@@ -60,22 +60,23 @@
                 const status_param = status ? `&status=${status}` : "";
                 const response = await fetch(`/mercure/api/listruns?page=${page}&page_size=${size}${status_param}`);
                 const json = await response.json();
-                if (json.success) {
-                    document.getElementById("banner-title").textContent = json.data.title || "Liste des runs";
-                    if (json.data.table.length > 0) {
-                        generateJsonTable(json.data, "runs-table");
+                if (isApiSuccess(json)) {
+                    const data = getApiData(json);
+                    document.getElementById("banner-title").textContent = data.title || "Liste des runs";
+                    if (data.table.length > 0) {
+                        generateJsonTable(data, "runs-table");
                     } else {
                         document.getElementById("runs-table").innerHTML = "<p>Aucune donnée à afficher.</p>";
                     }
 
                     // Update pagination info
-                    if (json.data.pagination) {
-                        currentPage = json.data.pagination.current_page;
-                        totalPages = json.data.pagination.total_pages;
+                    if (data.pagination) {
+                        currentPage = data.pagination.current_page;
+                        totalPages = data.pagination.total_pages;
                         updatePaginationControls();
                     }
                 } else {
-                    showMessage("error", json.message || "Erreur inconnue");
+                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
                 }
             } catch {
                 showMessage("error", "Erreur de chargement des données.");

@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Group Forms</title>
-    <link rel="stylesheet" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
 
-    <script src="/static/scripts/show_message.js"></script>
-    <script src="/static/scripts/json_table.js"></script>
+    <script src="/mercure/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/json_table.js"></script>
 </head>
 
 <body>
@@ -115,14 +115,15 @@
                 // Permet d'afficher les cinq derniers runs de l'utilisateur (trié par date)
                 const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);
                 const json = await response.json();
-                if (json.success) {
-                    if (json.data.table.length > 0) {
-                        generateJsonTable(json.data, "latest-runs-table");
+                if (isApiSuccess(json)) {
+                    const data = getApiData(json);
+                    if (data.table.length > 0) {
+                        generateJsonTable(data, "latest-runs-table");
                     } else {
                         document.getElementById("latest-runs-table").innerHTML = `<p>Aucune donnée à afficher.</p>`;
                     }
                 } else {
-                    showMessage("error", json.message || "Erreur inconnue");
+                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
                 }
             } catch (e) {
                 showMessage(`error", "Erreur: ${e}`);

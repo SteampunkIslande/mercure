@@ -4,9 +4,9 @@
 <head>
     <meta charset="utf-8" />
     <title>Run en cours d'analyse - {{ run.run_name }}</title>
-    <link rel="stylesheet" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
     <style>
         .progress {
             background: hsl(0, 0%, 50%);
@@ -136,8 +136,8 @@
                 const response = await fetch(url);
                 const data = await response.json();
 
-                if (data && data.success && data.data) {
-                    await updateJobInfo(data.data);
+                if (isApiSuccess(data) && getApiData(data)) {
+                    await updateJobInfo(getApiData(data));
                 } else {
                     await updateJobInfo(null);
                 }

@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Modifier le mot de passe</title>
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/show_message.js"></script>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/show_message.js"></script>
 </head>
 
 <body>
@@ -94,15 +94,15 @@
                         user_id: parseInt(user_id)
                     })
                 }).then((response) => { return response.json() }).then((res_json) => {
-                    if (res_json.success) {
-                        alert(res_json.data);
+                    if (isApiSuccess(res_json)) {
+                        alert(getApiData(res_json));
                         {% if auth_user.is_admin %}
                         window.location.href = "/mercure/admin/editusers/"
                         {% else %}
                         window.location.href = "/mercure/home"
                         {% endif %}
                     } else {
-                        showMessage('error', res_json.message);
+                        showMessage('error', getApiMessage(res_json));
                     }
                 }).catch((e) => {
                     showMessage('error', e);

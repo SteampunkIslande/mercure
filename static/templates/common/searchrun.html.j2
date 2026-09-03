@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <title>Recherche avancée de runs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
-    <script src="/static/scripts/show_message.js"></script>
-    <script src="/static/scripts/json_table.js"></script>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/json_table.js"></script>
     <style>
         .pagination-btn {
             padding: 6px 10px;
@@ -155,22 +155,23 @@
                 const resultsDiv = document.getElementById('search-results');
                 const paginationDiv = document.getElementById('pagination-controls');
 
-                if (json.success) {
-                    if (json.data && json.data.table && json.data.table.length > 0) {
-                        generateJsonTable(json.data, "search-results");
+                if (isApiSuccess(json)) {
+                    const data = getApiData(json);
+                    if (data && data.table && data.table.length > 0) {
+                        generateJsonTable(data, "search-results");
                         paginationDiv.style.display = 'flex';
                     } else {
                         resultsDiv.innerHTML = "<p>Aucun résultat trouvé.</p>";
                         paginationDiv.style.display = 'none';
                     }
 
-                    if (json.data.pagination) {
-                        currentPage = json.data.pagination.current_page;
-                        totalPages = json.data.pagination.total_pages;
+                    if (data.pagination) {
+                        currentPage = data.pagination.current_page;
+                        totalPages = data.pagination.total_pages;
                         updatePaginationControls();
                     }
                 } else {
-                    resultsDiv.innerHTML = "<p>Erreur: " + (json.message || "Inconnue") + "</p>";
+                    resultsDiv.innerHTML = "<p>Erreur: " + (getApiMessage(json) || "Inconnue") + "</p>";
                     paginationDiv.style.display = 'none';
                 }
             } catch (e) {

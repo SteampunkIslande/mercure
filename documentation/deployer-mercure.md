@@ -116,8 +116,8 @@ Configurer la section `[release]` pour la production :
 [release]
 address = "0.0.0.0"  # IP d'écoute
 mercure_db = "sqlite:///OPT/mercure/mercure.db"
-template_dir = "/static/templates"
-static_dir = "/static" 
+template_dir = "/mercure/static/templates"
+static_dir = "/mercure/static" 
 upload_dir = "/OPT/mercure/uploads"
 logs_dir = "/OPT/JOBS/LOGS"
 pipeline_dir = "/OPT/pipelines"
