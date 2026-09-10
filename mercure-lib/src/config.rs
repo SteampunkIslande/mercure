@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 /// Additional configuration for Mercure
 #[derive(Deserialize)]
+#[serde(default)]
 pub struct MercureConfig {
     pub mercure_db: String,
     pub sequencers_dir: String,
@@ -24,12 +25,12 @@ impl Default for MercureConfig {
             sequencers_dir: "/home/charles/mercure/sequenceurs".into(),
             upload_dir: "/home/charles/mercure/uploads".into(),
             analysis_dir: "/home/charles/mercure/analysis".into(),
-            static_dir: "/home/charles/mercure/mercure/static".into(),
+            static_dir: "/home/charles/mercure/static".into(),
             pipeline_dir: "/home/charles/mercure/pipelines".into(),
             jobs_dir: "/home/charles/mercure/JOBS".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),
             ont_dir: "/home/charles/mercure/ont".into(),
-            check_run_completed: "/home/charles/mercure/check-run-completed.sh".into(),
+            check_run_completed: "/home/charles/mercure/scripts/run-completed.sh".into(),
             post_run_script: "/home/charles/mercure/post-run.sh".into(),
         }
     }
