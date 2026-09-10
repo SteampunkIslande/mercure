@@ -1,5 +1,5 @@
+use crate::templates::{Template, context};
 use rocket::get;
-use rocket_dyn_templates::{Template, context};
 
 #[get("/")]
 pub async fn welcome_page_get() -> Option<Template> {

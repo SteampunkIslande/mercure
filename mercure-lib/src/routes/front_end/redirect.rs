@@ -1,6 +1,6 @@
+use crate::templates::{Template, context};
 use rocket::FromForm;
 use rocket::get;
-use rocket_dyn_templates::{Template, context};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, FromForm)]
@@ -23,10 +23,10 @@ pub async fn redirect_get(
     Template::render(
         "common/redirect",
         context! {
-            title: title,
-            message: message,
-            target_url: target_url,
-            seconds: seconds,
+            title=> title,
+            message=> message,
+            target_url=> target_url,
+            seconds=> seconds,
         },
     )
 }

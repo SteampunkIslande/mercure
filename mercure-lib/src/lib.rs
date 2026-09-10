@@ -5,4 +5,5 @@ pub mod launchers_check;
 pub mod models;
 pub mod pipeline_exec;
 pub mod routes;
+pub mod templates;
 pub mod utils;

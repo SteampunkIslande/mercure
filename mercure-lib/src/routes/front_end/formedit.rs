@@ -4,7 +4,7 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
-use rocket_dyn_templates::{Template, context};
+use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 
@@ -15,7 +15,10 @@ use super::newform::list_folders_with_launchers;
 #[get("/editform/<formid>")]
 pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid: i64) -> Template {
     if !auth.user.is_admin {
-        Template::render("errors/admin_only", context! {user_name:auth.user.username})
+        Template::render(
+            "errors/admin_only",
+            context! {user_name=>auth.user.username},
+        )
     } else {
         let groups = (Group::get_groups_with_ids(pool).await).unwrap_or_default();
         let config: MercureConfig = get_mercure_config();
@@ -27,8 +30,8 @@ pub async fn editform_get(auth: Authenticated, pool: &State<SqlitePool>, formid:
                 pipelines_struct,
                 groups,
                 formid,
-                edit_mode: true,
-                title: "Editer un formulaire de pipeline"
+                edit_mode=> true,
+                title=> "Editer un formulaire de pipeline"
             },
         )
     }
@@ -41,7 +44,10 @@ pub async fn edit_groups_get(
     form_id: i64,
 ) -> Template {
     if !auth.user.is_admin {
-        Template::render("errors/admin_only", context! {user_name:auth.user.username})
+        Template::render(
+            "errors/admin_only",
+            context! {user_name=>auth.user.username},
+        )
     } else {
         let groups = Group::get_groups_with_ids(pool).await.unwrap_or_default();
         let form_groups = Group::get_groups_for_form(pool, form_id)
@@ -65,11 +71,14 @@ pub async fn show_forms_get(auth: Authenticated, pool: &State<SqlitePool>) -> Te
     let user_groups: Option<Vec<Group>> = Group::get_user_groups(pool, auth.user.id).await.ok();
 
     if !auth.user.is_admin {
-        Template::render("errors/admin_only", context! {user_name:auth.user.username})
+        Template::render(
+            "errors/admin_only",
+            context! {user_name=>auth.user.username},
+        )
     } else {
         Template::render(
             "admin/showforms",
-            context! {user_groups:user_groups, is_admin:auth.user.is_admin},
+            context! {user_groups=>user_groups, is_admin=>auth.user.is_admin},
         )
     }
 }

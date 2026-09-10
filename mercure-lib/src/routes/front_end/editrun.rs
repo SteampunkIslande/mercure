@@ -6,7 +6,7 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
-use rocket_dyn_templates::{Template, context};
+use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
@@ -23,9 +23,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
             return Template::render(
                 "common/error",
                 context! {
-                    title: "Erreur de la base de données",
-                    h2: format!("Impossible d'obtenir le run {}", run_id),
-                    message: e.to_string()
+                    title=> "Erreur de la base de données",
+                    h2=> format!("Impossible d'obtenir le run {}", run_id),
+                    message=> e.to_string()
                 },
             );
         }
@@ -40,9 +40,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 Err(e) => {
                     return Template::render(
                         "common/error",
-                        context! {title: "Erreur de la base de données",
-                        h2: format!("Impossible d'obtenir les groupes de {} (vous)", auth.user.username),
-                        message: e.to_string()},
+                        context! {title=> "Erreur de la base de données",
+                        h2=> format!("Impossible d'obtenir les groupes de {} (vous)", auth.user.username),
+                        message=> e.to_string()},
                     );
                 }
             };
@@ -53,9 +53,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 Err(e) => {
                     return Template::render(
                         "common/error",
-                        context! {title: "Erreur de la base de données",
-                        h2: format!("Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)", run.user.username),
-                        message: e.to_string()},
+                        context! {title=> "Erreur de la base de données",
+                        h2=> format!("Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)", run.user.username),
+                        message=> e.to_string()},
                     );
                 }
             };
@@ -81,9 +81,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                     return Template::render(
                         "common/error",
                         context! {
-                            title:"Launcher manquant",
-                            h2:"Launcher manquant",
-                            message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                            title=>"Launcher manquant",
+                            h2=>"Launcher manquant",
+                            message=>format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
                         },
                     );
                 }
@@ -94,9 +94,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                     return Template::render(
                         "common/error",
                         context! {
-                            title: "Pipeline archivé",
-                            h2: "Pipeline archivé",
-                            message: format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
+                            title=> "Pipeline archivé",
+                            h2=> "Pipeline archivé",
+                            message=> format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
                         },
                     );
                 }
@@ -126,9 +126,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                         return Template::render(
                             "common/error",
                             context! {
-                                title:"Formulaire invalide",
-                                h2:"Formulaire invalide",
-                                message:format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
+                                title=>"Formulaire invalide",
+                                h2=>"Formulaire invalide",
+                                message=>format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
                             },
                         );
                     }
@@ -137,15 +137,15 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 Template::render(
                     "common/editrun",
                     context! {
-                        run: &run,
-                        user: auth.user,
-                        form_id: &run.form.form_id,
-                        run_id: &run.run_id,
+                        run=> &run,
+                        user=> auth.user,
+                        form_id=> &run.form.form_id,
+                        run_id=> &run.run_id,
                         sequenceurs_list,
                         user_defined_vars_json,
-                        indir_type: &run.form.indir_type,
-                        form: &run.form,
-                        pipeline_is_archived: pipeline_is_archived,
+                        indir_type=> &run.form.indir_type,
+                        form=> &run.form,
+                        pipeline_is_archived=> pipeline_is_archived,
                     },
                 )
             }
@@ -159,9 +159,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
                 Template::render(
                     "common/error",
                     context! {
-                        title: status_str,
-                        h2: format!("Impossible d'éditer un {}.", status_str.to_lowercase()),
-                        message: "Seuls les runs à l'état 'A valider' peuvent être édités."
+                        title=> status_str,
+                        h2=> format!("Impossible d'éditer un {}.", status_str.to_lowercase()),
+                        message=> "Seuls les runs à l'état 'A valider' peuvent être édités."
                     },
                 )
             }
@@ -170,9 +170,9 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
         Template::render(
             "common/error",
             context! {
-                title: "Accès refusé",
-                h2: "Accès refusé",
-                message: "Vous n'avez pas les permissions nécessaires pour éditer ce run"
+                title=> "Accès refusé",
+                h2=> "Accès refusé",
+                message=> "Vous n'avez pas les permissions nécessaires pour éditer ce run"
             },
         )
     }

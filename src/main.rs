@@ -1,6 +1,5 @@
+use mercure_lib::templates::{Template, context, minijinja_fairing};
 use rocket::fs::FileServer;
-use rocket_dyn_templates::minijinja::UndefinedBehavior;
-use rocket_dyn_templates::{Template, context};
 
 #[macro_use]
 extern crate rocket;
@@ -14,9 +13,9 @@ pub async fn unauthorized() -> Template {
     Template::render(
         "errors/unauthorized",
         context! {
-            title: "Session expirée",
-            h2: "Session expirée",
-            message: "Votre session a expirée, veuillez vous reconnecter"
+            title=> "Session expirée",
+            h2=> "Session expirée",
+            message=> "Votre session a expirée, veuillez vous reconnecter"
         },
     )
 }
@@ -125,9 +124,5 @@ async fn rocket() -> _ {
             ],
         )
         .manage(pool)
-        .attach(Template::custom(|engines| {
-            engines
-                .minijinja
-                .set_undefined_behavior(UndefinedBehavior::SemiStrict);
-        }))
+        .attach(minijinja_fairing())
 }

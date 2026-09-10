@@ -1,6 +1,6 @@
+use crate::templates::{Template, context};
 use crate::{auth::Authenticated, models::User};
 use rocket::{State, get};
-use rocket_dyn_templates::{Template, context};
 use sqlx::SqlitePool;
 
 #[get("/dashboard")]
@@ -10,7 +10,7 @@ pub async fn admin_dashboard_get(auth: Authenticated) -> Option<Template> {
     }
     Some(Template::render(
         "admin/dashboard",
-        context! {user:auth.user},
+        context! {user=>auth.user},
     ))
 }
 
@@ -27,7 +27,7 @@ pub async fn password_edit_get(
     let edited_user = User::find_by_id(user_id, pool).await.ok()?;
     Some(Template::render(
         "admin/passedit",
-        context! {auth_user: auth.user, edited_user:edited_user},
+        context! {auth_user=> auth.user, edited_user=>edited_user},
     ))
 }
 

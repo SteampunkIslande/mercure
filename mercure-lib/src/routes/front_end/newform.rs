@@ -2,7 +2,7 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
-use rocket_dyn_templates::{Template, context};
+use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 
@@ -53,7 +53,10 @@ pub fn list_folders_with_launchers<P: AsRef<Path>>(base_dir: P) -> HashMap<Strin
 #[get("/newform")]
 pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Template {
     if !auth.user.is_admin {
-        Template::render("errors/admin_only", context! {user_name:auth.user.username})
+        Template::render(
+            "errors/admin_only",
+            context! {user_name=>auth.user.username},
+        )
     } else {
         let groups = (Group::get_groups_with_ids(pool).await).unwrap_or_default();
         let config: MercureConfig = get_mercure_config();
@@ -64,8 +67,8 @@ pub async fn newform_get(auth: Authenticated, pool: &State<SqlitePool>) -> Templ
             context! {
                 pipelines_struct,
                 groups,
-                edit_mode: false,
-                title: "Nouveau formulaire de pipeline"
+                edit_mode=> false,
+                title=> "Nouveau formulaire de pipeline"
             },
         )
     }

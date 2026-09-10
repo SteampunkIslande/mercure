@@ -1,5 +1,5 @@
+use crate::templates::{Template, context};
 use rocket::{State, get};
-use rocket_dyn_templates::{Template, context};
 use serde_json::{self};
 use sqlx::SqlitePool;
 
@@ -21,9 +21,9 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             return Template::render(
                 "common/error",
                 context! {
-                    title:"Formulaire invalide",
-                    h2:"Formulaire invalide",
-                    message:format!("Erreur lors du chargement de la définition du formulaire: {}", e)
+                    title=>"Formulaire invalide",
+                    h2=>"Formulaire invalide",
+                    message=>format!("Erreur lors du chargement de la définition du formulaire: {}", e)
                 },
             );
         }
@@ -34,9 +34,9 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
         return Template::render(
             "common/error",
             context! {
-                title:"Launcher manquant",
-                h2:"Launcher manquant",
-                message:format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
+                title=>"Launcher manquant",
+                h2=>"Launcher manquant",
+                message=>format!("Le launcher spécifié dans le formulaire n'existe plus: {}/launchers/{}.", form_def.pipeline_name, form_def.launcher_name)
             },
         );
     }
@@ -47,9 +47,9 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
         return Template::render(
             "common/error",
             context! {
-                title: "Pipeline archivé",
-                h2: "Pipeline archivé",
-                message: format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
+                title=> "Pipeline archivé",
+                h2=> "Pipeline archivé",
+                message=> format!("Impossible de créer un nouveau run avec ce formulaire: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
             },
         );
     }
@@ -80,9 +80,9 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
             return Template::render(
                 "common/error",
                 context! {
-                    title:"Formulaire invalide",
-                    h2:"Formulaire invalide",
-                    message:format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
+                    title=>"Formulaire invalide",
+                    h2=>"Formulaire invalide",
+                    message=>format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
                 },
             );
         }
@@ -92,14 +92,14 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
     Template::render(
         "common/editrun",
         context! {
-            run: None::<HgRun>,
-            user: auth.user,
+            run=> None::<HgRun>,
+            user=> auth.user,
             form_id,
-            run_id: None::<i64>,
+            run_id=> None::<i64>,
             sequenceurs_list,
             user_defined_vars_json,
-            indir_type: &form_def.indir_type,
-            form: &form_def,
+            indir_type=> &form_def.indir_type,
+            form=> &form_def,
         },
     )
 }

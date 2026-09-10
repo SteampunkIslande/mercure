@@ -22,9 +22,5 @@ log = "0.4.28"
 env_logger = "0.11.8"
 regex = "1.12.2"
 
-[dependencies.rocket_dyn_templates]
-version = "0.2.0"
-features = ["minijinja"]
-
 [dev-dependencies]
 rocket = { version = "0.5", features = ["secrets", "json"] }

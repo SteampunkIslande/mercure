@@ -6,7 +6,7 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
-use rocket_dyn_templates::{Template, context};
+use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
@@ -32,9 +32,9 @@ pub async fn show_run_get(
             return Template::render(
                 "common/error",
                 context! {
-                    title: "Erreur de la base de données",
-                    h2: format!("Impossible d'obtenir le run {}", run_id),
-                    message: e.to_string()
+                    title=> "Erreur de la base de données",
+                    h2=> format!("Impossible d'obtenir le run {}", run_id),
+                    message=> e.to_string()
                 },
             );
         }
@@ -49,9 +49,9 @@ pub async fn show_run_get(
                 Err(e) => {
                     return Template::render(
                         "common/error",
-                        context! {title: "Erreur de la base de données",
-                        h2: format!("Impossible d'obtenir les groupes de {} (vous)", auth.user.username),
-                        message: e.to_string()},
+                        context! {title=> "Erreur de la base de données",
+                        h2=> format!("Impossible d'obtenir les groupes de {} (vous)", auth.user.username),
+                        message=> e.to_string()},
                     );
                 }
             };
@@ -62,9 +62,9 @@ pub async fn show_run_get(
                 Err(e) => {
                     return Template::render(
                         "common/error",
-                        context! {title: "Erreur de la base de données",
-                        h2: format!("Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)", run.user.username),
-                        message: e.to_string()},
+                        context! {title=> "Erreur de la base de données",
+                        h2=> format!("Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)", run.user.username),
+                        message=> e.to_string()},
                     );
                 }
             };
@@ -84,9 +84,9 @@ pub async fn show_run_get(
             return Template::render(
                 "common/error",
                 context! {
-                    title:"Launcher manquant",
-                    h2:"Launcher manquant",
-                    message:format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
+                    title=>"Launcher manquant",
+                    h2=>"Launcher manquant",
+                    message=>format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
                 },
             );
         }
@@ -111,9 +111,9 @@ pub async fn show_run_get(
                 return Template::render(
                     "common/error",
                     context! {
-                        title: "Pipeline archivé",
-                        h2: "Pipeline archivé",
-                        message: format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
+                        title=> "Pipeline archivé",
+                        h2=> "Pipeline archivé",
+                        message=> format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
                     },
                 );
             }
@@ -157,16 +157,16 @@ pub async fn show_run_get(
             Template::render(
                 "common/idlerun",
                 context! {
-                    run: &run,
-                    form: &run.form,
-                    attempt: &attempt,
-                    history: history,
-                    sequenceurs_list: sequenceurs_list,
-                    samplesheet_adn_static_name: samplesheet_adn_static_name,
-                    samplesheet_arn_static_name: samplesheet_arn_static_name,
-                    metadata_static_name: metadata_static_name,
-                    user_defined_vars_json: &user_defined_vars_json,
-                    user: auth.user,
+                    run=> &run,
+                    form=> &run.form,
+                    attempt=> &attempt,
+                    history=> history,
+                    sequenceurs_list=> sequenceurs_list,
+                    samplesheet_adn_static_name=> samplesheet_adn_static_name,
+                    samplesheet_arn_static_name=> samplesheet_arn_static_name,
+                    metadata_static_name=> metadata_static_name,
+                    user_defined_vars_json=> &user_defined_vars_json,
+                    user=> auth.user,
                 },
             )
         } else {
@@ -182,9 +182,9 @@ pub async fn show_run_get(
                     return Template::render(
                         "common/error",
                         context! {
-                            title: "Tentative introuvable",
-                            h2: format!("Impossible d'obtenir la tentative {} pour le run {}", attempt_number, run_id),
-                            message: e.to_string()
+                            title=> "Tentative introuvable",
+                            h2=> format!("Impossible d'obtenir la tentative {} pour le run {}", attempt_number, run_id),
+                            message=> e.to_string()
                         },
                     );
                 }
@@ -213,70 +213,70 @@ pub async fn show_run_get(
                 RunStatus::Pending => Template::render(
                     "common/pendingrun",
                     context! {
-                        run: &run,
-                        form: &run.form,
-                        attempt: &attempt,
-                        history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
-                        user_defined_vars_json: &user_defined_vars_json,
-                        user: auth.user,
-                        is_pipeline_archived: pipeline_is_archived,
+                        run=> &run,
+                        form=> &run.form,
+                        attempt=> &attempt,
+                        history=> &history,
+                        samplesheet_adn_static_name=> samplesheet_adn_static_name,
+                        samplesheet_arn_static_name=> samplesheet_arn_static_name,
+                        metadata_static_name=> metadata_static_name,
+                        user_defined_vars_json=> &user_defined_vars_json,
+                        user=> auth.user,
+                        is_pipeline_archived=> pipeline_is_archived,
                     },
                 ),
                 RunStatus::Running => Template::render(
                     "common/runningrun",
                     context! {
-                        run: &run,
-                        form: &run.form,
-                        attempt: &attempt,
-                        history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
-                        user_defined_vars_json: &user_defined_vars_json,
-                        user: auth.user,
-                        is_pipeline_archived: pipeline_is_archived,
+                        run=> &run,
+                        form=> &run.form,
+                        attempt=> &attempt,
+                        history=> &history,
+                        samplesheet_adn_static_name=> samplesheet_adn_static_name,
+                        samplesheet_arn_static_name=> samplesheet_arn_static_name,
+                        metadata_static_name=> metadata_static_name,
+                        user_defined_vars_json=> &user_defined_vars_json,
+                        user=> auth.user,
+                        is_pipeline_archived=> pipeline_is_archived,
                     },
                 ),
                 RunStatus::Success => Template::render(
                     "common/successrun",
                     context! {
-                        run: &run,
-                        form: &run.form,
-                        attempt: &attempt,
-                        history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
-                        user_defined_vars_json: &user_defined_vars_json,
-                        user: auth.user,
-                        is_pipeline_archived: pipeline_is_archived,
+                        run=> &run,
+                        form=> &run.form,
+                        attempt=> &attempt,
+                        history=> &history,
+                        samplesheet_adn_static_name=> samplesheet_adn_static_name,
+                        samplesheet_arn_static_name=> samplesheet_arn_static_name,
+                        metadata_static_name=> metadata_static_name,
+                        user_defined_vars_json=> &user_defined_vars_json,
+                        user=> auth.user,
+                        is_pipeline_archived=> pipeline_is_archived,
                     },
                 ),
                 RunStatus::Failure(ref fail_reason) => Template::render(
                     "common/failurerun",
                     context! {
-                        run: &run,
-                        attempt: &attempt,
-                        form: &run.form,
-                        history: &history,
-                        samplesheet_adn_static_name: samplesheet_adn_static_name,
-                        samplesheet_arn_static_name: samplesheet_arn_static_name,
-                        metadata_static_name: metadata_static_name,
-                        fail_reason: fail_reason,
-                        user_defined_vars_json: &user_defined_vars_json,
-                        user: auth.user,
-                        is_pipeline_archived: pipeline_is_archived,
+                        run=> &run,
+                        attempt=> &attempt,
+                        form=> &run.form,
+                        history=> &history,
+                        samplesheet_adn_static_name=> samplesheet_adn_static_name,
+                        samplesheet_arn_static_name=> samplesheet_arn_static_name,
+                        metadata_static_name=> metadata_static_name,
+                        fail_reason=> fail_reason,
+                        user_defined_vars_json=> &user_defined_vars_json,
+                        user=> auth.user,
+                        is_pipeline_archived=> pipeline_is_archived,
                     },
                 ),
                 RunStatus::Idle => Template::render(
                     "common/error",
                     context! {
-                        title: "Erreur logique",
-                        h2: "Erreur logique",
-                        message: "Une erreur logique est survenue, veuillez contacter votre administrateur système.\nUne tentative ne peut pas être en état 'A valider'"
+                        title=> "Erreur logique",
+                        h2=> "Erreur logique",
+                        message=> "Une erreur logique est survenue, veuillez contacter votre administrateur système.\nUne tentative ne peut pas être en état 'A valider'"
                     },
                 ),
             }
@@ -285,9 +285,9 @@ pub async fn show_run_get(
         Template::render(
             "common/error",
             context! {
-                title: "Accès refusé",
-                h2: "Accès refusé",
-                message: "Vous n'avez pas les permissions nécessaires pour voir ce run"
+                title=> "Accès refusé",
+                h2=> "Accès refusé",
+                message=> "Vous n'avez pas les permissions nécessaires pour voir ce run"
             },
         )
     }
