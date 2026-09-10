@@ -21,7 +21,7 @@ intersection = "1.0.0"
 anyhow = "1.0.100"
 reqwest = { version = "0.12.24", features = ["native-tls-vendored"] }
 lazy-regex = "3.4.2"
-minijinja = "2.24.0"
+minijinja = { version = "2.24.0", features = ["builtins", "json", "urlencode"] }
 rust-embed = "8.12.0"
 log = "0.4.34"
 
