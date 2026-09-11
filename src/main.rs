@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use chrono::Local;
 use env_logger::Builder;
 use mercure::config::get_mercure_config;
@@ -9,7 +9,6 @@ mod routine;
 mod web;
 use clap::{Parser, Subcommand};
 use mercure::db;
-use std::process;
 
 use crate::admin::Admin;
 use crate::web::Web;
@@ -56,11 +55,10 @@ async fn main() -> Result<()> {
     let pool = match db::init_db_from_url(&database_path).await {
         Ok(pool) => pool,
         Err(e) => {
-            eprintln!(
+            bail!(
                 "Erreur lors de l'initialisation de la base de données : {}",
                 e
             );
-            process::exit(1);
         }
     };
 
