@@ -4,7 +4,6 @@ use env_logger::Builder;
 use mercure::config::get_mercure_config;
 use std::io::Write;
 
-use tokio;
 mod admin;
 mod routine;
 mod web;
@@ -46,7 +45,7 @@ enum Commands {
     Web(Web),
 }
 
-#[tokio::main]
+#[rocket::main]
 async fn main() -> Result<()> {
     init_logger();
 

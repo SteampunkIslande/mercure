@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::net::Ipv4Addr;
 
 use clap::Parser;
@@ -5,6 +6,7 @@ use mercure_lib::templates::{Template, context, minijinja_fairing};
 use rocket::Build;
 use rocket::Config;
 use rocket::Rocket;
+use rocket::config::Shutdown;
 use rocket::fs::FileServer;
 use tokio::signal::unix::{SignalKind, signal};
 
@@ -33,9 +35,15 @@ async fn unauthorized() -> Template {
 async fn rocket(pool: SqlitePool) -> Rocket<Build> {
     let config = config::get_mercure_config();
 
-    // let figment = Config::figment().merge(("shutdown.ctrlc", false));
+    let shutdown_config = Shutdown {
+        ctrlc: false,
+        signals: HashSet::new(),
+        ..Default::default()
+    };
 
-    rocket::build()
+    let figment = Config::figment().merge(("shutdown", shutdown_config));
+
+    rocket::custom(figment)
         .register("/mercure", catchers![unauthorized])
         .mount("/mercure/static", FileServer::from(config.static_dir))
         .mount("/mercure/uploads", FileServer::from(config.upload_dir))
