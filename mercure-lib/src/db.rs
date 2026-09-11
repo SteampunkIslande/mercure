@@ -1,8 +1,6 @@
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::time::Duration;
 
-use crate::config::get_mercure_config;
-
 pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     SqlitePoolOptions::new()
         .max_connections(5)
@@ -162,11 +160,6 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .await?;
 
     Ok(())
-}
-
-pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
-    let database_url: String = get_mercure_config().mercure_db;
-    init_db_from_url(&database_url).await
 }
 
 pub async fn init_db_from_url(url: &str) -> Result<SqlitePool, sqlx::Error> {

@@ -1,128 +1,73 @@
-use mercure_lib::templates::{Template, context, minijinja_fairing};
-use rocket::fs::FileServer;
+use anyhow::Result;
+use chrono::Local;
+use env_logger::Builder;
+use mercure::config::get_mercure_config;
+use std::io::Write;
 
-#[macro_use]
-extern crate rocket;
+use tokio;
+mod admin;
+mod routine;
+mod web;
+use clap::{Parser, Subcommand};
+use mercure::db;
+use std::process;
 
-use mercure_lib::config;
-use mercure_lib::db;
-use mercure_lib::routes;
+use crate::admin::Admin;
+use crate::web::Web;
 
-#[catch(401)]
-pub async fn unauthorized() -> Template {
-    Template::render(
-        "errors/unauthorized",
-        context! {
-            title=> "Session expirée",
-            h2=> "Session expirée",
-            message=> "Votre session a expirée, veuillez vous reconnecter"
-        },
-    )
+// Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
+fn init_logger() {
+    Builder::new()
+        .format(|buf, record| {
+            let now = Local::now().format("%Y-%m-%d %H:%M:%S");
+            writeln!(buf, "[{} {}] {}", record.level(), now, record.args())
+        })
+        .filter_level(log::LevelFilter::Info)
+        .target(env_logger::Target::Stderr)
+        .init();
 }
 
-#[launch]
-async fn rocket() -> _ {
-    // Initialiser la base de données
-    let pool = db::init_db()
-        .await
-        .expect("Impossible d'initialiser la base de données");
+#[derive(Parser)]
+#[command(about = "Application web dédiée au lancement des analyses bio-informatiques", long_about = None)]
+pub struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 
-    let config = config::get_mercure_config();
+    /// Database path
+    #[arg(short, long)]
+    database: Option<String>,
+}
 
-    rocket::build()
-        .register("/mercure", catchers![unauthorized])
-        .mount("/mercure/static", FileServer::from(config.static_dir))
-        .mount("/mercure/uploads", FileServer::from(config.upload_dir))
-        .mount("/mercure/logs", FileServer::from(config.logs_dir))
-        .mount(
-            "/mercure",
-            routes![
-                // Page d'accueil
-                routes::frontend::welcome_page_get,
-                // Page de login
-                routes::frontend::login_get,
-                // Simple GET pour se déconnecter, la seule route GET qui appartient au backend
-                routes::backend::logout_get,
-                // Routes pour le frontend: renvoie toujours du HTML
-                routes::frontend::home_get,
-                routes::frontend::password_edit_get,
-                routes::frontend::new_run_get,
-                // Affichage d'un run spécifique
-                routes::frontend::show_run_get,
-                // Affichage de la liste des runs
-                routes::frontend::list_runs,
-                // Recherche avancée de runs
-                routes::frontend::search_run,
-                // Edition d'un run
-                routes::frontend::edit_run_get
-            ],
-        )
-        .mount(
-            "/mercure/admin",
-            //Routes réservées à l'admin
-            routes![
-                routes::frontend::register_get,
-                routes::frontend::admin_dashboard_get,
-                routes::frontend::newform_get,
-                routes::frontend::editform_get,
-                routes::frontend::show_forms_get,
-                routes::frontend::edit_users,
-                routes::frontend::edit_groups_for_user,
-                routes::frontend::edit_groups_get,
-                // Route pour gérer les mises à jour des formulaires
-                routes::frontend::forms_list_updates_get,
-            ],
-        )
-        .mount(
-            "/mercure/api",
-            routes![
-                // Routes pour le backend: renvoie toujours du JSON
-                routes::backend::register_post,
-                routes::backend::login_post,
-                routes::backend::newform_post,
-                routes::backend::newgroup_get,
-                routes::backend::list_groups,
-                routes::backend::get_form_from_id,
-                routes::backend::get_all_forms_for_group,
-                // Simple GET pour mettre un formulaire en production
-                routes::backend::enable_form,
-                // Simple GET pour retirer un formulaire du service
-                routes::backend::disable_form,
-                // Simple GET pour lister les utilisateurs
-                routes::backend::list_users,
-                // Simple GET pour lister les groupes d'un utilisateur
-                routes::backend::list_groups_for_user,
-                routes::backend::update_groups,
-                routes::backend::get_all_forms,
-                routes::backend::password_edit_post,
-                routes::backend::newrun_post,
-                routes::backend::editrun_post,
-                routes::backend::validate_run_post,
-                routes::backend::upload_post,
-                routes::backend::list_runs_get,
-                routes::backend::check_samplesheet,
-                routes::backend::list_samples_from_samplesheet,
-                routes::backend::parse_launcher_endpoint,
-                routes::backend::edit_form_groups,
-                routes::backend::get_nextversion,
-                // Route renvoyant un EventStream
-                routes::backend::watch,
-                // Route pour rechercher des runs
-                routes::backend::search_run_get,
-                // Route pour traduire les noms des séquenceurs
-                routes::backend::prettify_seqname,
-                // Routes pour lister les dossiers selon le type
-                routes::backend::list_directories_by_type,
-                // Route pour toutes les redirections
-                routes::frontend::redirect_get,
-                // Route pour relancer un run (une fois terminé)
-                routes::backend::retry_run_get,
-                // Route pour mettre à jour la révision d'un formulaire
-                routes::backend::forms_list_updates_get,
-                // Route pour obtenir le statut de tous les formulaires avec pagination
-                routes::backend::forms_update_status_paginated_get
-            ],
-        )
-        .manage(pool)
-        .attach(minijinja_fairing())
+#[derive(Subcommand)]
+enum Commands {
+    #[command(subcommand)]
+    Admin(Admin),
+
+    Web(Web),
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    init_logger();
+
+    let cli = Cli::parse();
+
+    let database_path = cli.database.unwrap_or(get_mercure_config().mercure_db);
+
+    let pool = match db::init_db_from_url(&database_path).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            eprintln!(
+                "Erreur lors de l'initialisation de la base de données : {}",
+                e
+            );
+            process::exit(1);
+        }
+    };
+
+    match cli.command {
+        Commands::Admin(admin) => admin.run(pool).await?,
+        Commands::Web(web) => web.run(pool).await?,
+    }
+    Ok(())
 }
