@@ -1,11 +1,12 @@
 use std::net::Ipv4Addr;
 
+use clap::Parser;
 use mercure_lib::templates::{Template, context, minijinja_fairing};
 use rocket::Build;
+use rocket::Config;
 use rocket::Rocket;
 use rocket::fs::FileServer;
-
-use clap::Parser;
+use tokio::signal::unix::{SignalKind, signal};
 
 use rocket::{catch, catchers, routes};
 
@@ -13,6 +14,7 @@ use anyhow::Result;
 use mercure_lib::config;
 use mercure_lib::routes;
 use sqlx::SqlitePool;
+use tokio::sync::broadcast;
 
 use crate::routine::run_routine_loop;
 
@@ -30,6 +32,8 @@ async fn unauthorized() -> Template {
 
 async fn rocket(pool: SqlitePool) -> Rocket<Build> {
     let config = config::get_mercure_config();
+
+    // let figment = Config::figment().merge(("shutdown.ctrlc", false));
 
     rocket::build()
         .register("/mercure", catchers![unauthorized])
@@ -141,12 +145,51 @@ pub struct Web {
 
 impl Web {
     pub async fn run(self, pool: SqlitePool) -> Result<()> {
-        let routine = run_routine_loop(pool.clone());
-        let webapp = rocket(pool).await.launch();
+        // Au lieu de lancer Rocket tout de suite, on l'initialise ("ignite")
+        // Cela permet de récupérer son gestionnaire d'arrêt (shutdown_handle)
+        let rocket_app = rocket(pool.clone()).await.ignite().await.unwrap();
+        let shutdown_handle = rocket_app.shutdown();
 
-        tokio::select! {
-            _ = webapp=>{}
-            _ = routine=>{}
+        // Canal pour prévenir la routine qu'elle doit s'arrêter
+        let (routine_shutdown_tx, routine_shutdown_rx) = broadcast::channel(1);
+
+        // On lance une tâche dédiée à l'écoute des signaux OS
+        tokio::spawn(async move {
+            let mut sigterm = signal(SignalKind::terminate()).unwrap();
+            let mut sigint = signal(SignalKind::interrupt()).unwrap();
+            let mut sigquit = signal(SignalKind::quit()).unwrap();
+
+            tokio::select! {
+                _ = sigterm.recv() => println!("\n🛑 SIGTERM reçu."),
+                _ = sigint.recv() => println!("\n🛑 SIGINT (Ctrl+C) reçu."),
+                _ = sigquit.recv() => println!("\n🛑 SIGQUIT reçu."),
+            }
+
+            println!("Amorçage de l'arrêt des services...");
+
+            // 1. On signale à Rocket de s'arrêter proprement
+            shutdown_handle.notify();
+
+            // 2. On signale à la routine de s'arrêter
+            let _ = routine_shutdown_tx.send(());
+        });
+
+        // On démarre la routine avec le récepteur de fermeture
+        let routine = run_routine_loop(pool, routine_shutdown_rx);
+
+        // On démarre le serveur web
+        let webapp = rocket_app.launch();
+
+        // ⚠️ Remplacer tokio::select! par tokio::join!
+        // join! attendra que les DEUX tâches se terminent proprement au lieu d'en tuer une.
+        let (web_res, routine_res) = tokio::join!(webapp, routine);
+
+        // (Optionnel) Vous pouvez logger s'il y a eu des erreurs de retour
+        if let Err(e) = web_res {
+            log::error!("Erreur de fermeture Rocket: {}", e);
+        }
+        if let Err(e) = routine_res {
+            log::error!("Erreur de fermeture Routine: {}", e);
         }
 
         Ok(())

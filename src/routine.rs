@@ -18,7 +18,6 @@ use sqlx::Error;
 use mercure_lib::models::HgAttempt;
 
 use tokio::process::Command;
-use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
 
@@ -46,38 +45,40 @@ enum RoutineError {
     CheckRunCompletedError(String),
 }
 
-pub async fn run_routine_loop(pool: SqlitePool) -> Result<()> {
-    let (shutdown_tx, _) = broadcast::channel(1);
+pub async fn run_routine_loop(
+    pool: SqlitePool,
+    mut global_shutdown_rx: broadcast::Receiver<()>,
+) -> Result<()> {
+    // Ce canal sert toujours à prévenir les *processus enfants* de la routine
+    let (child_shutdown_tx, _) = broadcast::channel(1);
     let mut join_set = JoinSet::new();
-
-    // Configuration de l'interception des signaux Unix
-    let mut sigterm = signal(SignalKind::terminate())?;
-    let mut sigint = signal(SignalKind::interrupt())?;
-    let mut sigquit = signal(SignalKind::quit())?;
 
     let mut interval = interval(Duration::from_secs(2));
 
     loop {
         tokio::select! {
-        // --- Interception des signaux ---
-        _ = sigterm.recv() => { println!("\n🛑 SIGTERM reçu. Amorçage de l'arrêt..."); break; }
-        _ = sigint.recv() => { println!("\n🛑 SIGINT (Ctrl+C) reçu. Amorçage de l'arrêt..."); break; }
-        _ = sigquit.recv() => { println!("\n🛑 SIGQUIT reçu. Amorçage de l'arrêt..."); break; }
+            // --- Interception du signal centralisé envoyé depuis web.rs ---
+            _ = global_shutdown_rx.recv() => {
+                println!("\n🛑 Signal d'arrêt reçu par la routine...");
+                break;
+            }
 
-        // --- Logique de polling toutes les 2 secondes ---
-        _ = interval.tick() => {
-            if let Some(script) = find_run_to_launch(&pool).await {
-                let shutdown_rx = shutdown_tx.subscribe();
-                        // Lancement de la tâche dans le JoinSet
-                        join_set.spawn(async move {
-                            run_analysis(&script, shutdown_rx).await;
-                        });
-                    }
+            // --- Logique de polling toutes les 2 secondes ---
+            _ = interval.tick() => {
+                if let Some(script) = find_run_to_launch(&pool).await {
+                    let child_rx = child_shutdown_tx.subscribe();
 
+                    // Lancement de la tâche dans le JoinSet
+                    join_set.spawn(async move {
+                        run_analysis(&script, child_rx).await;
+                    });
+                }
             }
         }
     }
-    let _ = shutdown_tx.send(()); // Réveille tous les `shutdown_rx.recv()`
+
+    // Réveille tous les `child_rx.recv()` dans run_analysis
+    let _ = child_shutdown_tx.send(());
 
     if join_set.is_empty() {
         info!("Aucun job n'était en train de tourner");
@@ -92,7 +93,7 @@ pub async fn run_routine_loop(pool: SqlitePool) -> Result<()> {
         }
     }
 
-    println!("👋 Tous les processus ont été arrêtés. Fermeture du superviseur.");
+    println!("👋 Tous les processus ont été arrêtés. Fin de la routine.");
 
     Ok(())
 }
@@ -101,7 +102,7 @@ async fn find_run_to_launch(_pool: &SqlitePool) -> Option<String> {
     None
 }
 
-async fn run_analysis(script_content: &str, mut shutdown_rx: broadcast::Receiver<()>) {
+async fn run_analysis(_script_content: &str, mut shutdown_rx: broadcast::Receiver<()>) {
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
         Err(e) => {
