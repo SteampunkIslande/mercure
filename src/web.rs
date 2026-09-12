@@ -33,7 +33,7 @@ async fn unauthorized() -> Template {
     )
 }
 
-async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<i16>) -> Rocket<Build> {
+async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
     let config = config::get_mercure_config();
 
     let shutdown_config = Shutdown {
@@ -155,7 +155,7 @@ pub struct Web {
     ip: Option<Ipv4Addr>,
 
     #[arg(short = 'p', long = "port")]
-    port: Option<i16>,
+    port: Option<u16>,
 }
 
 impl Web {
