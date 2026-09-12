@@ -21,6 +21,11 @@ use tokio::process::Command;
 use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
 
+use nix::{
+    sys::signal::{Signal::SIGINT, kill},
+    unistd::Pid,
+};
+
 #[derive(Error, Debug)]
 enum RoutineError {
     #[error(transparent)]
@@ -47,9 +52,9 @@ enum RoutineError {
 
 pub async fn run_routine_loop(
     pool: SqlitePool,
-    mut global_shutdown_rx: broadcast::Receiver<()>,
+    mut routine_shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
-    // Ce canal sert toujours à prévenir les *processus enfants* de la routine
+    // Canal pour prévenir les processus enfants démarrés par la routine
     let (child_shutdown_tx, _) = broadcast::channel(1);
     let mut join_set = JoinSet::new();
 
@@ -57,43 +62,48 @@ pub async fn run_routine_loop(
 
     loop {
         tokio::select! {
-            // --- Interception du signal centralisé envoyé depuis web.rs ---
-            _ = global_shutdown_rx.recv() => {
-                println!("\n🛑 Signal d'arrêt reçu par la routine...");
+
+            _ = routine_shutdown_rx.recv() => {
+                info!("Signal d'arrêt reçu par la routine...");
                 break;
             }
 
-            // --- Logique de polling toutes les 2 secondes ---
             _ = interval.tick() => {
                 if let Some(script) = find_run_to_launch(&pool).await {
                     let child_rx = child_shutdown_tx.subscribe();
 
                     // Lancement de la tâche dans le JoinSet
                     join_set.spawn(async move {
-                        run_analysis(&script, child_rx).await;
+                        run_script(&script,0,0, child_rx).await;
                     });
                 }
             }
         }
     }
 
-    // Réveille tous les `child_rx.recv()` dans run_analysis
-    let _ = child_shutdown_tx.send(());
+    match child_shutdown_tx.send(()) {
+        Ok(n) => {
+            info!(
+                "{} jobs sont encore en cours, un signal SIGINT leur a été envoyé",
+                n
+            );
+        }
+        Err(_) => {
+            info!("Aucun job n'est en train d'écouter");
+        }
+    }
 
     if join_set.is_empty() {
         info!("Aucun job n'était en train de tourner");
     } else {
-        info!("⏳ Attente de l'arrêt propre des processus enfants...");
-    }
-
-    // On attend que chaque tâche ait terminé son bloc de code (incluant le kill et le rename)
-    while let Some(res) = join_set.join_next().await {
-        if let Err(e) = res {
-            warn!("Un des jobs s'est terminé avec une erreur : {}", e);
+        info!("Attente de l'arrêt propre des jobs encore en cours");
+        while let Some(res) = join_set.join_next().await {
+            if let Err(e) = res {
+                warn!("Un des jobs s'est terminé avec une erreur : {}", e);
+            }
         }
+        println!("Tous les jobs ont été arrêtés. Fin de la routine.");
     }
-
-    println!("👋 Tous les processus ont été arrêtés. Fin de la routine.");
 
     Ok(())
 }
@@ -102,11 +112,19 @@ async fn find_run_to_launch(_pool: &SqlitePool) -> Option<String> {
     None
 }
 
-async fn run_analysis(_script_content: &str, mut shutdown_rx: broadcast::Receiver<()>) {
+async fn run_script(
+    _script_content: &str,
+    run_id: u64,
+    attempt_id: u64,
+    mut shutdown_rx: broadcast::Receiver<()>,
+) {
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
         Err(e) => {
-            error!("Erreur de lancement pour {:?} : {}", "nom du run...", e);
+            error!(
+                "Erreur de lancement pour la tentative {} du run {}. Erreur: `{}`",
+                attempt_id, run_id, e
+            );
             return;
         }
     };
@@ -129,11 +147,13 @@ async fn run_analysis(_script_content: &str, mut shutdown_rx: broadcast::Receive
         }
 
         _ = shutdown_rx.recv() => {
-
-            // Terminer le processus
-            if let Err(e) = child.kill().await {
-                error!("Erreur au moment de terminer le processus : {}",  e);
+            if let Some(pid) = child.id() {
+                if let Err(e) = kill(Pid::from_raw(pid.try_into().expect("Invalid PID")), SIGINT) {
+                    eprintln!("Failed to forward SIGTERM to child process: {}", e);
+                }
             }
+            // Wait to get the child's exit code.
+            let exit_code =child.wait().await;
         }
     }
 }

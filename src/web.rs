@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::net::Ipv4Addr;
 
 use clap::Parser;
+use log::info;
 use mercure_lib::templates::{Template, context, minijinja_fairing};
 use rocket::Build;
 use rocket::Config;
@@ -32,7 +33,7 @@ async fn unauthorized() -> Template {
     )
 }
 
-async fn rocket(pool: SqlitePool) -> Rocket<Build> {
+async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<i16>) -> Rocket<Build> {
     let config = config::get_mercure_config();
 
     let shutdown_config = Shutdown {
@@ -41,7 +42,13 @@ async fn rocket(pool: SqlitePool) -> Rocket<Build> {
         ..Default::default()
     };
 
-    let figment = Config::figment().merge(("shutdown", shutdown_config));
+    let mut figment = Config::figment().merge(("shutdown", shutdown_config));
+    if let Some(host) = host {
+        figment = figment.merge(("address", host));
+    }
+    if let Some(port) = port {
+        figment = figment.merge(("port", port));
+    }
 
     rocket::custom(figment)
         .register("/mercure", catchers![unauthorized])
@@ -153,46 +160,47 @@ pub struct Web {
 
 impl Web {
     pub async fn run(self, pool: SqlitePool) -> Result<()> {
-        // Au lieu de lancer Rocket tout de suite, on l'initialise ("ignite")
-        // Cela permet de récupérer son gestionnaire d'arrêt (shutdown_handle)
-        let rocket_app = rocket(pool.clone()).await.ignite().await.unwrap();
+        let rocket_app = rocket(pool.clone(), self.ip, self.port)
+            .await
+            .ignite()
+            .await?;
         let shutdown_handle = rocket_app.shutdown();
 
         // Canal pour prévenir la routine qu'elle doit s'arrêter
         let (routine_shutdown_tx, routine_shutdown_rx) = broadcast::channel(1);
 
+        let mut sigterm =
+            signal(SignalKind::terminate()).expect("Impossible d'écouter le signal SIGTERM");
+        let mut sigint =
+            signal(SignalKind::interrupt()).expect("Impossible d'écouter le signal SIGINT");
+        let mut sigquit =
+            signal(SignalKind::quit()).expect("Impossible d'écouter le signal SIGQUIT");
         // On lance une tâche dédiée à l'écoute des signaux OS
         tokio::spawn(async move {
-            let mut sigterm = signal(SignalKind::terminate()).unwrap();
-            let mut sigint = signal(SignalKind::interrupt()).unwrap();
-            let mut sigquit = signal(SignalKind::quit()).unwrap();
-
             tokio::select! {
-                _ = sigterm.recv() => println!("\n🛑 SIGTERM reçu."),
-                _ = sigint.recv() => println!("\n🛑 SIGINT (Ctrl+C) reçu."),
-                _ = sigquit.recv() => println!("\n🛑 SIGQUIT reçu."),
+                _ = sigterm.recv() => info!("SIGTERM reçu."),
+                _ = sigint.recv() => info!("SIGINT (Ctrl+C) reçu."),
+                _ = sigquit.recv() => info!("SIGQUIT reçu."),
             }
 
-            println!("Amorçage de l'arrêt des services...");
+            info!("Signal d'arrêt reçu.");
 
-            // 1. On signale à Rocket de s'arrêter proprement
+            // Notification de l'arrêt au runtime de Rocket
             shutdown_handle.notify();
 
-            // 2. On signale à la routine de s'arrêter
+            // Envoi d'un signal de shutdown à la routine
             let _ = routine_shutdown_tx.send(());
         });
 
-        // On démarre la routine avec le récepteur de fermeture
+        // Démarrage de la routine (exécution des jobs)
         let routine = run_routine_loop(pool, routine_shutdown_rx);
 
-        // On démarre le serveur web
+        // Démarrage de l'application web
         let webapp = rocket_app.launch();
 
-        // ⚠️ Remplacer tokio::select! par tokio::join!
-        // join! attendra que les DEUX tâches se terminent proprement au lieu d'en tuer une.
+        // Attendre que l'application web et la routine sont tous les deux terminés
         let (web_res, routine_res) = tokio::join!(webapp, routine);
 
-        // (Optionnel) Vous pouvez logger s'il y a eu des erreurs de retour
         if let Err(e) = web_res {
             log::error!("Erreur de fermeture Rocket: {}", e);
         }
