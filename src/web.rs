@@ -182,9 +182,6 @@ impl Web {
                 _ = sigint.recv() => info!("SIGINT (Ctrl+C) reçu."),
                 _ = sigquit.recv() => info!("SIGQUIT reçu."),
             }
-
-            info!("Signal d'arrêt reçu.");
-
             // Notification de l'arrêt au runtime de Rocket
             shutdown_handle.notify();
 

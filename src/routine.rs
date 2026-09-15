@@ -69,12 +69,12 @@ pub async fn run_routine_loop(
             }
 
             _ = interval.tick() => {
-                if let Some(script) = find_run_to_launch(&pool).await {
+                if let Some(attempt) = find_run_to_launch(&pool).await {
                     let child_rx = child_shutdown_tx.subscribe();
 
                     // Lancement de la tâche dans le JoinSet
                     join_set.spawn(async move {
-                        run_script(&script,0,0, child_rx).await;
+                        run_script(&attempt, child_rx).await;
                     });
                 }
             }
@@ -108,22 +108,18 @@ pub async fn run_routine_loop(
     Ok(())
 }
 
-async fn find_run_to_launch(_pool: &SqlitePool) -> Option<String> {
+async fn find_run_to_launch(_pool: &SqlitePool) -> Option<HgAttempt> {
+    // Lire dans la base de données, pour trouver une tentative dans l'état 'Pending'
     None
 }
 
-async fn run_script(
-    _script_content: &str,
-    run_id: u64,
-    attempt_id: u64,
-    mut shutdown_rx: broadcast::Receiver<()>,
-) {
+async fn run_script(attempt: &HgAttempt, mut shutdown_rx: broadcast::Receiver<()>) {
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
         Err(e) => {
             error!(
                 "Erreur de lancement pour la tentative {} du run {}. Erreur: `{}`",
-                attempt_id, run_id, e
+                attempt.attempt_number, attempt.run_id, e
             );
             return;
         }
