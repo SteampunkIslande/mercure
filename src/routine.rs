@@ -1,8 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
 use mercure::models::{HgRun, ModelError};
 use mercure_lib::config::get_mercure_config;
+use nix::sys::signal::Signal;
 use std::io::Error as IoError;
+use std::process::ExitStatus;
 use tokio::task::{JoinError as TokioJoinError, JoinSet};
 
 use sqlx::SqlitePool;
@@ -17,14 +19,11 @@ use sqlx::Error;
 
 use mercure_lib::models::HgAttempt;
 
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
 
-use nix::{
-    sys::signal::{Signal::SIGINT, kill},
-    unistd::Pid,
-};
+use nix::{sys::signal::kill, unistd::Pid};
 
 #[derive(Error, Debug)]
 enum RoutineError {
@@ -113,6 +112,44 @@ async fn find_run_to_launch(_pool: &SqlitePool) -> Option<HgAttempt> {
     None
 }
 
+async fn send_sigint_then_kill(
+    child: &mut Child,
+    grace_time_seconds: Option<u64>,
+) -> Result<ExitStatus> {
+    let grace_time = Duration::from_secs(grace_time_seconds.unwrap_or(5));
+
+    let pid = match child.id() {
+        Some(id) => id,
+        None => bail!("Le processus n'a pas de PID (il a probablement déjà été récolté)"),
+    };
+
+    let nix_pid = Pid::from_raw(pid.try_into().context("PID invalide")?);
+    if let Err(e) = kill(nix_pid, Signal::SIGINT) {
+        bail!("Impossible d'envoyer SIGINT au processus {}: {}", pid, e);
+    }
+
+    // Première chance (SIGINT)...
+    match tokio::time::timeout(grace_time, child.wait()).await {
+        Ok(wait_result) => {
+            // Le timeout n'a pas expiré : tout va bien, on retourne le statut après un SIGINT
+            Ok(wait_result.context("Erreur lors de l'attente du processus")?)
+        }
+        Err(_) => {
+            // SIGINT n'a pas suffi après le grace_time: KILL (envoi de SIGKILL)
+            child
+                .kill()
+                .await
+                .context("Impossible d'envoyer SIGKILL au processus")?;
+
+            // On récupère le statut
+            Ok(child
+                .wait()
+                .await
+                .context("Erreur lors de la récolte du processus après SIGKILL")?)
+        }
+    }
+}
+
 async fn run_script(attempt: &HgAttempt, mut shutdown_rx: broadcast::Receiver<()>) {
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
@@ -143,13 +180,19 @@ async fn run_script(attempt: &HgAttempt, mut shutdown_rx: broadcast::Receiver<()
         }
 
         _ = shutdown_rx.recv() => {
-            if let Some(pid) = child.id() {
-                if let Err(e) = kill(Pid::from_raw(pid.try_into().expect("Invalid PID")), SIGINT) {
-                    eprintln!("Failed to forward SIGTERM to child process: {}", e);
+            eprintln!("Attention, la tentative {} du run {} a reçu un signal d'arrêt prématuré", attempt.attempt_number, attempt.run_id);
+            match send_sigint_then_kill(&mut child, None).await
+            {
+                Ok(status) if status.success() =>{
+                    eprintln!("OK. On a envoyé SIGINT mais tout va bien, status 0.");
+                },
+                Ok(status)=>{
+                    eprintln!("Ooops. Status: {}",status);
+                },
+                Err(e)=>{
+                    eprintln!("Double oops: {}",e);
                 }
             }
-            // Wait to get the child's exit code.
-            let exit_code =child.wait().await;
         }
     }
 }
