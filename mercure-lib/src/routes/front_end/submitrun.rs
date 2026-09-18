@@ -6,11 +6,17 @@ use sqlx::SqlitePool;
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::launchers_check::{exists_launcher, is_pipeline_archived};
-use crate::models::{HgFormDef, HgRun};
+use crate::models::Run;
 use std::fs::read_dir;
+use std::path::PathBuf;
 
-#[get("/runs/submit/<form_id>")]
-pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqlitePool>) -> Template {
+#[get("/runs/submit/<branch>/<form_path..>")]
+pub async fn new_run_get(
+    auth: Authenticated,
+    form_path: PathBuf,
+    branch: String,
+    pool: &State<SqlitePool>,
+) -> Template {
     let config = get_mercure_config();
     let sequenceurs_folder = config.sequencers_dir;
 
@@ -92,7 +98,7 @@ pub async fn new_run_get(auth: Authenticated, form_id: i64, pool: &State<SqliteP
     Template::render(
         "common/editrun",
         context! {
-            run=> None::<HgRun>,
+            run=> None::<Run>,
             user=> auth.user,
             form_id,
             run_id=> None::<i64>,

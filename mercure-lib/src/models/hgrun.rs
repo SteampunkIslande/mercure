@@ -1,7 +1,5 @@
-use crate::models::IndirType;
 use crate::models::User;
 
-use super::form::HgFormDef;
 use crate::models::ModelError;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -9,16 +7,16 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
-pub struct InvalidRunStatusError;
-
-impl Display for InvalidRunStatusError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Invalid run status")
-    }
+pub enum RunDefinitionError {
+    #[error("Le run est dans un statut invalide")]
+    InvalidRunStatusError,
+    #[error("RunID manquant!")]
+    MissingRunID,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
@@ -49,7 +47,7 @@ impl Display for RunStatus {
 }
 
 impl FromStr for RunStatus {
-    type Err = InvalidRunStatusError;
+    type Err = RunDefinitionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -58,173 +56,86 @@ impl FromStr for RunStatus {
             "Running" => Ok(RunStatus::Running),
             "Success" => Ok(RunStatus::Success),
             s if s.starts_with("Failure:") => Ok(RunStatus::Failure(s[8..].to_string())),
-            _ => Err(InvalidRunStatusError),
+            _ => Err(RunDefinitionError::InvalidRunStatusError),
         }
     }
-}
-
-/// Édition d'un run existant
-/// Utilisé dans la route /mercure/api/editrun
-///
-/// Ne permet pas de modifier le nom du run, l'utilisateur, ou le formulaire associé.
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgRunEdit {
-    pub form_id: i64,
-
-    pub run_id: i64,
-    pub run_date: String,
-    pub run_sequencer: String,
-    pub run_flowcellid: String,
-
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
-    pub user_defined_vars: HashMap<String, String>,
-    pub indir: Option<String>,
-    pub outdir: Option<String>,
-}
-
-/// Soumission d'un nouveau run
-/// Utilisé dans la route /mercure/api/newrun
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgRunSubmission {
-    pub form_id: i64,
-    pub user_id: i64,
-    pub run_name: String,
-    pub run_date: String,
-    pub run_sequencer: String,
-    pub run_flowcellid: String,
-
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
-    pub user_defined_vars: HashMap<String, String>,
-    pub indir: Option<String>,
-    pub outdir: Option<String>,
 }
 
 /// Created by users.
 /// On any user's home page, there is a list of runs submitted by the user
 /// There is also a button that the user can press to get to route '/newrun/groupname'
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HgRun {
-    pub run_id: i64,
-
-    /// The form definition used to create this run
-    /// Not modifiable with new attempts, defines the pipeline used.
-    pub form: HgFormDef,
-
-    /// The user who created this run. Not modifiable with new attempts.
-    pub user: User,
-
-    /// The key,value pairs for user-defined variables. Editable from attempt to attempt
-    /// Comes from the form definition, once the user has defined values for them.
-    pub user_defined_vars: HashMap<String, String>,
+pub struct Run {
+    /// Auto-incremented Run ID (database defined).
+    pub run_id: Option<i64>,
+    /// Id of the user who created this run. Not modifiable with new attempts.
+    pub user_id: i64,
 
     /// A user-defined name for this run
     /// Not modifiable with new attempts.
     pub run_name: String,
 
-    /// Date of the run, as defined by the user. Can be modified with new attempts.
-    pub run_date: String,
-    /// The sequencer used for this run, as defined by the user. Can be modified with new attempts.
-    pub run_sequencer: String,
-    /// The flowcell ID used for this run, as defined by the user. Can be modified with new attempts.
-    pub run_flowcellid: String,
-
     /// Date of creation of this run in the database. Not modifiable with new attempts.
     pub creation_date: String,
-
-    /// Paths to the SampleSheets and metadata file, as defined by the user. Can be modified with new attempts.
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-
-    /// Input and output directories for the run, determined based on form's indir_type
-    pub indir: Option<String>,
-    pub outdir: Option<String>,
 
     /// Current status of the run. Reflects the status of the latest attempt.
     pub status: RunStatus,
 
     /// Number of attempts made for this run. Incremented each time a new attempt is created.
     pub attempt_count: u32,
+
+    /// Name of the branch this run will take its code from
+    pub branch_name: String,
+
+    /// User defined variables
+    pub user_defined_vars: HashMap<String, String>,
+
+    /// Path to the yaml file within said `branch`
+    pub form_path: PathBuf,
 }
 
-impl HgRun {
+impl Run {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub async fn new_run(
-        run_submission: HgRunSubmission,
-        pool: &SqlitePool,
-    ) -> Result<i64, ModelError> {
-        // Date de création
-        let creation_date = OffsetDateTime::now_utc().to_string();
-
-        // Obtenir les informations du formulaire
-        let form = HgFormDef::get_formdef_from_id(pool, run_submission.form_id).await?;
+    pub async fn new_run(mut run_submission: Run, pool: &SqlitePool) -> Result<i64, ModelError> {
+        // Date de création (peu importe ce que l'utilisateur avait soumis)
+        run_submission.creation_date = OffsetDateTime::now_utc().to_string();
 
         // Insérer dans la table Runs
-        let user_defined_vars_json = serde_json::to_string(&run_submission.user_defined_vars)
+        let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_submission.sample_sheet_adn_path.is_empty()
-            && run_submission.sample_sheet_arn_path.is_empty()
-            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
-        {
-            return Err(ModelError::FormError(
-                "Erreur de soumission d'un run: au moins une SampleSheet est requise (à moins que vous ne partiez d'un dossier d'analyse)".to_string(),
-            ));
-        }
-
-        let run_id=sqlx::query(
+        let run_id = sqlx::query(
             r#"
-            INSERT INTO Runs (form_id, user_id, run_name, run_date, creation_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, status, user_defined_vars, attempt_count, indir, outdir)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Runs (user_id, run_name, creation_date, status, attempt_count, branch_name, user_defined_vars, form_path)
+            VALUES (?,?,?,?,?,?,?,?)
             RETURNING run_id
             "#,
         )
-        .bind(run_submission.form_id)
-        .bind(run_submission.user_id)
+        .bind(&run_submission.user_id)
         .bind(&run_submission.run_name)
-        .bind(&run_submission.run_date)
-        .bind(&creation_date)
-        .bind(&run_submission.run_sequencer)
-        .bind(&run_submission.run_flowcellid)
-        .bind(&run_submission.sample_sheet_adn_path)
-        .bind(&run_submission.sample_sheet_arn_path)
-        .bind(&run_submission.metadata_path)
-        .bind("Idle")
-        .bind(&user_defined_vars_json)
+        .bind(&run_submission.creation_date)
+        .bind(RunStatus::Idle.to_string())
         .bind(0)
-        .bind(&run_submission.indir)
-        .bind(&run_submission.outdir)
+        .bind(&run_submission.branch_name)
+        .bind(&user_defined_vars)
+        .bind(run_submission.form_path.display().to_string())
         .fetch_one(pool)
-        .await?.try_get("run_id")?;
+        .await?
+        .try_get("run_id")?;
 
         Ok(run_id)
     }
 
     /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
-    pub async fn edit_run(run_edit: HgRunEdit, pool: &SqlitePool) -> Result<i64, ModelError> {
-        eprintln!("Received run edit {:?}", run_edit);
-
-        let form = HgFormDef::get_formdef_from_id(pool, run_edit.form_id).await?;
-
-        let user_defined_vars_json = serde_json::to_string(&run_edit.user_defined_vars)
+    pub async fn edit_run(
+        run_id: i64,
+        user_defined_vars: HashMap<String, String>,
+        pool: &SqlitePool,
+    ) -> Result<(), ModelError> {
+        let user_defined_vars = serde_json::to_string(&user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
-        if run_edit.sample_sheet_adn_path.is_empty()
-            && run_edit.sample_sheet_arn_path.is_empty()
-            && matches!(form.indir_type, IndirType::BclDir | IndirType::OntDir)
-        {
-            return Err(ModelError::FormError(
-                "Erreur de soumission d'un run: au moins une SampleSheet est requise".to_string(),
-            ));
-        }
-
-        let run: HgRun = Self::get_run_from_id(run_edit.run_id, pool).await?;
+        let run: Run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
             return Err(ModelError::FormError(
                 "Impossible d'éditer un run validé, en cours d'analyse, ou terminé".to_string(),
@@ -233,26 +144,15 @@ impl HgRun {
 
         sqlx::query(
             r#"
-            UPDATE Runs SET
-            (user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir)
-            =
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            WHERE run_id = ?
+            UPDATE Runs SET user_defined_vars = ? WHERE run_id = ?
             "#,
         )
-        .bind(&user_defined_vars_json)
-        .bind(&run_edit.run_date)
-        .bind(&run_edit.run_sequencer)
-        .bind(&run_edit.run_flowcellid)
-        .bind(&run_edit.sample_sheet_adn_path)
-        .bind(&run_edit.sample_sheet_arn_path)
-        .bind(&run_edit.metadata_path)
-        .bind(&run_edit.indir)
-        .bind(&run_edit.outdir)
-        .bind(run_edit.run_id)
-        .execute(pool).await?;
+        .bind(&user_defined_vars)
+        .bind(run_id)
+        .execute(pool)
+        .await?;
 
-        Ok(run_edit.run_id)
+        Ok(())
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
@@ -266,14 +166,12 @@ impl HgRun {
         .fetch_one(pool)
         .await?;
 
-        let form_id: i64 = row.try_get("form_id")?;
+        let run_name: String = row.try_get("run_name")?;
+        let creation_date: String = row.try_get("creation_date")?;
+
         let user_id: i64 = row.try_get("user_id")?;
-
-        // Récupérer la définition du formulaire
-        let form = HgFormDef::get_formdef_from_id(pool, form_id).await?;
-
-        // Récupérer l'utilisateur
-        let user = sqlx::query_as::<_, User>(
+        // Récupérer l'utilisateur, juste pour s'assurer que le user_id est valide
+        let _ = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
             FROM Users WHERE id = ?
@@ -285,33 +183,31 @@ impl HgRun {
         .ok_or(ModelError::FormError("Utilisateur non trouvé".to_string()))?;
 
         // Désérialiser les variables définies par l'utilisateur
-        let user_defined_vars_json: String = row.try_get("user_defined_vars")?;
         let user_defined_vars: HashMap<String, String> =
-            serde_json::from_str(&user_defined_vars_json).map_err(|e| {
+            serde_json::from_str(row.try_get("user_defined_vars")?).map_err(|e| {
                 ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
             })?;
 
         // Parser le statut
         let status: RunStatus = RunStatus::from_str(row.try_get("status")?)?;
+        // Nombre de tentatives
+        let attempt_count = row.try_get("attempt_count")?;
+        // Le nom de la branche à utiliser pour l'exécution
+        let branch_name: String = row.try_get("branch_name")?;
+
+        let form_path = PathBuf::from_str(row.try_get("form_path")?)?;
 
         // Construire l'instance HgRun
-        let hgrun = HgRun {
-            run_id,
-            form,
-            user,
-            user_defined_vars,
-            run_name: row.try_get("run_name")?,
-            run_date: row.try_get("run_date")?,
-            creation_date: row.try_get("creation_date")?,
-            run_sequencer: row.try_get("run_sequencer")?,
-            run_flowcellid: row.try_get("run_flowcellid")?,
-            sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
-            sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
-            metadata_path: row.try_get("metadata_path")?,
-            indir: row.try_get("indir").ok(),
-            outdir: row.try_get("outdir").ok(),
+        let hgrun = Run {
+            run_id: Some(run_id),
+            user_id,
+            run_name,
+            creation_date,
             status,
-            attempt_count: row.try_get("attempt_count")?,
+            attempt_count,
+            branch_name,
+            user_defined_vars,
+            form_path,
         };
 
         Ok(hgrun)
@@ -329,7 +225,7 @@ impl HgRun {
             UPDATE Runs SET (attempt_count, status) = (attempt_count + 1, ?) WHERE run_id = ?
             "#,
         )
-        .bind("Pending")
+        .bind(RunStatus::Pending.to_string())
         .bind(run_id)
         .execute(pool)
         .await?;
@@ -345,7 +241,7 @@ impl HgRun {
             UPDATE Runs SET status = ? WHERE run_id = ?
             "#,
         )
-        .bind("Running")
+        .bind(RunStatus::Running.to_string())
         .bind(run_id)
         .execute(pool)
         .await?;
@@ -361,7 +257,7 @@ impl HgRun {
             UPDATE Runs SET status = ? WHERE run_id = ?
             "#,
         )
-        .bind("Success")
+        .bind(RunStatus::Success.to_string())
         .bind(run_id)
         .execute(pool)
         .await?;
@@ -381,7 +277,7 @@ impl HgRun {
             UPDATE Runs SET status = ? WHERE run_id = ?
             "#,
         )
-        .bind(format!("Failure:{}", reason))
+        .bind(RunStatus::Failure(reason.to_string()).to_string())
         .bind(run_id)
         .execute(pool)
         .await?;

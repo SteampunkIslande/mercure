@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use mercure::models::{HgRun, ModelError};
+use mercure::models::{ModelError, Run};
 use mercure_lib::config::get_mercure_config;
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
@@ -17,7 +17,7 @@ use mercure_lib::models::AnalysisStateMachineError;
 use regex::{Error as RegexError, Regex};
 use sqlx::Error;
 
-use mercure_lib::models::HgAttempt;
+use mercure_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
@@ -107,7 +107,7 @@ pub async fn run_routine_loop(
     Ok(())
 }
 
-async fn find_run_to_launch(_pool: &SqlitePool) -> Option<HgAttempt> {
+async fn find_run_to_launch(_pool: &SqlitePool) -> Option<Attempt> {
     // Lire dans la base de données, pour trouver une tentative dans l'état 'Pending'
     None
 }
@@ -150,7 +150,7 @@ async fn send_sigint_then_kill(
     }
 }
 
-async fn run_script(attempt: &HgAttempt, mut shutdown_rx: broadcast::Receiver<()>) {
+async fn run_script(attempt: &Attempt, mut shutdown_rx: broadcast::Receiver<()>) {
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
         Err(e) => {
@@ -197,16 +197,14 @@ async fn run_script(attempt: &HgAttempt, mut shutdown_rx: broadcast::Receiver<()
     }
 }
 
-fn get_indir_outdir_for_analysisdir(
-    attempt: &HgAttempt,
-) -> Result<(PathBuf, PathBuf), RoutineError> {
+fn get_indir_outdir_for_analysisdir(attempt: &Attempt) -> Result<(PathBuf, PathBuf), RoutineError> {
     let indir_str = attempt.indir.as_ref().ok_or(RoutineError::NoIndir)?;
     Ok((PathBuf::from(&indir_str), PathBuf::from(&indir_str)))
 }
 
 fn get_indir_outdir_for_ontdir(
-    attempt: &HgAttempt,
-    run: &HgRun,
+    attempt: &Attempt,
+    run: &Run,
 ) -> Result<(PathBuf, PathBuf), RoutineError> {
     let indir_str = attempt.indir.as_ref().ok_or(RoutineError::NoIndir)?;
 
@@ -223,8 +221,8 @@ fn get_indir_outdir_for_ontdir(
 }
 
 fn get_indir_outdir_for_illumina(
-    attempt: &HgAttempt,
-    _run: &HgRun,
+    attempt: &Attempt,
+    _run: &Run,
 ) -> Result<(PathBuf, PathBuf), RoutineError> {
     // Le dossier de run brut Illumina devrait être dans {sequencers_dir}/{run_sequencer}/output/{run_date}_{run_sequencer}_*_{run_flowcellid}*
     let config = get_mercure_config();

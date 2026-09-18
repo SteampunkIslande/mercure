@@ -39,37 +39,6 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
     sqlx::query(
         r#"
-        CREATE TABLE IF NOT EXISTS Formdef (
-            form_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pipeline_name TEXT NOT NULL,
-            launcher_name TEXT NOT NULL,
-            form_name TEXT NOT NULL,
-            enabled BOOLEAN NOT NULL DEFAULT 1,
-            version INTEGER NOT NULL DEFAULT 1,
-            indir_type TEXT NOT NULL DEFAULT 'BCL_DIR' CHECK (indir_type IN ('BCL_DIR', 'ANALYSIS_DIR', 'ONT_DIR')),
-            latest_launcher_revision TEXT
-        )
-        "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS FormdefHasGroup (
-            form_id INTEGER NOT NULL,
-            group_id INTEGER NOT NULL,
-            PRIMARY KEY (form_id, group_id),
-            FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
-            FOREIGN KEY (group_id) REFERENCES Groups(group_id) ON DELETE CASCADE
-        )
-        "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
         CREATE TABLE IF NOT EXISTS GroupHasUser (
             group_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
@@ -84,39 +53,16 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
     sqlx::query(
         r#"
-        CREATE TABLE IF NOT EXISTS UDV (
-            udv_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            form_id INTEGER NOT NULL,
-            varname TEXT NOT NULL,
-            default_values TEXT,
-            type TEXT NOT NULL CHECK (type IN ('FromValuesList', 'Constant', 'RunDefined')),
-            FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE
-        )
-        "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
         CREATE TABLE IF NOT EXISTS Runs (
             run_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            form_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             run_name TEXT NOT NULL,
-            run_date TEXT NOT NULL,
             creation_date TEXT NOT NULL,
-            run_sequencer TEXT NOT NULL,
-            run_flowcellid TEXT NOT NULL,
-            sample_sheet_adn_path TEXT NOT NULL,
-            sample_sheet_arn_path TEXT NOT NULL,
-            metadata_path TEXT NOT NULL,
             status TEXT NOT NULL,
-            user_defined_vars TEXT NOT NULL,
             attempt_count INTEGER NOT NULL DEFAULT 0,
-            indir TEXT,
-            outdir TEXT,
-            FOREIGN KEY (form_id) REFERENCES Formdef(form_id) ON DELETE CASCADE,
+            branch_name TEXT NOT NULL,
+            user_defined_vars TEXT NOT NULL,
+            form_path TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
         )
         "#,
@@ -131,14 +77,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             run_id INTEGER NOT NULL,
             attempt_date TEXT NOT NULL,
             user_defined_vars TEXT NOT NULL,
-            run_date TEXT NOT NULL,
-            run_sequencer TEXT NOT NULL,
-            run_flowcellid TEXT NOT NULL,
-            sample_sheet_adn_path TEXT NOT NULL,
-            sample_sheet_arn_path TEXT NOT NULL,
-            metadata_path TEXT NOT NULL,
-            indir TEXT,
-            outdir TEXT,
+            commit_hash TEXT NOT NULL,
             status TEXT NOT NULL,
             comment TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (run_id) REFERENCES Runs(run_id) ON DELETE CASCADE

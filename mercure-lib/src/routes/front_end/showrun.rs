@@ -11,8 +11,8 @@ use crate::templates::{Template, context};
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::launchers_check::{exists_launcher, is_pipeline_archived};
-use crate::models::HgAttempt;
-use crate::models::HgRun;
+use crate::models::Attempt;
+use crate::models::Run;
 use crate::models::RunStatus;
 use crate::models::{Group, HgFormDef};
 use crate::utils::filename_to_static_served_name;
@@ -26,7 +26,7 @@ pub async fn show_run_get(
 ) -> Template {
     // Get sequencers list for edit form
     let config = get_mercure_config();
-    let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
+    let run: Run = match Run::get_run_from_id(run_id, pool).await {
         Ok(run) => run,
         Err(e) => {
             return Template::render(
@@ -95,7 +95,7 @@ pub async fn show_run_get(
         let pipeline_is_archived = is_pipeline_archived(form_def);
 
         // Récupérer l'historique des tentatives pour la navigation
-        let history = HgAttempt::list_attempts_for_run(run_id, pool)
+        let history = Attempt::list_attempts_for_run(run_id, pool)
             .await
             .unwrap_or_default();
 
@@ -120,7 +120,7 @@ pub async fn show_run_get(
 
             let sequenceurs_folder = config.sequencers_dir;
 
-            let attempt = HgAttempt::get_hypothetic_attempt(&run);
+            let attempt = Attempt::get_hypothetic_attempt(&run);
 
             let sequenceurs_list = read_dir(&sequenceurs_folder)
                 .ok()
@@ -174,8 +174,7 @@ pub async fn show_run_get(
             let attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
 
             // On cherche la tentative demandée
-            let attempt = match HgAttempt::get_attempt_from_number(attempt_number, run_id, pool)
-                .await
+            let attempt = match Attempt::get_attempt_from_number(attempt_number, run_id, pool).await
             {
                 Ok(a) => a,
                 Err(e) => {

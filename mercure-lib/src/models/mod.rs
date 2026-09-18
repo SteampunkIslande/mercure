@@ -1,15 +1,13 @@
 pub mod analysis;
 pub mod attempt;
-pub mod directory_utils;
-pub mod form;
 pub mod groups;
 pub mod hgrun;
 pub mod user;
 
+use std::convert::Infallible;
+
 pub use analysis::*;
 pub use attempt::*;
-pub use directory_utils::*;
-pub use form::*;
 pub use groups::*;
 pub use hgrun::*;
 pub use user::*;
@@ -21,9 +19,13 @@ pub enum ModelError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] sqlx::Error),
     #[error(transparent)]
-    InvalidRunStatusError(#[from] hgrun::InvalidRunStatusError),
-    #[error(transparent)]
-    LauncherCheckError(#[from] crate::launchers_check::LauncherCheckError),
+    RunDefinitionError(#[from] hgrun::RunDefinitionError),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+}
+
+impl From<Infallible> for ModelError {
+    fn from(_: Infallible) -> Self {
+        unreachable!()
+    }
 }

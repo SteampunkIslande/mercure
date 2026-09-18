@@ -11,13 +11,13 @@ use crate::templates::{Template, context};
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
 use crate::models::Group;
-use crate::models::{HgFormDef, HgRun, RunStatus};
+use crate::models::{HgFormDef, Run, RunStatus};
 
 use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
-    let run: HgRun = match HgRun::get_run_from_id(run_id, pool).await {
+    let run: Run = match Run::get_run_from_id(run_id, pool).await {
         Ok(run) => run,
         Err(e) => {
             return Template::render(

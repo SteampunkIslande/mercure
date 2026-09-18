@@ -1,4 +1,4 @@
-use crate::models::{HgRun, ModelError, RunStatus};
+use crate::models::{ModelError, Run, RunStatus};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
@@ -7,25 +7,26 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
+#[derive(thiserror::Error, Debug)]
+pub enum AttemptError {
+    #[error("Aucun run n'est attaché à cette tentative")]
+    NoRunAttached,
+}
+
 /// Created every time we attempt to analyze an HgRun.
 ///
 /// Copies the editable data from HgRun at the time of attempt.
 ///
 /// All of its fields are read-only except for comment and status.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HgAttempt {
-    pub attempt_number: i64,
+pub struct Attempt {
     pub run_id: i64,
-    pub attempt_date: String,
+    pub attempt_number: u32,
+    pub attempt_date: OffsetDateTime,
+
     pub user_defined_vars: HashMap<String, String>,
-    pub run_date: String,
-    pub run_sequencer: String,
-    pub run_flowcellid: String,
-    pub sample_sheet_adn_path: String,
-    pub sample_sheet_arn_path: String,
-    pub metadata_path: String,
-    pub indir: Option<String>,
-    pub outdir: Option<String>,
+
+    pub commit_hash: String,
 
     /// One of the only two editable fields
     pub status: RunStatus,
@@ -33,33 +34,30 @@ pub struct HgAttempt {
     pub comment: String,
 }
 
-impl HgAttempt {
+impl Attempt {
     /// Crée une nouvelle tentative à partir d'une HgRun
-    pub(super) async fn new_attempt(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        let run: HgRun = HgRun::get_run_from_id(run_id, pool).await?;
+    pub(super) async fn new_attempt(
+        run_id: i64,
+        current_commit_hash: &str,
+        pool: &SqlitePool,
+    ) -> Result<(), ModelError> {
+        let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
         let attempt_date = OffsetDateTime::now_utc().to_string();
-        let user_defined_vars_json = serde_json::to_string(&run.user_defined_vars)
+        let user_defined_vars = serde_json::to_string(&run.user_defined_vars)
             .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
 
         sqlx::query(
             r#"
-            INSERT INTO Attempts (attempt_number, run_id, attempt_date, user_defined_vars, run_date, run_sequencer, run_flowcellid, sample_sheet_adn_path, sample_sheet_arn_path, metadata_path, indir, outdir, status, comment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+            INSERT INTO Attempts (run_id, attempt_number, attempt_date, user_defined_vars, commit_hash, status, comment)
+            VALUES (?, ?, ?, ?, ?, ?, '')
             "#,
         )
-        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
         .bind(run.run_id)
+        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
         .bind(&attempt_date)
-        .bind(&user_defined_vars_json)
-        .bind(&run.run_date)
-        .bind(&run.run_sequencer)
-        .bind(&run.run_flowcellid)
-        .bind(&run.sample_sheet_adn_path)
-        .bind(&run.sample_sheet_arn_path)
-        .bind(&run.metadata_path)
-        .bind(&run.indir)
-        .bind(&run.outdir)
+        .bind(&user_defined_vars)
+        .bind(&current_commit_hash)
         .bind(run.status.to_string())
         .execute(pool)
         .await?;
@@ -71,28 +69,21 @@ impl HgAttempt {
     ///
     /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
     /// Pratique pour l'API, uniformise l'environnement jinja2.
-    pub fn get_hypothetic_attempt(run: &HgRun) -> HgAttempt {
-        HgAttempt {
-            attempt_number: (run.attempt_count + 1) as i64,
-            run_id: run.run_id,
-            attempt_date: OffsetDateTime::now_utc().to_string(),
+    pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt, AttemptError> {
+        Ok(Attempt {
+            attempt_number: run.attempt_count + 1,
+            run_id: run.run_id.ok_or(AttemptError::NoRunAttached)?,
+            attempt_date: OffsetDateTime::now_utc(),
             user_defined_vars: run.user_defined_vars.clone(),
-            run_date: run.run_date.clone(),
-            run_sequencer: run.run_sequencer.clone(),
-            run_flowcellid: run.run_flowcellid.clone(),
-            sample_sheet_adn_path: run.sample_sheet_adn_path.clone(),
-            sample_sheet_arn_path: run.sample_sheet_arn_path.clone(),
-            metadata_path: run.metadata_path.clone(),
-            indir: run.indir.clone(),
-            outdir: run.outdir.clone(),
+            commit_hash: "".to_string(),
             status: RunStatus::Idle,
             comment: String::new(),
-        }
+        })
     }
 
     /// Récupère un HgAttempt à partir de son attempt_number et run_id
     pub async fn get_attempt_from_number(
-        attempt_number: i64,
+        attempt_number: u32,
         run_id: i64,
         pool: &SqlitePool,
     ) -> Result<Self, ModelError> {
@@ -107,29 +98,20 @@ impl HgAttempt {
         .await?;
 
         // Désérialiser les variables définies par l'utilisateur
-        let user_defined_vars_json: String = row.try_get("user_defined_vars")?;
         let user_defined_vars: HashMap<String, String> =
-            serde_json::from_str(&user_defined_vars_json).map_err(|e| {
+            serde_json::from_str(row.try_get("user_defined_vars")?).map_err(|e| {
                 ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
             })?;
 
-        let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())
-            .unwrap_or(RunStatus::Idle);
+        let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())?;
 
         // Construire l'instance HgAttempt
-        let attempt = HgAttempt {
+        let attempt = Attempt {
             attempt_number,
-            run_id: row.try_get("run_id")?,
+            run_id: run_id,
             attempt_date: row.try_get("attempt_date")?,
             user_defined_vars,
-            run_date: row.try_get("run_date")?,
-            run_sequencer: row.try_get("run_sequencer")?,
-            run_flowcellid: row.try_get("run_flowcellid")?,
-            sample_sheet_adn_path: row.try_get("sample_sheet_adn_path")?,
-            sample_sheet_arn_path: row.try_get("sample_sheet_arn_path")?,
-            metadata_path: row.try_get("metadata_path")?,
-            indir: row.try_get("indir").ok(),
-            outdir: row.try_get("outdir").ok(),
+            commit_hash: row.try_get("commit_hash")?,
             status,
             comment: row.try_get("comment")?,
         };
@@ -155,9 +137,8 @@ impl HgAttempt {
             .into_iter()
             .filter_map(|row| {
                 // Désérialiser les variables définies par l'utilisateur
-                let user_defined_vars_json: String = row.try_get("user_defined_vars").ok()?;
                 let user_defined_vars: HashMap<String, String> =
-                    serde_json::from_str(&user_defined_vars_json)
+                    serde_json::from_str(row.try_get("user_defined_vars").ok()?)
                         .map_err(|e| {
                             ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
                         })
@@ -166,19 +147,12 @@ impl HgAttempt {
                 // Parser le statut
                 let status_str: String = row.try_get("status").ok()?;
                 let status = RunStatus::from_str(status_str.as_str()).ok()?;
-                Some(HgAttempt {
+                Some(Attempt {
                     attempt_number: row.try_get("attempt_number").ok()?,
                     run_id: row.try_get("run_id").ok()?,
                     attempt_date: row.try_get("attempt_date").ok()?,
                     user_defined_vars,
-                    run_date: row.try_get("run_date").ok()?,
-                    run_sequencer: row.try_get("run_sequencer").ok()?,
-                    run_flowcellid: row.try_get("run_flowcellid").ok()?,
-                    sample_sheet_adn_path: row.try_get("sample_sheet_adn_path").ok()?,
-                    sample_sheet_arn_path: row.try_get("sample_sheet_arn_path").ok()?,
-                    metadata_path: row.try_get("metadata_path").ok()?,
-                    indir: row.try_get("indir").ok(),
-                    outdir: row.try_get("outdir").ok(),
+                    commit_hash: row.try_get("commit_hash").ok()?,
                     status,
                     comment: row.try_get("comment").ok()?,
                 })
@@ -187,7 +161,7 @@ impl HgAttempt {
     }
 
     pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        let run = HgRun::get_run_from_id(run_id, pool).await?;
+        let run = Run::get_run_from_id(run_id, pool).await?;
         sqlx::query(r#"UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?"#)
             .bind("Running")
             .bind(run_id)
@@ -199,7 +173,7 @@ impl HgAttempt {
 
     /// La tentative `attempt_number` s'est terminée avec succès.
     pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        let run = HgRun::get_run_from_id(run_id, pool).await?;
+        let run = Run::get_run_from_id(run_id, pool).await?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -219,7 +193,7 @@ impl HgAttempt {
         reason: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        let run = HgRun::get_run_from_id(run_id, pool).await?;
+        let run = Run::get_run_from_id(run_id, pool).await?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -236,7 +210,7 @@ impl HgAttempt {
     /// Met à jour le commentaire d'une tentative
     pub(super) async fn update_comment(
         run_id: i64,
-        attempt_number: i64,
+        attempt_number: u32,
         new_comment: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {

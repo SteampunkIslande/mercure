@@ -52,9 +52,9 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
 
     rocket::custom(figment)
         .register("/mercure", catchers![unauthorized])
-        .mount("/mercure/static", FileServer::from(config.static_dir))
-        .mount("/mercure/uploads", FileServer::from(config.upload_dir))
-        .mount("/mercure/logs", FileServer::from(config.logs_dir))
+        .mount("/mercure/static", FileServer::from(&config.static_dir))
+        .mount("/mercure/uploads", FileServer::from(&config.upload_dir))
+        .mount("/mercure/logs", FileServer::from(&config.logs_dir))
         .mount(
             "/mercure",
             routes![
@@ -132,8 +132,6 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::backend::search_run_get,
                 // Route pour traduire les noms des séquenceurs
                 routes::backend::prettify_seqname,
-                // Routes pour lister les dossiers selon le type
-                routes::backend::list_directories_by_type,
                 // Route pour toutes les redirections
                 routes::frontend::redirect_get,
                 // Route pour relancer un run (une fois terminé)
@@ -145,6 +143,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             ],
         )
         .manage(pool)
+        .manage(config)
         .attach(minijinja_fairing())
 }
 

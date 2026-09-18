@@ -1,0 +1,50 @@
+name: "Smaug-v3 simple"
+description: "Démultiplexe à partir d'un dossier de run brut, lance l'analyse smaug avec le BED spécifié, puis copie le résultat sur le NAS."
+variables:
+  - name: bed
+    title: BED
+    description: Le fichier BED à utiliser pour cette analyse
+    type: FromURL
+    source: /mercure/api/aux/list_beds
+  - name: genome
+    title: Génome
+    userdefined: true
+    description: Le génome à utiliser
+    type: ValuesList
+    values:
+      - hg19
+      - hg38
+  - name: indir
+    title: Dossier BCL
+    description: Le dossier de run brut Illumina
+    type: FromURL
+    source: /mercure/api/aux/list_illumina_dirs
+  - name: outdir
+    title: Dossier de sortie
+    description: Le dossier de travail pour snakemake
+  - name: panel
+    title: Nom du panel
+    type: FromURL
+  - name: sample_sheet
+    title: SampleSheet
+    description: La samplesheet, espèce de neuneu
+    type: ExistingFile
+exec_type: shell
+trigger: Manual
+workdir: outdir
+exec: |
+  # Copie de la samplesheet dans le bon dossier
+  rsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv
+  
+  # Démultiplexage
+  snakemake -s pipelines/demul/Snakefile --config indir={{ indir }} outdir={{ outdir }}
+  
+  # Copie vers MOABI 
+  rsync -a --info=progress2 "{{ outdir }}/fastq" user@depot:/where/it/should/go
+  
+  # Smaug v3
+  snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}
+  
+  # Copie NAS
+  rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ panel }}
+

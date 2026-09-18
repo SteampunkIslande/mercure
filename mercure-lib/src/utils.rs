@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use lazy_regex::{Lazy, Regex, lazy_regex};
 
+use anyhow::Result;
 use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
 
