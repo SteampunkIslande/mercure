@@ -1,9 +1,10 @@
+use rocket::State;
 use rocket::form::{Form, FromForm};
 use rocket::fs::TempFile;
 use rocket::serde::json::Json;
 use std::path::PathBuf;
 
-use crate::config::get_mercure_config;
+use crate::config::MercureConfig;
 use crate::routes::ApiResponse;
 
 #[derive(FromForm)]
@@ -13,15 +14,16 @@ pub struct UploadForm<'r> {
 }
 
 #[rocket::post("/upload", data = "<form>")]
-pub async fn upload_post(mut form: Form<UploadForm<'_>>) -> Json<ApiResponse<String>> {
-    let config = get_mercure_config();
-
+pub async fn upload_post(
+    mut form: Form<UploadForm<'_>>,
+    config: &State<MercureConfig>,
+) -> Json<ApiResponse<String>> {
     // Get upload directory
-    let upload_dir = PathBuf::from(config.upload_dir);
+    let upload_dir = PathBuf::from(&config.upload_dir);
 
-    // Ensure directory exists
-    if !upload_dir.exists() && std::fs::create_dir_all(&upload_dir).is_err() {
-        return Json(ApiResponse::error("Failed to create upload directory"));
+    // If the upload dir doesn't exist, this is an error (admin should have created it!)
+    if !upload_dir.exists() {
+        return Json(ApiResponse::error("Le dossier d'upload n'existe pas !"));
     }
 
     // Generate a unique filename. Alphabetical order is also creation time order.

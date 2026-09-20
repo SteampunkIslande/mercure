@@ -41,6 +41,9 @@ enum Commands {
     #[command(subcommand)]
     Admin(Admin),
 
+    /// Exécute à la fois l'application web et la routine
+    ///
+    /// La routine et l'application sont lancées de façon concurrente.
     Web(Web),
 }
 

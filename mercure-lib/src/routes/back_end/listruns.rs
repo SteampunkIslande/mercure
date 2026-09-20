@@ -94,77 +94,64 @@ async fn list_runs(
     page: Option<i64>,
     status: Option<String>,
 ) -> Result<(Vec<serde_json::Value>, i64), sqlx::Error> {
-    // Here, if status is empty, this will match everything since status is a string type field and `LIKE %` will match any string!
-    let status = status.unwrap_or_default();
+    // On prépare la valeur du LIKE pour le bind ("valeur%")
+    let status_bind = format!("{}%", status.unwrap_or_default());
 
-    let (count_query, base_query) = match user {
-        Some(u) => {
-            let count_query = format!(
-                r#"
-                SELECT COUNT(r.run_id) as total
-                FROM Runs r
-                WHERE r.form_id IN (
-                    SELECT f.form_id
-                    FROM Formdef f
-                    INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                    INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                    WHERE gu.user_id = {} 
-                )
-                AND r.status LIKE '{status}%'
-                "#,
-                u.id
-            );
+    let limit = page_size.unwrap_or(20);
+    let offset = (page.unwrap_or(1) - 1) * limit;
 
-            let base_query = format!(
-                r#"
-                SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
-                FROM Runs r
-                INNER JOIN Users u ON r.user_id = u.id
-                WHERE r.form_id IN (
-                    SELECT f.form_id
-                    FROM Formdef f
-                    INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                    INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                    WHERE gu.user_id = {} 
-                )
-                AND r.status LIKE '{status}%'
-                ORDER BY r.run_date DESC
-                LIMIT ? OFFSET ?
-                "#,
-                u.id
-            );
-
-            (count_query, base_query)
+    // Le filtre contient désormais le placeholder "?" à la place de l'ID direct
+    let user_filter = match user {
+        Some(_) => {
+            r#"r.form_id IN (
+                SELECT f.form_id
+                FROM Formdef f
+                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
+                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
+                WHERE gu.user_id = ? 
+            ) AND "#
         }
-        None => {
-            let count_query = format!(
-                "SELECT COUNT(r.run_id) as total FROM Runs r WHERE r.status LIKE '{status}%'"
-            );
-
-            let base_query = format!(
-                r#"
-                SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
-                FROM Runs r
-                INNER JOIN Users u ON r.user_id = u.id
-                WHERE r.status LIKE '{status}%'
-                ORDER BY r.run_date DESC
-                LIMIT ? OFFSET ?
-            "#
-            );
-
-            (count_query, base_query)
-        }
+        None => "",
     };
 
-    // Get total count
-    let total_count: i64 = sqlx::query(&count_query)
-        .fetch_one(pool)
-        .await?
-        .try_get("total")?;
+    let count_query_str = format!(
+        "SELECT COUNT(r.run_id) as total FROM Runs r WHERE {} r.status LIKE ?",
+        user_filter
+    );
 
-    let runs_data = sqlx::query(&base_query)
-        .bind(page_size.unwrap_or(20))
-        .bind((page.unwrap_or(1) - 1) * page_size.unwrap_or(20))
+    let base_query_str = format!(
+        r#"
+        SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
+        FROM Runs r
+        INNER JOIN Users u ON r.user_id = u.id
+        WHERE {} r.status LIKE ?
+        ORDER BY r.run_date DESC
+        LIMIT ? OFFSET ?
+        "#,
+        user_filter
+    );
+
+    // Initialisation des requêtes sqlx
+    let mut count_query = sqlx::query(&count_query_str);
+    let mut base_query = sqlx::query(&base_query_str);
+
+    // 1. Bind conditionnel de l'utilisateur (doit être le premier "?" s'il existe)
+    if let Some(u) = user {
+        count_query = count_query.bind(u.id);
+        base_query = base_query.bind(u.id);
+    }
+
+    // 2. Bind du statut pour les deux requêtes (second "?")
+    count_query = count_query.bind(&status_bind);
+    base_query = base_query.bind(&status_bind);
+
+    // Exécution du count
+    let total_count: i64 = count_query.fetch_one(pool).await?.try_get("total")?;
+
+    // 3. Bind finaux pour la pagination (troisième et quatrième "?") puis exécution
+    let runs_data = base_query
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await?
         .iter()

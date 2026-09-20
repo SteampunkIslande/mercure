@@ -10,11 +10,10 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::config::get_mercure_config;
-use crate::launchers_check::{exists_launcher, is_pipeline_archived};
 use crate::models::Attempt;
 use crate::models::Run;
 use crate::models::RunStatus;
-use crate::models::{Group, HgFormDef};
+use crate::models::{Form, Group};
 use crate::utils::filename_to_static_served_name;
 
 #[get("/show/run/<run_id>?<attempt_number>")]

@@ -1,4 +1,8 @@
+use std::path::Path;
+
 use crate::config::{GitWebConfig, MercureConfig, get_mercure_config};
+use reqwest::Client;
+use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
@@ -12,6 +16,25 @@ pub enum GitCheckError {
     NoSuchBranch(String),
     #[error(transparent)]
     AnyhowError(#[from] anyhow::Error),
+    #[error("{0}")]
+    Unsupported(String),
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaCommitResponse {
+    id: String,
+    // the rest of the commit is not needed for BranchInfo
+    #[serde(flatten)]
+    _rest: serde::de::IgnoredAny,
+}
+
+#[derive(Debug, Deserialize)]
+struct GiteaBranchResponse {
+    name: String,
+    commit: GiteaCommitResponse,
+    // Gitea also returns effective_branch_protection_name, protected,... we ignore them here
+    #[serde(default)]
+    _rest: serde::de::IgnoredAny,
 }
 
 pub struct BranchInfo {
@@ -20,14 +43,10 @@ pub struct BranchInfo {
 }
 
 impl BranchInfo {
-    pub fn from_str_tuple<T, U>(tuple: (T, U)) -> Self
-    where
-        T: AsRef<str>,
-        U: AsRef<str>,
-    {
+    pub fn from_gitea(b: GiteaBranchResponse) -> Self {
         Self {
-            name: tuple.0.as_ref().to_string(),
-            last_commit: tuple.1.as_ref().to_string(),
+            name: b.name.clone(),
+            last_commit: b.commit.id.clone(),
         }
     }
 }
@@ -35,6 +54,103 @@ impl BranchInfo {
 pub async fn get_latest_commit(
     branch_name: Option<&str>,
 ) -> Result<Vec<BranchInfo>, GitCheckError> {
+    let MercureConfig { pipelines, .. } = get_mercure_config();
+
+    match &pipelines {
+        GitWebConfig::GiteaV1 {
+            base_url,
+            owner,
+            repo,
+        } => {
+            let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/branches");
+            let branches: Vec<GiteaBranchResponse> = reqwest::get(&url)
+                .await?
+                .json::<Vec<GiteaBranchResponse>>()
+                .await?;
+
+            Ok(branches
+                .into_iter()
+                .map(|b| BranchInfo::from_gitea(b))
+                .filter(|info| branch_name.map(|n| n == &info.name).unwrap_or(true))
+                .collect())
+        }
+
+        GitWebConfig::GitlabV4 { base_url: _, id: _ } => Err(GitCheckError::Unsupported(
+            "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
+        )),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DirContentsItem {
+    pub name: String,
+    pub path: String,
+    #[serde(rename = "type")]
+    pub item_type: String,
+    pub size: Option<u64>,
+    // les autres champs ne sont pas nécessaires ici
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DirContentsResponse {
+    pub dir_contents: Vec<DirContentsItem>,
+}
+
+pub async fn list_yaml_forms_giteav1(
+    base_url: &str,
+    owner: &str,
+    repo: &str,
+    branch_name: &str,
+) -> Result<Vec<DirContentsItem>, GitCheckError> {
+    let client = Client::new();
+
+    let url = format!(
+        "{}/api/v1/repos/{}/{}/contents-ext/.forms",
+        base_url, owner, repo
+    );
+
+    let resp = client
+        .get(&url)
+        .query(&[("ref", branch_name)])
+        .send()
+        .await?;
+
+    let body = resp.json::<DirContentsResponse>().await?;
+
+    // filtre uniquement les fichiers yml / yaml
+    let filtered = body
+        .dir_contents
+        .into_iter()
+        .filter(|item| {
+            item.item_type.eq_ignore_ascii_case("file")
+                && (item.name.ends_with(".yml") || item.name.ends_with(".yaml"))
+        })
+        .collect::<Vec<_>>();
+
+    Ok(filtered)
+}
+
+pub async fn get_file_giteav1(
+    base_url: &str,
+    owner: &str,
+    repo: &str,
+    branch_name: &str,
+    path: &Path,
+) -> Result<String, GitCheckError> {
+    let client = Client::new();
+    // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
+    let url = format!(
+        "{}/{}/{}/raw/branch/{}/{}",
+        base_url,
+        owner,
+        repo,
+        branch_name,
+        path.display()
+    );
+    Ok(client.get(&url).send().await?.text().await?)
+}
+
+pub async fn get_all_branches() -> Result<Vec<String>, GitCheckError> {
     let MercureConfig { pipelines, .. } = get_mercure_config();
 
     match &pipelines {
@@ -51,14 +167,7 @@ pub async fn get_latest_commit(
         .as_array()
         .ok_or(anyhow::anyhow!("Gitea should have responded with an array"))?
         .iter()
-        .filter_map(|v| {
-            Some((
-                v["name"].as_str()?.to_string(),
-                v["commit"]["id"].as_str()?.to_string(),
-            ))
-        })
-        .filter(|v| branch_name.as_ref().is_none_or(|n| n == &v.0))
-        .map(BranchInfo::from_str_tuple)
+        .filter_map(|v| Some(v["name"].as_str()?.to_string()))
         .collect()),
 
         GitWebConfig::GitlabV4 { base_url: _, id: _ } => {

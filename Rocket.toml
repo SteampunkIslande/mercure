@@ -1,0 +1,6 @@
+
+[debug.pipelines]
+api = "gitea_v1"
+base_url = "localhost:3333"
+owner = "bioinfo"
+repo = "mercure"

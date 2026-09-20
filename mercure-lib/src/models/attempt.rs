@@ -44,8 +44,7 @@ impl Attempt {
         let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
         let attempt_date = OffsetDateTime::now_utc().to_string();
-        let user_defined_vars = serde_json::to_string(&run.user_defined_vars)
-            .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
+        let user_defined_vars = serde_json::to_string(&run.user_defined_vars)?;
 
         sqlx::query(
             r#"
@@ -99,9 +98,7 @@ impl Attempt {
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars: HashMap<String, String> =
-            serde_json::from_str(row.try_get("user_defined_vars")?).map_err(|e| {
-                ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
-            })?;
+            serde_json::from_str(row.try_get("user_defined_vars")?)?;
 
         let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())?;
 
@@ -138,11 +135,7 @@ impl Attempt {
             .filter_map(|row| {
                 // Désérialiser les variables définies par l'utilisateur
                 let user_defined_vars: HashMap<String, String> =
-                    serde_json::from_str(row.try_get("user_defined_vars").ok()?)
-                        .map_err(|e| {
-                            ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
-                        })
-                        .ok()?;
+                    serde_json::from_str(row.try_get("user_defined_vars").ok()?).ok()?;
 
                 // Parser le statut
                 let status_str: String = row.try_get("status").ok()?;

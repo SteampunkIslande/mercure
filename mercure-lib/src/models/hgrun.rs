@@ -1,3 +1,4 @@
+use crate::models::Form;
 use crate::models::User;
 
 use crate::models::ModelError;
@@ -101,8 +102,7 @@ impl Run {
         run_submission.creation_date = OffsetDateTime::now_utc().to_string();
 
         // Insérer dans la table Runs
-        let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)
-            .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
+        let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)?;
 
         let run_id = sqlx::query(
             r#"
@@ -132,8 +132,7 @@ impl Run {
         user_defined_vars: HashMap<String, String>,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        let user_defined_vars = serde_json::to_string(&user_defined_vars)
-            .map_err(|e| ModelError::FormError(format!("Erreur de sérialisation JSON: {}", e)))?;
+        let user_defined_vars = serde_json::to_string(&user_defined_vars)?;
 
         let run: Run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
@@ -184,9 +183,7 @@ impl Run {
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars: HashMap<String, String> =
-            serde_json::from_str(row.try_get("user_defined_vars")?).map_err(|e| {
-                ModelError::FormError(format!("Erreur de désérialisation JSON: {}", e))
-            })?;
+            serde_json::from_str(row.try_get("user_defined_vars")?)?;
 
         // Parser le statut
         let status: RunStatus = RunStatus::from_str(row.try_get("status")?)?;
@@ -211,6 +208,10 @@ impl Run {
         };
 
         Ok(hgrun)
+    }
+
+    pub async fn get_form(&self) -> Result<Form, ModelError> {
+        Form::get_form(&self.branch_name, &self.form_path).await
     }
 
     /// Valide le formulaire pour ce run : Idle -> Pending

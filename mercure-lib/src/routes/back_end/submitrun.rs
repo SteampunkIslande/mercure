@@ -81,7 +81,7 @@ pub async fn editrun_post(
         )));
     }
 
-    match hgrun::Run::edit_run(run.0, pool).await {
+    match hgrun::Run::edit_run(run_id, run.0.user_defined_vars, pool).await {
         Ok(_) => Json(ApiResponse::success(
             json!({"message":"Run modifié avec succès!","run_id":run_id}),
         )),
