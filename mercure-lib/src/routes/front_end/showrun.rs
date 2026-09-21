@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs::read_dir;
 use std::ops::Not;
 
 use rocket::State;
@@ -14,14 +13,13 @@ use crate::models::Attempt;
 use crate::models::Run;
 use crate::models::RunStatus;
 use crate::models::{Form, Group};
-use crate::utils::filename_to_static_served_name;
 
 #[get("/show/run/<run_id>?<attempt_number>")]
 pub async fn show_run_get(
     auth: Authenticated,
     pool: &State<SqlitePool>,
     run_id: i64,
-    attempt_number: Option<i64>,
+    attempt_number: Option<u32>,
 ) -> Template {
     // Get sequencers list for edit form
     let config = get_mercure_config();
@@ -38,11 +36,26 @@ pub async fn show_run_get(
             );
         }
     };
+    let form: Form = match run.get_form().await {
+        Ok(form) => form,
+        Err(e) => {
+            return Template::render(
+                "common/error",
+                context! { title=> "Erreur", h2=>format!("Impossible d'obtenir le formulaire pour le run {}",run_id),message=>e.to_string() },
+            );
+        }
+    };
     let can_see_run = {
         if auth.user.is_admin {
             true
         } else {
-            let form_groups: HashSet<i64> = run.form.groups.iter().map(|grp| grp.id).collect();
+            let form_groups: HashSet<i64> = form
+                .get_group_ids(pool)
+                .await
+                .ok()
+                .map(|v| v.into_iter().collect())
+                .unwrap_or_default();
+
             let auth_groups: HashSet<i64> = match Group::get_user_groups(pool, auth.user.id).await {
                 Ok(groups) => groups.iter().map(|grp| grp.id).collect(),
                 Err(e) => {
@@ -54,7 +67,7 @@ pub async fn show_run_get(
                     );
                 }
             };
-            let form_user_groups: HashSet<i64> = match Group::get_user_groups(pool, run.user.id)
+            let form_user_groups: HashSet<i64> = match Group::get_user_groups(pool, run.user_id)
                 .await
             {
                 Ok(groups) => groups.iter().map(|grp| grp.id).collect(),
@@ -75,83 +88,14 @@ pub async fn show_run_get(
     };
 
     if can_see_run {
-        let form_def = &run.form;
-
-        if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
-            // Désactiver le formulaire si ce n'était pas déjà fait
-            HgFormDef::disable_form(pool, form_def.form_id).await.ok();
-            return Template::render(
-                "common/error",
-                context! {
-                    title=>"Launcher manquant",
-                    h2=>"Launcher manquant",
-                    message=>format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
-                },
-            );
-        }
-
-        // Vérifier si le pipeline est archivé
-        let pipeline_is_archived = is_pipeline_archived(form_def);
-
         // Récupérer l'historique des tentatives pour la navigation
         let history = Attempt::list_attempts_for_run(run_id, pool)
             .await
             .unwrap_or_default();
 
-        // Serialize user_defined_vars for JavaScript
-        let user_defined_vars_json =
-            match serde_json::to_string(&run.form.user_defined_vars.clone().unwrap_or_default()) {
-                Ok(json_str) => json_str,
-                Err(e) => format!("{{\"Error\": \"{}\"}}", e),
-            };
         // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
-            if pipeline_is_archived {
-                return Template::render(
-                    "common/error",
-                    context! {
-                        title=> "Pipeline archivé",
-                        h2=> "Pipeline archivé",
-                        message=> format!("Impossible de voir ce run: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", form_def.form_id)
-                    },
-                );
-            }
-
-            let sequenceurs_folder = config.sequencers_dir;
-
             let attempt = Attempt::get_hypothetic_attempt(&run);
-
-            let sequenceurs_list = read_dir(&sequenceurs_folder)
-                .ok()
-                .map(|entries| {
-                    entries
-                        .filter_map(|entry| {
-                            entry.ok().and_then(|e| {
-                                if e.file_type().ok()?.is_dir() {
-                                    e.file_name().to_str().map(|s| s.to_string())
-                                } else {
-                                    None
-                                }
-                            })
-                        })
-                        .collect::<Vec<String>>()
-                })
-                .unwrap_or_default();
-
-            let samplesheet_adn_static_name = filename_to_static_served_name(
-                &run.sample_sheet_adn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let samplesheet_arn_static_name = filename_to_static_served_name(
-                &run.sample_sheet_arn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let metadata_static_name =
-                filename_to_static_served_name(&run.metadata_path, &config.upload_dir, "/uploads");
 
             Template::render(
                 "common/idlerun",
@@ -170,7 +114,7 @@ pub async fn show_run_get(
             )
         } else {
             // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
-            let attempt_number = attempt_number.unwrap_or(run.attempt_count as i64);
+            let attempt_number = attempt_number.unwrap_or(run.attempt_count);
 
             // On cherche la tentative demandée
             let attempt = match Attempt::get_attempt_from_number(attempt_number, run_id, pool).await
@@ -187,24 +131,6 @@ pub async fn show_run_get(
                     );
                 }
             };
-
-            let samplesheet_adn_static_name = filename_to_static_served_name(
-                &attempt.sample_sheet_adn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let samplesheet_arn_static_name = filename_to_static_served_name(
-                &attempt.sample_sheet_arn_path,
-                &config.upload_dir,
-                "/uploads",
-            );
-
-            let metadata_static_name = filename_to_static_served_name(
-                &attempt.metadata_path,
-                &config.upload_dir,
-                "/uploads",
-            );
 
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {

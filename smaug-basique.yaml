@@ -32,6 +32,9 @@ variables:
 exec_type: shell
 trigger: Manual
 workdir: outdir
+groups:
+  - Admin
+  - Génétique
 exec: |
   # Copie de la samplesheet dans le bon dossier
   rsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv

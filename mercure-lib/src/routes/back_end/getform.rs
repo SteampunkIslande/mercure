@@ -20,9 +20,10 @@ pub async fn get_all_forms(config: &State<MercureConfig>) -> Json<ApiResponse<Ve
 #[get("/forms/groups/<group_id>")]
 pub async fn get_all_forms_for_group(
     pool: &State<SqlitePool>,
+    config: &State<MercureConfig>,
     group_id: i64,
 ) -> Json<ApiResponse<serde_json::Value>> {
-    match Form::get_form_list_items_for_group(pool, group_id).await {
+    match Form::get_form_list_items_for_group(pool, config, group_id).await {
         Ok(alldefs) => Json(ApiResponse::success(json!({
             "with_group": alldefs.0,
             "without_group": alldefs.1

@@ -26,6 +26,8 @@ pub enum AuthError {
     BcryptError(#[from] bcrypt::BcryptError),
     #[error("No password given")]
     NoPassword,
+    #[error(transparent)]
+    ModelError(#[from] crate::models::ModelError),
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {
@@ -59,6 +61,10 @@ impl<'r> Responder<'r, 'static> for AuthError {
             AuthError::NoPassword => {
                 response.status(Status::BadRequest);
                 ApiResponse::<()>::error(self.to_string())
+            }
+            AuthError::ModelError(e) => {
+                response.status(Status::InternalServerError);
+                ApiResponse::<()>::error(format!("Erreur générique: {e}"))
             }
         };
 

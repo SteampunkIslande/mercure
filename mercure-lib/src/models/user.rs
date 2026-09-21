@@ -5,6 +5,7 @@ use sqlx::{FromRow, SqlitePool};
 use time::OffsetDateTime;
 
 use crate::auth::AuthError;
+use crate::models::ModelError;
 
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct User {
@@ -64,8 +65,7 @@ impl User {
         .bind(&password_hash)
         .bind(now)
         .execute(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .await?;
 
         // Récupérer l'utilisateur créé
         let user = sqlx::query_as::<_, User>(
@@ -76,8 +76,7 @@ impl User {
         )
         .bind(&new_user.usermail)
         .fetch_one(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .await?;
 
         Ok(user)
     }
@@ -88,7 +87,7 @@ impl User {
             .await
     }
 
-    pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<Option<User>, AuthError> {
+    pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<User, ModelError> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
@@ -96,9 +95,8 @@ impl User {
             "#,
         )
         .bind(id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .fetch_one(pool)
+        .await?;
 
         Ok(user)
     }
@@ -115,8 +113,7 @@ impl User {
         )
         .bind(usermail)
         .fetch_optional(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .await?;
 
         Ok(user)
     }
@@ -140,8 +137,7 @@ impl User {
         .bind(new_password_hash)
         .bind(user_id)
         .execute(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .await?;
         Ok(())
     }
 
@@ -191,8 +187,7 @@ impl User {
         .bind(now)
         .bind(self.id)
         .execute(pool)
-        .await
-        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+        .await?;
 
         Ok(())
     }

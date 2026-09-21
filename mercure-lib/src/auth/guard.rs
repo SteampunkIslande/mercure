@@ -26,12 +26,7 @@ async fn user_from_cookie(request: &Request<'_>) -> Result<User, AuthError> {
             let user_id: i64 = cookie.value().parse().map_err(|err| {
                 AuthError::TokenError(format!("Could not parse int from cookie: {}", err))
             })?;
-            User::find_by_id(user_id, pool)
-                .await?
-                .ok_or(AuthError::DatabaseError(format!(
-                    "Cannot find user {}",
-                    user_id
-                )))
+            Ok(User::find_by_id(user_id, pool).await?)
         }
         None => Err(AuthError::TokenError(
             "Could not find cookie with key `user_id`".to_string(),

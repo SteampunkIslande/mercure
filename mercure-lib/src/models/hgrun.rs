@@ -85,14 +85,14 @@ pub struct Run {
     /// Number of attempts made for this run. Incremented each time a new attempt is created.
     pub attempt_count: u32,
 
-    /// Name of the branch this run will take its code from
-    pub branch_name: String,
-
     /// User defined variables
     pub user_defined_vars: HashMap<String, String>,
 
     /// Path to the yaml file within said `branch`
     pub form_path: PathBuf,
+
+    /// Name of the branch this run will take its code from
+    pub branch_name: String,
 }
 
 impl Run {
@@ -212,6 +212,10 @@ impl Run {
 
     pub async fn get_form(&self) -> Result<Form, ModelError> {
         Form::get_form(&self.branch_name, &self.form_path).await
+    }
+
+    pub async fn get_user(&self, pool: &SqlitePool) -> Result<User, ModelError> {
+        Ok(User::find_by_id(self.user_id, pool).await?)
     }
 
     /// Valide le formulaire pour ce run : Idle -> Pending

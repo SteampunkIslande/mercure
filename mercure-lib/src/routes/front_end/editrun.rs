@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs::read_dir;
 use std::ops::Not;
 
 use rocket::State;
@@ -9,11 +8,8 @@ use sqlx::SqlitePool;
 use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
-use crate::config::get_mercure_config;
 use crate::models::Group;
-use crate::models::{HgFormDef, Run, RunStatus};
-
-use crate::launchers_check::{exists_launcher, is_pipeline_archived};
+use crate::models::{Run, RunStatus};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id: i64) -> Template {
@@ -68,87 +64,19 @@ pub async fn edit_run_get(auth: Authenticated, pool: &State<SqlitePool>, run_id:
 
     if can_see_run {
         match run.status {
-            RunStatus::Idle => {
-                // Get sequencers list for edit form
-                let config = get_mercure_config();
-                let sequenceurs_folder = config.sequencers_dir;
-                let form_def = &run.form;
-
-                // Si le fichier de launcher n'existe plus, afficher une erreur
-                if !exists_launcher(&form_def.pipeline_name, &form_def.launcher_name).await {
-                    // Désactiver le formulaire si ce n'était pas déjà fait
-                    HgFormDef::disable_form(pool, form_def.form_id).await.ok();
-                    return Template::render(
-                        "common/error",
-                        context! {
-                            title=>"Launcher manquant",
-                            h2=>"Launcher manquant",
-                            message=>format!("Impossible d'éditer le run {}: le launcher spécifié dans le formulaire n'existe plus ({}/launchers/{}). Le formulaire correspondant a été désactivé.", run.run_id, form_def.pipeline_name, form_def.launcher_name)
-                        },
-                    );
-                }
-
-                // Vérifier si le pipeline est archivé (révision git différente)
-                let pipeline_is_archived = is_pipeline_archived(form_def);
-                if pipeline_is_archived {
-                    return Template::render(
-                        "common/error",
-                        context! {
-                            title=> "Pipeline archivé",
-                            h2=> "Pipeline archivé",
-                            message=> format!("Impossible d'éditer le run {}: le pipeline a été archivé. Veuillez demander à votre administrateur de mettre à jour le formulaire. Numéro du formulaire: {}.", run.run_id, form_def.form_id)
-                        },
-                    );
-                }
-                let sequenceurs_list = read_dir(&sequenceurs_folder)
-                    .ok()
-                    .map(|entries| {
-                        entries
-                            .filter_map(|entry| {
-                                entry.ok().and_then(|e| {
-                                    if e.file_type().ok()?.is_dir() {
-                                        e.file_name().to_str().map(|s| s.to_string())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            })
-                            .collect::<Vec<String>>()
-                    })
-                    .unwrap_or_default();
-
-                // Serialize user_defined_vars for JavaScript
-                let user_defined_vars_json = match serde_json::to_string(
-                    &run.form.user_defined_vars.clone().unwrap_or_default(),
-                ) {
-                    Ok(json_str) => json_str,
-                    Err(e) => {
-                        return Template::render(
-                            "common/error",
-                            context! {
-                                title=>"Formulaire invalide",
-                                h2=>"Formulaire invalide",
-                                message=>format!("Erreur lors du chargement des variables définies par l'utilisateur: {}", e)
-                            },
-                        );
-                    }
-                };
-
-                Template::render(
-                    "common/editrun",
-                    context! {
-                        run=> &run,
-                        user=> auth.user,
-                        form_id=> &run.form.form_id,
-                        run_id=> &run.run_id,
-                        sequenceurs_list,
-                        user_defined_vars_json,
-                        indir_type=> &run.form.indir_type,
-                        form=> &run.form,
-                        pipeline_is_archived=> pipeline_is_archived,
-                    },
-                )
-            }
+            RunStatus::Idle => Template::render(
+                "common/editrun",
+                context! {
+                    run=> &run,
+                    user=> &auth.user,
+                    form_id=> &run.form.form_id,
+                    run_id=> &run.run_id,
+                    sequenceurs_list,
+                    user_defined_vars_json,
+                    indir_type=> &run.form.indir_type,
+                    form=> &run.get_form().await,
+                },
+            ),
             status => {
                 let status_str = match status {
                     RunStatus::Running => "Run en cours",
