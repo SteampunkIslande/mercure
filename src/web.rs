@@ -35,6 +35,9 @@ async fn unauthorized() -> Template {
 }
 
 async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
+    use rocket_include_dir::{Dir, StaticFiles, include_dir};
+    static PROJECT_DIR: Dir = include_dir!("static");
+
     let config = config::get_mercure_config();
 
     let shutdown_config = Shutdown {
@@ -55,6 +58,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         .register("/mercure", catchers![unauthorized])
         .mount("/mercure/uploads", FileServer::from(&config.upload_dir))
         .mount("/mercure/logs", FileServer::from(&config.logs_dir))
+        .mount("/mercure/static", StaticFiles::from(&PROJECT_DIR))
         .mount(
             "/mercure",
             routes![

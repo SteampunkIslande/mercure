@@ -1331,6 +1331,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "include_dir"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
+dependencies = [
+ "include_dir_macros",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1590,11 +1609,13 @@ dependencies = [
  "chrono",
  "clap",
  "env_logger",
+ "include_dir",
  "log",
  "mercure-lib",
  "nix",
  "regex",
  "rocket",
+ "rocket-include-dir",
  "sqlx",
  "thiserror",
  "tokio",
@@ -2242,6 +2263,16 @@ dependencies = [
  "ubyte",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "rocket-include-dir"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6be430ce738be3053c0a27d9cf79286ab9a8e52ec4df5ab69412077ced73b255"
+dependencies = [
+ "include_dir",
+ "rocket",
 ]
 
 [[package]]
