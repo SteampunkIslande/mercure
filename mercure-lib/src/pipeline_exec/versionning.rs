@@ -29,7 +29,7 @@ struct GiteaCommitResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct GiteaBranchResponse {
+pub struct GiteaBranchResponse {
     name: String,
     commit: GiteaCommitResponse,
     // Gitea also returns effective_branch_protection_name, protected,... we ignore them here

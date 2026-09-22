@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use mercure::models::{ModelError, Run};
-use mercure_lib::config::get_mercure_config;
+use mercure::models::ModelError;
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
 use std::process::ExitStatus;
@@ -9,12 +8,11 @@ use tokio::task::{JoinError as TokioJoinError, JoinSet};
 
 use sqlx::SqlitePool;
 
-use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use chrono::ParseError;
 use mercure_lib::models::AnalysisStateMachineError;
-use regex::{Error as RegexError, Regex};
+use regex::Error as RegexError;
 use sqlx::Error;
 
 use mercure_lib::models::Attempt;

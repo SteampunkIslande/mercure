@@ -27,9 +27,3 @@ pub async fn update_groups(
         Err(e) => Json(ApiResponse::error(format!("{}", e))),
     }
 }
-
-#[derive(Deserialize)]
-pub struct FormGroupEdit {
-    form_id: i64,
-    group_ids: Vec<i64>,
-}

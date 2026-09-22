@@ -52,7 +52,6 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
 
     rocket::custom(figment)
         .register("/mercure", catchers![unauthorized])
-        .mount("/mercure/static", FileServer::from(&config.static_dir))
         .mount("/mercure/uploads", FileServer::from(&config.upload_dir))
         .mount("/mercure/logs", FileServer::from(&config.logs_dir))
         .mount(
@@ -84,14 +83,9 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             routes![
                 routes::frontend::register_get,
                 routes::frontend::admin_dashboard_get,
-                routes::frontend::newform_get,
-                routes::frontend::editform_get,
-                routes::frontend::show_forms_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
                 routes::frontend::edit_groups_get,
-                // Route pour gérer les mises à jour des formulaires
-                routes::frontend::forms_list_updates_get,
             ],
         )
         .mount(
@@ -100,15 +94,10 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 // Routes pour le backend: renvoie toujours du JSON
                 routes::backend::register_post,
                 routes::backend::login_post,
-                routes::backend::newform_post,
                 routes::backend::newgroup_get,
                 routes::backend::list_groups,
                 routes::backend::get_form_from_id,
                 routes::backend::get_all_forms_for_group,
-                // Simple GET pour mettre un formulaire en production
-                routes::backend::enable_form,
-                // Simple GET pour retirer un formulaire du service
-                routes::backend::disable_form,
                 // Simple GET pour lister les utilisateurs
                 routes::backend::list_users,
                 // Simple GET pour lister les groupes d'un utilisateur
@@ -123,9 +112,6 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::backend::list_runs_get,
                 routes::backend::check_samplesheet,
                 routes::backend::list_samples_from_samplesheet,
-                routes::backend::parse_launcher_endpoint,
-                routes::backend::edit_form_groups,
-                routes::backend::get_nextversion,
                 // Route renvoyant un EventStream
                 routes::backend::watch,
                 // Route pour rechercher des runs
@@ -136,10 +122,6 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::redirect_get,
                 // Route pour relancer un run (une fois terminé)
                 routes::backend::retry_run_get,
-                // Route pour mettre à jour la révision d'un formulaire
-                routes::backend::forms_list_updates_get,
-                // Route pour obtenir le statut de tous les formulaires avec pagination
-                routes::backend::forms_update_status_paginated_get
             ],
         )
         .manage(pool)
