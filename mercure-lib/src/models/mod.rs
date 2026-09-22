@@ -14,7 +14,7 @@ pub use groups::*;
 pub use hgrun::*;
 pub use user::*;
 
-use crate::pipeline_exec::versionning;
+use crate::{models, pipeline_exec::versionning};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ModelError {
@@ -32,6 +32,10 @@ pub enum ModelError {
     GitCheckError(#[from] versionning::GitCheckError),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+    #[error(transparent)]
+    AttemptError(#[from] models::AttemptError),
+    #[error(transparent)]
+    BcryptError(#[from] bcrypt::BcryptError),
 }
 
 impl From<Infallible> for ModelError {

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx;
 use sqlx::{Row, SqlitePool};
 
+use crate::models::ModelError;
+
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, FromForm)]
 pub struct Group {
     pub id: i64,
@@ -11,7 +13,7 @@ pub struct Group {
 
 impl Group {
     /// Retrieves all groups from the database with their IDs and names
-    pub async fn get_groups_with_ids(pool: &SqlitePool) -> Result<Vec<Group>, sqlx::Error> {
+    pub async fn get_groups_with_ids(pool: &SqlitePool) -> Result<Vec<Group>, ModelError> {
         let rows = sqlx::query("SELECT group_id, group_name FROM Groups")
             .fetch_all(pool)
             .await?;
@@ -29,7 +31,7 @@ impl Group {
         Ok(groups)
     }
 
-    pub async fn group_name_from_id(pool: &SqlitePool, id: i64) -> Result<String, sqlx::Error> {
+    pub async fn group_name_from_id(pool: &SqlitePool, id: i64) -> Result<String, ModelError> {
         Ok(
             sqlx::query_scalar("SELECT group_name FROM Groups WHERE group_id = ?")
                 .bind(id)
@@ -41,7 +43,7 @@ impl Group {
     pub async fn get_user_groups(
         pool: &SqlitePool,
         user_id: i64,
-    ) -> Result<Vec<Group>, sqlx::Error> {
+    ) -> Result<Vec<Group>, ModelError> {
         Ok(sqlx::query(
             r#"SELECT g.group_name, gh.group_id, gh.user_id
 FROM Groups g
@@ -66,7 +68,7 @@ WHERE gh.user_id = ?; "#,
         user_id: i64,
         to_remove: Vec<Group>,
         to_add: Vec<Group>,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), ModelError> {
         for g in to_remove {
             sqlx::query(r#"DELETE FROM GroupHasUser WHERE group_id = ? AND user_id = ? "#)
                 .bind(g.id)
@@ -85,7 +87,7 @@ WHERE gh.user_id = ?; "#,
     }
 
     /// Adds a new group to the database and returns its ID
-    pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64, sqlx::Error> {
+    pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64, ModelError> {
         let row = sqlx::query(
             r#"
             INSERT INTO Groups (group_name)

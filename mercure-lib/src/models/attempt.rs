@@ -68,7 +68,7 @@ impl Attempt {
     ///
     /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
     /// Pratique pour l'API, uniformise l'environnement jinja2.
-    pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt, AttemptError> {
+    pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt, ModelError> {
         Ok(Attempt {
             attempt_number: run.attempt_count + 1,
             run_id: run.run_id.ok_or(AttemptError::NoRunAttached)?,

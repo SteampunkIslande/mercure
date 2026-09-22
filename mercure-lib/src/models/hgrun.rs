@@ -48,7 +48,7 @@ impl Display for RunStatus {
 }
 
 impl FromStr for RunStatus {
-    type Err = RunDefinitionError;
+    type Err = ModelError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -57,7 +57,7 @@ impl FromStr for RunStatus {
             "Running" => Ok(RunStatus::Running),
             "Success" => Ok(RunStatus::Success),
             s if s.starts_with("Failure:") => Ok(RunStatus::Failure(s[8..].to_string())),
-            _ => Err(RunDefinitionError::InvalidRunStatusError),
+            _ => Err(RunDefinitionError::InvalidRunStatusError.into()),
         }
     }
 }

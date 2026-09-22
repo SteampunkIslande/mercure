@@ -48,7 +48,7 @@ pub struct PasswordUpdate<'a> {
 }
 
 impl User {
-    pub async fn create(new_user: NewUser, pool: &SqlitePool) -> Result<User, AuthError> {
+    pub async fn create(new_user: NewUser, pool: &SqlitePool) -> Result<User, ModelError> {
         let password_hash = hash(new_user.password.as_bytes(), DEFAULT_COST)?;
 
         let now = OffsetDateTime::now_utc();
@@ -81,10 +81,10 @@ impl User {
         Ok(user)
     }
 
-    pub async fn list_users(pool: &SqlitePool) -> Result<Vec<User>, sqlx::Error> {
-        sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
+    pub async fn list_users(pool: &SqlitePool) -> Result<Vec<User>, ModelError> {
+        Ok(sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
             .fetch_all(pool)
-            .await
+            .await?)
     }
 
     pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<User, ModelError> {

@@ -64,7 +64,7 @@ impl<'r> Responder<'r, 'static> for AuthError {
             }
             AuthError::ModelError(e) => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<()>::error(format!("Erreur générique: {e}"))
+                ApiResponse::<()>::error(e.to_string())
             }
         };
 
