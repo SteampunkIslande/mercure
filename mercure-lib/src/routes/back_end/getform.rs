@@ -17,7 +17,7 @@ pub async fn get_all_forms(config: &State<MercureConfig>) -> Json<ApiResponse<Ve
 }
 
 ///<branch>/<form_path..>
-#[get("/forms/groups/<group_id>")]
+#[get("/groups/forms/<group_id>")]
 pub async fn get_all_forms_for_group(
     pool: &State<SqlitePool>,
     config: &State<MercureConfig>,

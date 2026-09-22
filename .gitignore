@@ -2,3 +2,4 @@
 mercure.db
 mercure-lib/target
 *.sif
+Rocket.toml

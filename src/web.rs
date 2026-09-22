@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::net::Ipv4Addr;
 
+use anyhow::bail;
 use clap::Parser;
 use log::info;
 use mercure_lib::templates::{Template, context, minijinja_fairing};
@@ -140,10 +141,16 @@ pub struct Web {
 
 impl Web {
     pub async fn run(self, pool: SqlitePool) -> Result<()> {
-        let rocket_app = rocket(pool.clone(), self.ip, self.port)
+        let rocket_app = match rocket(pool.clone(), self.ip, self.port)
             .await
             .ignite()
-            .await?;
+            .await
+        {
+            Ok(app) => app,
+            Err(e) => {
+                bail!("{}: {:?}", e, e.kind())
+            }
+        };
         let shutdown_handle = rocket_app.shutdown();
 
         // Canal pour prévenir la routine qu'elle doit s'arrêter
