@@ -104,7 +104,7 @@ impl User {
     pub async fn find_by_usermail(
         usermail: &str,
         pool: &SqlitePool,
-    ) -> Result<Option<User>, AuthError> {
+    ) -> Result<Option<User>, ModelError> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
@@ -126,7 +126,7 @@ impl User {
         pool: &SqlitePool,
         new_password_hash: &str,
         user_id: i64,
-    ) -> Result<(), AuthError> {
+    ) -> Result<(), ModelError> {
         sqlx::query(
             r#"
             UPDATE Users
@@ -149,12 +149,12 @@ impl User {
         if password_update.old_password.is_none() {
             // No need to check, this comes from an administrator
             let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
-            return Self::actually_update_password(
+            return Ok(Self::actually_update_password(
                 pool,
                 &new_password_hash,
                 password_update.user_id,
             )
-            .await;
+            .await?);
         }
         let correct_old_password_hash: String =
             sqlx::query("SELECT password_hash FROM Users WHERE id = ?")
@@ -172,10 +172,13 @@ impl User {
         )? {
             return Err(AuthError::InvalidCredentials);
         }
-        Self::actually_update_password(pool, &new_password_hash, password_update.user_id).await
+        Ok(
+            Self::actually_update_password(pool, &new_password_hash, password_update.user_id)
+                .await?,
+        )
     }
 
-    pub async fn update_last_login(&mut self, pool: &SqlitePool) -> Result<(), AuthError> {
+    pub async fn update_last_login(&mut self, pool: &SqlitePool) -> Result<(), ModelError> {
         let now = OffsetDateTime::now_utc();
         self.last_login = Some(now);
 

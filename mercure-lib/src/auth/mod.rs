@@ -4,6 +4,7 @@ use std::io::Cursor;
 
 use super::routes::ApiResponse;
 
+use crate::models;
 pub use guard::*;
 
 use rocket::http::Status;
@@ -27,7 +28,7 @@ pub enum AuthError {
     #[error("No password given")]
     NoPassword,
     #[error(transparent)]
-    ModelError(#[from] crate::models::ModelError),
+    ModelError(#[from] models::ModelError),
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {

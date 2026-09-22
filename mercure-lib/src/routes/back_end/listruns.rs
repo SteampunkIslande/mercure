@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::models::RunStatus;
+use crate::models::{ModelError, RunStatus};
 use crate::utils::format_french_date;
 use crate::{auth::Authenticated, models::User, routes::ApiResponse};
 use rocket::serde::json::Json;
@@ -93,7 +93,7 @@ async fn list_runs(
     page_size: Option<i64>,
     page: Option<i64>,
     status: Option<String>,
-) -> Result<(Vec<serde_json::Value>, i64), sqlx::Error> {
+) -> Result<(Vec<serde_json::Value>, i64), ModelError> {
     // On prépare la valeur du LIKE pour le bind ("valeur%")
     let status_bind = format!("{}%", status.unwrap_or_default());
 
