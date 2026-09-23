@@ -113,7 +113,8 @@ pub async fn list_yaml_forms_giteav1(
         .get(&url)
         .query(&[("ref", branch_name)])
         .send()
-        .await?;
+        .await?
+        .error_for_status()?;
 
     let body = resp.json::<DirContentsResponse>().await?;
 
