@@ -20,17 +20,12 @@ pub async fn edit_run_get(
     run_id: i64,
 ) -> Result<Template, FrontendError> {
     let run: Run = Run::get_run_from_id(run_id, pool).await?;
+    let form = run.get_form().await?;
     let can_see_run = {
         if auth.user.is_admin {
             true
         } else {
-            let form_groups: HashSet<i64> = run
-                .get_form()
-                .await?
-                .get_group_ids(pool)
-                .await?
-                .into_iter()
-                .collect();
+            let form_groups: HashSet<i64> = form.get_group_ids(pool).await?.into_iter().collect();
             let auth_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                 .await?
                 .iter()
@@ -59,9 +54,8 @@ pub async fn edit_run_get(
                 context! {
                     run=> &run,
                     user=> &auth.user,
-                    form=> &run.get_form().await?,
-                    run_id=> &run.run_id,
-                    form=> &run.get_form().await?,
+                    form=> &form,
+                    run_id=> &run_id,
                 },
             )),
             status => {

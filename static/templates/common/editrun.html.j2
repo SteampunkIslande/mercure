@@ -9,17 +9,16 @@
     <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
 
-    <script src="/mercure/static/scripts/json_list.js"></script>
     <script src="/mercure/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/form_variables.js"></script>
 </head>
 
 <body>
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text">{% if run %}Editer un run<br><span class="banner-text">Pipeline: {{ form.form_name
-                    }} (version {{ form.version }})</span>{% else %}Nouveau Run<br><span class="banner-text">Pipeline:
-                    {{
-                    form.form_name }} (version {{ form.version }})</span>{% endif %}</span>
+            <span class="banner-text">{% if run %}Editer un run{% else %}Nouveau Run{% endif %}<br>
+                <span class="banner-text">Pipeline: {{ form.name }}{% if form.branch %} (branche {{ form.branch
+                    }}{% if form.file_path %}, {{ form.file_path }}{% endif %}){% endif %}</span></span>
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span
                         class="material-icons icon-align">logout</span>Déconnexion</a>
@@ -36,107 +35,18 @@
     <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
 
         <input type="hidden" id="run_id" value="{{ run_id }}">
-        <input type="hidden" id="form_id" value="{{ form_id }}">
-        <input type="hidden" id="user_id" value="{{ user.id }}">
 
         <div>
             <label for="run_name">Nom du run:</label>
             {% if run %}
-            <span id="run_name" style="font-weight: bold;">{{ run.run_name | safe }}</span>
-            <input type="hidden" id="run_name" value="{{ run.run_name }}">
+            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
             {% else %}
             <input type="text" id="run_name" required>
             {% endif %}
         </div>
 
-        <!-- Section statique pour les informations du run -->
-        <h3>Informations sur le run</h3>
-        <div>
-            <label for="run_date">Date du run:</label>
-            <input type="date" id="run_date">
-        </div>
-        <div>
-            <label for="run_sequencer">Séquenceur:</label>
-            <select id="run_sequencer">
-                {% for seq in sequenceurs_list %}
-                <option value="{{ seq }}">{{ seq }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Section statique pour la définition du BclDir -->
-        <div id="bcl-dir-def-section" style="display:none;">
-            <div>
-                <label for="run_flowcellid">Flowcell ID:</label>
-                <input type="text" id="run_flowcellid">
-            </div>
-        </div>
-
-        <!-- Hidden input for indir -->
-        {% if run %}
-        <input type="hidden" id="indir" value="{{ run.indir }}">
-        {% else %}
-        <input type="hidden" id="indir" value="">
-        {% endif %}
-
-        <!-- Section statique pour le choix du dossier d'analyse -->
-        <div id="analysis-dir-section" style="display:none;">
-            <h3>Dossier d'analyse</h3>
-            <div>
-                <label for="analysis_indir">Choisir un dossier d'analyse:</label>
-                <select id="analysis_indir" class="tall-select"></select>
-                <span id="no-analysis-dir" style="display: none;"><em>Aucun dossier d'analyse
-                        trouvé</em></span>
-            </div>
-        </div>
-
-        <!-- Section statique pour le choix du dossier OntDir -->
-        <div id="ont-dir-section" style="display:none;">
-            <h3>Dossier de run nanopore</h3>
-            <div>
-                <label for="ont_indir">Choisir un dossier de run nanopore:</label>
-                <select id="ont_indir" class="tall-select"></select>
-                <span id="no-ont-dir" style="display: none;"><em>Aucun dossier de run
-                        nanopore
-                        trouvé</em></span>
-            </div>
-        </div>
-
-        <h3>Fichiers de samplesheet et metadata</h3>
-
-        <div class="tab">
-            <button class="tablinks active" onclick="openTab(event,`adn`)">ADN</button>
-            <button class="tablinks" onclick="openTab(event,`arn`)">ARN</button>
-            <button class="tablinks" onclick="openTab(event,`metadata`)">Metadata</button>
-        </div>
-
-        <div class="tabcontent" id="tabcontent-adn" style="display:block; height:400px; overflow:auto;">
-            <label for="sample_sheet_adn_file">Fichier sample sheet ADN:</label>
-            <input type="file" id="sample_sheet_adn_file">
-            <input type="hidden" id="sample_sheet_adn_path" {% if run %}value="{{ run.sample_sheet_adn_path }}" {% endif
-                %}>
-            <div id="sample_sheet_adn_check"></div>
-            <div id="sample_sheet_adn_list" class="sample-list"></div>
-        </div>
-
-        <div class="tabcontent" id="tabcontent-arn" style="display:none; height:400px; overflow:auto;">
-            <label for="sample_sheet_arn_file">Fichier sample sheet ARN:</label>
-            <input type="file" id="sample_sheet_arn_file">
-            <input type="hidden" id="sample_sheet_arn_path" {% if run %}value="{{ run.sample_sheet_arn_path }}" {% endif
-                %}>
-            <div id="sample_sheet_arn_check"></div>
-            <div id="sample_sheet_arn_list" class="sample-list"></div>
-        </div>
-
-        <div class="tabcontent" id="tabcontent-metadata" style="display:none; height:400px; overflow:auto;">
-            <label for="metadata_file">Fichier metadata:</label>
-            <input type="file" id="metadata_file">
-            <input type="hidden" id="metadata_path" {% if run %}value="{{ run.metadata_path }}" {% endif %}>
-            <div id="spacer"></div>
-        </div>
-
-        <h3>Variables définies par l'utilisateur</h3>
-        <div id="user-defined-vars"></div>
+        <h3>Variables du formulaire</h3>
+        <div id="form-variables"></div>
 
         <div style="text-align: left; margin-top: 20px;">
             {% if run %}
@@ -150,413 +60,57 @@
     </form>
 
     <script>
-        // Exemple: {"BED_PATH":{"Constant":"/reference/bed/pneumo"},"RUN_NAME":"RunDefined","BED":{"FromValuesList":{"allowed":["pneumo_v6","pneumo_v7","pneumo_v8"]}}}
-        const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
-
+        // Le formulaire est fourni tel quel par la route : le rendu des variables
+        // est entièrement à la charge de la page (cf. form_variables.js).
+        const formSchema = {{ form | tojson }};
+        const currentUser = {{ user | tojson }};
         {% if run %}
-        const indirType = "{{ indir_type | safe }}";
-        const currentIndir = {{ run.indir | tojson }};
+        const currentRun = {{ run | tojson }};
         {% else %}
-        const indirType = "{{ indir_type | safe }}";
+        const currentRun = null;
         {% endif %}
 
-        // Remplacement dynamique des noms de séquenceurs par leur pretty_name
         document.addEventListener('DOMContentLoaded', async function () {
-
-            await init_udv_fields();
-            await init_indir_selection(indirType);
-            await init_samplesheet_checks();
-
-            const select = document.getElementById('run_sequencer');
-            const options = select.querySelectorAll('option');
-            for (const option of options) {
-                const seq = option.getAttribute('value');
-                try {
-                    const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seq)}`);
-                    if (resp.ok) {
-                        const data = await resp.text();
-                        option.textContent = data;
-                    }
-                } catch (e) {
-                    // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
-                }
-            }
-        });
-
-        async function init_samplesheet_checks() {
-            try {
-
-                const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
-                const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
-                if (adnPath) {
-                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
-                    document.getElementById('sample_sheet_adn_path').value = file_name;
-                    document.getElementById('sample_sheet_adn_check').innerHTML = message;
-                    if (sample_names) {
-                        const container = document.getElementById('sample_sheet_adn_list');
-                        container.innerHTML = "";
-                        createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
-                    }
-                }
-                if (arnPath) {
-                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
-                    document.getElementById('sample_sheet_arn_path').value = file_name;
-                    document.getElementById('sample_sheet_arn_check').innerHTML = message;
-                    if (sample_names) {
-                        const container = document.getElementById('sample_sheet_arn_list');
-                        container.innerHTML = "";
-                        createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
-                    }
-                }
-            } catch (e) {
-                showMessage("error", e);
-            }
-        }
-
-        async function init_udv_fields() {
-
-            // Generate user-defined fields
-            const container = document.getElementById('user-defined-vars');
-
-            for (const [key, value] of Object.entries(userDefinedVars).sort()) {
-                if (typeof value === 'object' && value.Constant) {
-                    const hidden = document.createElement('input');
-                    hidden.type = 'hidden';
-                    hidden.id = 'udv_' + key;
-                    hidden.value = value.Constant;
-                    container.appendChild(hidden);
-                } else if (typeof value === 'object' && value.FromValuesList) {
-                    const div = document.createElement('div');
-                    const label = document.createElement('label');
-                    label.for = 'udv_' + key;
-                    label.textContent = key + ':';
-                    div.appendChild(label);
-                    div.appendChild(document.createTextNode(' '));
-                    const select = document.createElement('select');
-                    select.id = 'udv_' + key;
-                    value.FromValuesList.allowed.forEach(val => {
-                        const option = document.createElement('option');
-                        option.value = val;
-                        option.textContent = val;
-                        select.appendChild(option);
-                    });
-                    // Ajouter une option vide (sélection par défaut)
-                    const emptyOption = document.createElement('option');
-                    emptyOption.value = '';
-                    emptyOption.selected = true;
-                    emptyOption.textContent = '---Sélectionner une valeur---';
-                    select.appendChild(emptyOption);
-                    div.appendChild(select);
-                    container.appendChild(div);
-                } else if (value === 'RunDefined') {
-                    const div = document.createElement('div');
-                    const label = document.createElement('label');
-                    label.for = 'udv_' + key;
-                    label.textContent = key + ':';
-                    div.appendChild(label);
-                    div.appendChild(document.createTextNode(' '));
-                    const input = document.createElement('input');
-                    input.type = 'text';
-                    input.id = 'udv_' + key;
-                    div.appendChild(input);
-                    container.appendChild(div);
-                }
-            }
-
-            // Populate user-defined variables with current values
-            {% if run %}
-            const currentUserDefinedVars = {{ run.user_defined_vars | tojson
-        }};
-
-        for (const [key, value] of Object.entries(currentUserDefinedVars)) {
-            const element = document.getElementById('udv_' + key);
-            if (element) {
-                element.value = value;
-            }
-        }
-        {% endif %}
-        }
-
-        // Generic function to populate directory select
-        async function populateDirSelect(select, error_div, dirtype) {
-            try {
-                const response = await fetch(`/mercure/api/directories/list?dirtype=${dirtype}`);
-                const result = await response.json();
-                const indirInput = document.getElementById('indir');
-                const dirs = getApiData(result);
-                if (isApiSuccess(result) && dirs.length > 0) {
-                    dirs.forEach((dir, index) => {
-                        const option = document.createElement('option');
-                        option.value = dir.path;
-                        option.textContent = dir.name;
-                        {% if run %}
-                        if (currentIndir === dir.path) {
-                            option.selected = true;
-                            indirInput.value = dir.path;
-                        }
-                        {% else %}
-                        if (index === 0) {
-                            option.selected = true;
-                            indirInput.value = dir.path;
-                        }
-                        {% endif %}
-                        select.appendChild(option);
-                    });
-                    select.size = dirs.length;
-                } else if (isApiSuccess(result) && dirs.length === 0) {
-                    error_div.style.display = 'block';
-                    select.style.display = 'none';
-                } else {
-                    error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + getApiMessage(result);
-                    select.style.display = 'none';
-                }
-            } catch (e) {
-                error_div.innerHTML = 'Erreur lors du chargement des dossiers: ' + e.message;
-                select.style.display = 'none';
-            }
-        }
-
-        async function init_indir_selection(indirTypeConst) {
-            {% if run %}
-            document.getElementById('run_name').textContent = "{{ run.run_name }}";
-            document.getElementById('run_date').value = "{{ run.run_date }}";
-            document.getElementById('run_sequencer').value = "{{ run.run_sequencer }}";
-            {% endif %}
-            // BclDir case
-            if (indirTypeConst === 'BclDir') {
-                const bclDirDefSection = document.getElementById('bcl-dir-def-section');
-                bclDirDefSection.style.display = 'block';
-                {% if run %}
-                document.getElementById('run_flowcellid').value = "{{ run.run_flowcellid }}";
-                {% endif %}
-            } else if (indirTypeConst === 'AnalysisDir') {
-                const analysisSection = document.getElementById('analysis-dir-section');
-                analysisSection.style.display = 'block';
-                const select = document.getElementById('analysis_indir');
-                const indirInput = document.getElementById('indir');
-                {% if run %}
-                indirInput.value = currentIndir || '';
-                {% endif %}
-                select.addEventListener('change', function () {
-                    indirInput.value = this.value;
-                });
-                await populateDirSelect(select, document.getElementById('no-analysis-dir'), 'analysis');
-            } else if (indirTypeConst === 'OntDir') {
-                const ontSection = document.getElementById('ont-dir-section');
-                ontSection.style.display = 'block';
-                const select = document.getElementById('ont_indir');
-                const indirInput = document.getElementById('indir');
-                {% if run %}
-                indirInput.value = currentIndir || '';
-                {% endif %}
-                select.addEventListener('change', function () {
-                    indirInput.value = this.value;
-                });
-                await populateDirSelect(select, document.getElementById('no-ont-dir'), 'ont');
-            }
-        }
-
-        // Function to upload file
-        async function uploadFile(file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('file_name_base', file.name);
-
-            const response = await fetch('/mercure/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-            if (isApiSuccess(result)) {
-                return getApiData(result);
-            } else {
-                throw new Error(getApiMessage(result));
-            }
-        }
-        // Function to check sample sheet
-        async function checkSampleSheet(filename) {
-            const formData = new FormData();
-            formData.append('file_name', filename);
-
-            const response = await fetch('/mercure/api/samplesheet/check', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-            try {
-                if (isApiSuccess(result)) {
-                    return getApiData(result);
-                } else {
-                    throw new Error(getApiMessage(result));
-                }
-            }
-            catch (e) {
-                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + e.message };
-            }
-        }
-
-        // Tabs initialization for file-type panels (use same classes as home.html)
-        function openTab(evt, tabName) {
-            // Prevent default button behavior (avoids submitting the form)
-            evt.preventDefault();
-
-            // Declare all variables
-            var i, tabcontent, tablinks;
-
-            // Get all elements with class="tabcontent" and hide them
-            tabcontent = document.getElementsByClassName("tabcontent");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-
-            // Get all elements with class="tablinks" and remove the class "active"
-            tablinks = document.getElementsByClassName("tablinks");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-
-            // Show the current tab, and add an "active" class to the button that opened the tab
-            document.getElementById(`tabcontent-${tabName}`).style.display = "block";
-            evt.currentTarget.className += " active";
-        }
-
-        // on upload: show check message AND sample list when available
-        document.getElementById('sample_sheet_adn_file').addEventListener('change', async function () {
-            if (this.files.length > 0) {
-                try {
-                    const upload_path = await uploadFile(this.files[0]);
-                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(upload_path);
-                    document.getElementById('sample_sheet_adn_path').value = file_name;
-                    document.getElementById('sample_sheet_adn_check').innerHTML = message;
-                    if (sample_names) {
-                        const container = document.getElementById('sample_sheet_adn_list');
-                        createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
-                    }
-                } catch (error) {
-                    alert('Erreur upload ADN: ' + error.message);
-                }
-            }
-        });
-
-        document.getElementById('sample_sheet_arn_file').addEventListener('change', async function () {
-            if (this.files.length > 0) {
-                try {
-                    const upload_path = await uploadFile(this.files[0]);
-                    const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(upload_path);
-                    document.getElementById('sample_sheet_arn_path').value = file_name;
-                    document.getElementById('sample_sheet_arn_check').innerHTML = message;
-                    if (sample_names) {
-                        const container = document.getElementById('sample_sheet_arn_list');
-                        createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
-                    }
-                } catch (error) {
-                    alert('Erreur upload ARN: ' + error.message);
-                }
-            }
-        });
-
-        document.getElementById('metadata_file').addEventListener('change', async function () {
-            if (this.files.length > 0) {
-                try {
-                    const path = await uploadFile(this.files[0]);
-                    document.getElementById('metadata_path').value = path;
-                } catch (error) {
-                    alert('Erreur upload metadata: ' + error.message);
-                }
-            }
+            await renderFormVariables(formSchema, currentRun ? currentRun.user_defined_vars : {});
         });
 
         async function handleSubmit() {
-            // Collect user_defined_vars
-            const userDefinedVars = {};
-            const udvElements = document.querySelectorAll('[id^="udv_"]');
-            udvElements.forEach(el => {
-                if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-                    const key = el.id.replace('udv_', '');
-                    userDefinedVars[key] = el.value;
-                }
-            });
-
-            const run_date = document.getElementById('run_date').value;
-            if (!run_date) {
-                showMessage("error", "La date du run est obligatoire.");
+            const missing = missingFormVariables();
+            if (missing.length > 0) {
+                showMessage("error", "Valeur(s) manquante(s) pour : " + missing.join(", "));
                 return;
             }
-            const run_sequencer = document.getElementById('run_sequencer').value;
-            if (!run_sequencer) {
-                showMessage("error", "Le séquenceur est obligatoire.");
-                return;
-            }
-
-            const run_flowcellid = document.getElementById('run_flowcellid').value;
-
-            if (!run_flowcellid && indirType === 'BclDir') {
-                showMessage("error", "Le numéro de flowcell est obligatoire pour les runs Illumina.");
-                return;
-            }
-
-            // Remplir le formulaire, dans le cas d'une édition
-            {% if run %}
-            const formData = {
-                form_id: parseInt(document.getElementById('form_id').value),
-
-                run_id: parseInt(document.getElementById('run_id').value),
-                run_date: run_date,
-                run_sequencer: run_sequencer,
-                run_flowcellid: run_flowcellid,
-
-                // A l'appréciation du backend de gérer les fichiers absents
-                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
-                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
-                metadata_path: document.getElementById('metadata_path').value,
-
-                user_defined_vars: userDefinedVars,
-                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
-                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
-            };
-
-            // Remplir le formulaire, dans le cas d'une création
-            {% else %}
-
-            const run_name = document.getElementById('run_name').value;
-            if (!run_name) {
-                showMessage("error", "Le nom du run est obligatoire.");
-                return;
-            }
-
-            const formData = {
-                form_id: parseInt(document.getElementById('form_id').value),
-                user_id: parseInt(document.getElementById('user_id').value),
-                run_name: run_name,
-                run_date: run_date,
-                run_sequencer: run_sequencer,
-                run_flowcellid: run_flowcellid,
-
-                // A l'appréciation du backend de gérer les fichiers absents
-                sample_sheet_adn_path: document.getElementById('sample_sheet_adn_path').value,
-                sample_sheet_arn_path: document.getElementById('sample_sheet_arn_path').value,
-                metadata_path: document.getElementById('metadata_path').value,
-
-                user_defined_vars: userDefinedVars,
-                indir: document.getElementById('indir') ? document.getElementById('indir').value : null,
-                outdir: document.getElementById('outdir') ? document.getElementById('outdir').value : null
-            };
-            {% endif %}
+            const userDefinedVars = collectFormVariables();
 
             try {
                 {% if run %}
-                const endpoint = `/mercure/api/editrun`;
+                const payload = {
+                    run_id: parseInt(document.getElementById('run_id').value),
+                    user_defined_vars: userDefinedVars
+                };
+                const endpoint = '/mercure/api/editrun';
                 {% else %}
+                const run_name = document.getElementById('run_name').value;
+                if (!run_name) {
+                    showMessage("error", "Le nom du run est obligatoire.");
+                    return;
+                }
+                const payload = {
+                    user_id: currentUser.id,
+                    run_name: run_name,
+                    user_defined_vars: userDefinedVars,
+                    form_path: formSchema.file_path,
+                    branch_name: formSchema.branch
+                };
                 const endpoint = '/mercure/api/newrun';
                 {% endif %}
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify(payload)
                 });
                 const data = await response.json();
                 if (response.status !== 200) {
