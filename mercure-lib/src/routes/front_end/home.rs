@@ -13,7 +13,7 @@ pub async fn home_get(
     let is_admin = auth.user.is_admin;
     let user_groups = Group::get_user_groups(pool, auth.user.id)
         .await
-        .context("Ooopsd")?;
+        .context("Erreur lors de la récupération de vos groupes")?;
     Ok(Template::render(
         "common/home",
         context! {user=>auth.user,user_groups,is_admin},

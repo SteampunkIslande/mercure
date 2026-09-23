@@ -1,5 +1,7 @@
+use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
 use crate::{auth::Authenticated, models::User};
+use anyhow::Context;
 use rocket::{State, get};
 use sqlx::SqlitePool;
 
@@ -9,13 +11,18 @@ pub async fn edit_groups_for_user(
     auth: Authenticated,
     pool: &State<SqlitePool>,
     user_id: i64,
-) -> Template {
+) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        return Template::render(
+        return Ok(Template::render(
             "errors/admin_only",
             context! {user_name=>auth.user.username},
-        );
+        ));
     }
-    let user = User::find_by_id(user_id, pool).await.unwrap_or_default();
-    Template::render("admin/groups_list", context! {user_id,user})
+    let user = User::find_by_id(user_id, pool)
+        .await
+        .context("Utilisateur introuvable")?;
+    Ok(Template::render(
+        "admin/groups_list",
+        context! {user_id,user},
+    ))
 }

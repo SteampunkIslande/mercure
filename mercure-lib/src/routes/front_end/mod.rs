@@ -40,7 +40,17 @@ impl<'r> Responder<'r, 'static> for FrontendError {
         let (title, detail) = match &self {
             FrontendError::ModelError(e) => ("Erreur de modèle".to_string(), e.to_string()),
             FrontendError::SqlxError(e) => ("Erreur SQL".to_string(), e.to_string()),
-            FrontendError::UserError(e) => ("Erreur utilisateur".to_string(), e.to_string()),
+            FrontendError::UserError(e) => (
+                "Erreur utilisateur".to_string(),
+                format!(
+                    "{}<br>Détail:\n<br>{}",
+                    e.to_string(),
+                    e.source()
+                        .as_ref()
+                        .map(|s| s.to_string())
+                        .unwrap_or("(Inconnu)".to_string())
+                ),
+            ),
             FrontendError::AttemptError(e) => ("Erreur de tentative".to_string(), e.to_string()),
             FrontendError::LogicalError(e) => ("Erreur logique".to_string(), e.to_string()),
         };
