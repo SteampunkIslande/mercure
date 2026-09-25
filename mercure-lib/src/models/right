@@ -1,0 +1,58 @@
+{
+    "name": "Smaug-v3 simple",
+    "description": "Démultiplexe à partir d'un dossier de run brut, lance l'analyse smaug avec le BED spécifié, puis copie le résultat sur le NAS.",
+    "variables": [
+        {
+            "name": "bed",
+            "title": "BED",
+            "description": "Le fichier BED à utiliser pour cette analyse",
+            "type": "FromURL",
+            "source": "/mercure/api/aux/list_beds"
+        },
+        {
+            "name": "genome",
+            "title": "Génome",
+            "description": "Le génome à utiliser",
+            "type": "ValuesList",
+            "values": [
+                "hg19",
+                "hg38"
+            ]
+        },
+        {
+            "name": "indir",
+            "title": "Dossier BCL",
+            "description": "Le dossier de run brut Illumina",
+            "type": "FromURL",
+            "source": "/mercure/api/aux/list_illumina_dirs"
+        },
+        {
+            "name": "outdir",
+            "title": "Dossier de sortie",
+            "description": "Le dossier de travail pour snakemake",
+            "type": "LineEdit"
+        },
+        {
+            "name": "panel",
+            "title": "Nom du panel",
+            "description": "Le nom du panel",
+            "type": "FromURL",
+            "source": "/mercure/api/aux/list_panels"
+        },
+        {
+            "name": "sample_sheet",
+            "title": "SampleSheet",
+            "description": "La samplesheet, espèce de neuneu",
+            "type": "ExistingFile"
+        }
+    ],
+    "exec_type": "shell",
+    "exec": "# Copie de la samplesheet dans le bon dossier\nrsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv\n\n# Démultiplexage\nsnakemake -s pipelines/demul/Snakefile --config indir={{ indir }} outdir={{ outdir }}\n\n# Copie vers MOABI \nrsync -a --info=progress2 \"{{ outdir }}/fastq\" user@depot:/where/it/should/go\n\n# Smaug v3\nsnakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}\n\n# Copie NAS\nrsync -a --info=progress2 \"{{ outdir }}/{bam,vcf,reports}\" /mnt/nas/analysis/{{ panel }}\n",
+    "workdir": "outdir",
+    "branch": null,
+    "file_path": null,
+    "groups": [
+        "Admin",
+        "Génétique"
+    ]
+}

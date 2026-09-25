@@ -1,4 +1,7 @@
-use std::{collections::HashSet, path::Path};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -9,27 +12,66 @@ use crate::{
     pipeline_exec::{GitCheckError, versionning},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug)]
+pub enum FormDefinitionError {
+    #[error(transparent)]
+    SerdeError(#[from] yaml_serde::Error),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(tag = "type")]
+pub enum VariableType {
+    FromURL {
+        source: String,
+    },
+    ValuesList {
+        values: Vec<String>,
+    },
+    /// With this type, the user is prompted a date and the date is returned
+    DateEdit,
+    /// By default, a variable is set by the user from a text field
+    #[default]
+    LineEdit,
+    /// The user will have to upload a file to the server
+    ExistingFile,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "exec_type")]
+pub enum FormExecType {
+    #[serde(rename = "shell")]
+    Shell { exec: String },
+    #[serde(rename = "script")]
+    Script { script_name: PathBuf },
+}
+
+impl Default for FormExecType {
+    fn default() -> Self {
+        Self::Shell {
+            exec: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Variable {
     pub name: String,
     pub title: String,
-    pub description: Option<String>,
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub source: Option<String>,
-    pub userdefined: Option<bool>,
-    pub values: Option<Vec<String>>,
+    pub description: String,
+    #[serde(flatten)]
+    pub variable_type: VariableType,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Form {
     pub name: String,
-    pub description: Option<String>,
+    pub description: String,
     pub variables: Vec<Variable>,
-    pub exec_type: Option<String>,
-    pub trigger: Option<String>,
-    pub workdir: Option<String>,
-    pub exec: Option<String>,
+    #[serde(flatten)]
+    pub exec_type: FormExecType,
+    pub workdir: String,
     pub branch: Option<String>,
     pub file_path: Option<String>,
     pub groups: Option<Vec<String>>,
@@ -182,5 +224,103 @@ impl Form {
             .collect();
 
         Ok(ids)
+    }
+
+    pub async fn check_validity(&self) -> Result<(), FormDefinitionError> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::models::VariableType::ValuesList;
+
+    use super::*;
+
+    #[test]
+    fn test_form_serialize() {
+
+        let expected = Form {
+                        name: "Smaug-v3 simple".to_string(),
+                        description: "Démultiplexe à partir d'un dossier de run brut, \
+                        lance l'analyse smaug avec le BED spécifié, puis copie \
+                        le résultat sur le NAS."
+                            .to_string(),
+                        variables: vec![
+                            Variable {
+                                name: "bed".to_string(),
+                                title: "BED".to_string(),
+                                description: "Le fichier BED à utiliser pour cette analyse".to_string(),
+                                variable_type: VariableType::FromURL {
+                                    source: "/mercure/api/aux/list_beds".to_string()
+                                },
+                                
+                            },
+                            Variable {
+                                name: "genome".to_string(),
+                                title: "Génome".to_string(),
+                                
+                                description: "Le génome à utiliser".to_string(),
+                                variable_type: ValuesList {
+                                    values: vec!["hg19".to_string(), "hg38".to_string()]
+                                }
+                            },
+                            Variable {
+                                name: "indir".to_string(),
+                                title: "Dossier BCL".to_string(),
+                                description: "Le dossier de run brut Illumina".to_string(),
+                                variable_type: VariableType::FromURL {
+                                    source: "/mercure/api/aux/list_illumina_dirs".to_string()
+                                },
+                            },
+                            Variable {
+                                name: "outdir".to_string(),
+                                title: "Dossier de sortie".to_string(),
+                                description: "Le dossier de travail pour snakemake".to_string(),
+                                variable_type: VariableType::LineEdit,
+                            },
+                            Variable {
+                                name: "panel".to_string(),
+                                title: "Nom du panel".to_string(),
+                                description: "Le nom du panel".to_string(),
+                                variable_type: VariableType::FromURL {
+                                    source: "/mercure/api/aux/list_panels".to_string()
+                                },
+                            },
+                            Variable {
+                                name: "sample_sheet".to_string(),
+                                title: "SampleSheet".to_string(),
+                                description: "La samplesheet, espèce de neuneu".to_string(),
+                                variable_type: VariableType::ExistingFile,
+                            }
+                        ],
+                        branch:None,
+                        file_path: None,
+
+                        workdir: "outdir".to_string(),
+                        groups: Some(vec!["Admin".to_string(),"Génétique".to_string()]),
+                        exec_type: FormExecType::Shell { exec: r#"# Copie de la samplesheet dans le bon dossier
+rsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv
+
+# Démultiplexage
+snakemake -s pipelines/demul/Snakefile --config indir={{ indir }} outdir={{ outdir }}
+
+# Copie vers MOABI 
+rsync -a --info=progress2 "{{ outdir }}/fastq" user@depot:/where/it/should/go
+
+# Smaug v3
+snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}
+
+# Copie NAS
+rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ panel }}
+"#.to_string() }};
+        let form: Form = yaml_serde::from_str(include_str!("../../../.forms/smaug-basique.yaml"))
+            .expect("Cannot serialize");
+        
+        let expected_str = serde_json::to_string(&expected).expect("Cannot serialize");
+        let form_str = serde_json::to_string(&form).expect("Cannot serialize back");
+
+        assert_eq!(expected_str,form_str,"Left should be:\n-----\n {} and right should be:\n------\n {}",expected_str,form_str);
     }
 }

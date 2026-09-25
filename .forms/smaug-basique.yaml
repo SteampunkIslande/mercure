@@ -8,7 +8,6 @@ variables:
     source: /mercure/api/aux/list_beds
   - name: genome
     title: Génome
-    userdefined: true
     description: Le génome à utiliser
     type: ValuesList
     values:
@@ -22,19 +21,23 @@ variables:
   - name: outdir
     title: Dossier de sortie
     description: Le dossier de travail pour snakemake
+    type: LineEdit
   - name: panel
     title: Nom du panel
+    description: "Le nom du panel"
     type: FromURL
+    source: /mercure/api/aux/list_panels
   - name: sample_sheet
     title: SampleSheet
     description: La samplesheet, espèce de neuneu
     type: ExistingFile
-exec_type: shell
-trigger: Manual
+# Workdir doit être un chemin relatif à la racine définie dans la config (/data/analysis par défaut)
+# Dans workdir, se trouve toujours un dossier issu d'un git clone sur le dépôt configuré (pipelines par défaut)
 workdir: outdir
 groups:
   - Admin
   - Génétique
+exec_type: shell
 exec: |
   # Copie de la samplesheet dans le bon dossier
   rsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv
