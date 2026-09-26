@@ -19,6 +19,11 @@ pub async fn register_post(
     if !auth.user.is_admin {
         return Ok(Json(ApiResponse::error("Accès non autorisé")));
     }
+    if user.password.is_empty() {
+        return Ok(Json(ApiResponse::error(
+            "Le mot de passe ne peut pas être vide!",
+        )));
+    }
 
     // Make sure the user doesn't already exist
     if (User::find_by_usermail(&user.usermail, pool).await?).is_some() {
