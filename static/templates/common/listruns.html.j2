@@ -9,6 +9,8 @@
 
 {% block banner_text_attrs %} id="banner-title"{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <section>
         <div>
@@ -178,13 +180,13 @@
             window.location.search = params.toString();
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            loadRuns(1);
+        async function init() {
+            await loadRuns(1);
             const params = new URLSearchParams(window.location.search);
             const status = params.get("status");
             if (status) {
                 document.getElementById("status-filter").value = status;
             }
-        });
+        }
     </script>
 {% endblock %}

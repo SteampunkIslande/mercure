@@ -41,7 +41,7 @@
 
         <div style="margin-top: 1em; text-align: left;">
             <a class="btn btn-secondary" href="/mercure/show/runs">Retour à la liste</a>
-            <a id="searchrun-button" class="btn primary">Rechercher</a>
+            <a id="searchrun-button" class="btn primary" onclick="searchRuns(1)">Rechercher</a>
         </div>
     </form>
 
@@ -175,9 +175,5 @@
                 pageInput.value = currentPage;
             }
         }
-
-        document.getElementById('searchrun-button').addEventListener('click', function () {
-            searchRuns(1);
-        });
     </script>
 {% endblock %}

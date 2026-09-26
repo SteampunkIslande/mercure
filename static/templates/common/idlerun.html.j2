@@ -51,7 +51,7 @@
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
         <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
-        <a id="validate-btn" class="btn btn-primary">Valider</a>
+        <a id="validate-btn" class="btn btn-primary" onclick="validateRun()">Valider</a>
     </div>
 {% endblock %}
 
@@ -72,79 +72,73 @@
         }
 
         async function checkSampleSheet(filename) {
-            const formData = new FormData();
-            formData.append('file_name', filename);
-            const response = await fetch('/mercure/api/samplesheet/check', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
             try {
+                const formData = new FormData();
+                formData.append('file_name', filename);
+                const response = await fetch('/mercure/api/samplesheet/check', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
                 if (isApiSuccess(result)) {
                     return getApiData(result);
-                } else {
-                    throw new Error(getApiMessage(result));
                 }
-            }
-            catch (e) {
-                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + e.message };
+                throw new Error(getApiMessage(result));
+            } catch (error) {
+                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + error.message };
             }
         }
 
-        document.getElementById('validate-btn').addEventListener('click', async function () {
+        async function validateRun() {
             const runId = "{{ run.run_id }}";
             if (!runId) {
                 showMessage("error", "ID du run introuvable dans l'URL.");
                 return;
             }
-            if (confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
-                try {
-                    const response = await fetch('/mercure/api/validate/' + runId, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const data = await response.json();
-                    if (isApiSuccess(data)) {
-                        window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}" +
-                            "&title=" + encodeURIComponent("Succès") +
-                            "&message=" + encodeURIComponent(getApiData(data).message) +
-                            "&seconds=5";
-                    } else {
-                        showMessage("error", getApiMessage(data));
-                    }
-                } catch (error) {
-                    showMessage("error", "Erreur lors de la validation: " + error);
-                }
+            if (!confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
+                return;
             }
-        });
+            try {
+                const response = await fetch('/mercure/api/validate/' + runId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (isApiSuccess(data)) {
+                    window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}" +
+                        "&title=" + encodeURIComponent("Succès") +
+                        "&message=" + encodeURIComponent(getApiData(data).message) +
+                        "&seconds=5";
+                } else {
+                    showMessage("error", getApiMessage(data));
+                }
+            } catch (error) {
+                showMessage("error", error);
+            }
+        }
 
         async function migrateToForm(targetFormId) {
             if (!confirm("Créer un nouveau run à partir de ce formulaire compatible ? Cela créera une copie de ce run avec le nouveau formulaire.")) {
                 return;
             }
-
             try {
                 const response = await fetch(`/api/migrate/run?from_run_id={{ run.run_id }}&to_form_id=${targetFormId}`, {
                     method: 'GET'
-                }
-                );
-
-                const result = await response.json();
-
-                if (isApiSuccess(result)) {
-                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${getApiData(result).new_run_id}` +
+                });
+                const data = await response.json();
+                if (isApiSuccess(data)) {
+                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${getApiData(data).new_run_id}` +
                         `&title=${encodeURIComponent("Migration réussie")}` +
-                        `&message=${encodeURIComponent(getApiData(result).message)}` +
+                        `&message=${encodeURIComponent(getApiData(data).message)}` +
                         `&seconds=3`;
                     window.location.href = redirectUrl;
                 } else {
-                    alert('Erreur lors de la migration: ' + getApiMessage(result));
+                    showMessage('error', getApiMessage(data));
                 }
             } catch (error) {
-                console.error('Erreur lors de la migration:', error);
-                alert('Erreur lors de la migration: ' + error.message);
+                showMessage('error', error);
             }
         }
 {% endblock %}

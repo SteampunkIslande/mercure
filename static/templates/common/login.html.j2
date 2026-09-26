@@ -4,6 +4,8 @@
 
 {% block banner %}{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <div class="container">
         <h1 class="title">Connexion</h1>
@@ -47,8 +49,9 @@
                 showMessage("error", error);
             }
         }
-        window.onload = function () {
+
+        function init() {
             document.getElementById('loginForm').reset();
-        };
+        }
     </script>
 {% endblock %}

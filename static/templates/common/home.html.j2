@@ -8,6 +8,8 @@
 
 {% block banner_text %}Bienvenue, {{user.username }}{% endblock %}
 
+{% block body_attrs %} onload="init()" onclick="closeDropdowns(event)"{% endblock %}
+
 {% block content %}
     <div class="dropdown">
         <button onclick="navigateTo(`/mercure/show/runs`)" class="dropbtn"><span
@@ -74,7 +76,7 @@
             window.location.href = uri;
         }
 
-        window.onclick = function (event) {
+        function closeDropdowns(event) {
             if (!event.target.matches('.dropbtn')) {
                 var dropdowns = document.getElementsByClassName("dropdown-content");
                 var i;
@@ -158,8 +160,8 @@
                 } else {
                     showMessage("error", getApiMessage(json) || "Erreur inconnue");
                 }
-            } catch (e) {
-                showMessage(`error", "Erreur: ${e}`);
+            } catch (error) {
+                showMessage("error", error);
             }
         }
 
@@ -183,10 +185,9 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', async function () {
+        async function init() {
             await loadGroupForms();
             await lastRuns();
-        });
-
+        }
     </script>
 {% endblock %}

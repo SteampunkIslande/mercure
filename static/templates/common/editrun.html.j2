@@ -10,6 +10,8 @@
                 <span class="banner-text">Pipeline: {{ form.name }}{% if form.branch %} (branche {{ form.branch
                     }}{% if form.file_path %}, {{ form.file_path }}{% endif %}){% endif %}</span>{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <h2>{% if run %}Edition du run{% else %}Déclarer un nouveau run{% endif %}</h2>
 
@@ -51,9 +53,9 @@
         const currentRun = null;
         {% endif %}
 
-        document.addEventListener('DOMContentLoaded', async function () {
+        async function init() {
             await renderFormVariables(formSchema, currentRun ? currentRun.user_defined_vars : {});
-        });
+        }
 
         async function handleSubmit() {
             const missing = missingFormVariables();

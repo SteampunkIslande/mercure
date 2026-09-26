@@ -77,11 +77,19 @@
     </div>
 {% endblock %}
 
+{% block run_body_attrs %} onbeforeunload="stopPolling()"{% endblock %}
+
 {% block run_extra_js %}
         const runId = {{ run.run_id }};
         const attemptNumber = {{ attempt.attempt_number }};
 
         let intervalId = null;
+
+        function stopPolling() {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        }
 
         function setProgress(percent) {
             const p = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -136,14 +144,10 @@
             }
         }
 
-        window.addEventListener('beforeunload', () => {
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
-        });
 {% endblock %}
 
 {% block run_on_ready %}
+        await loadFieldPresets();
         intervalId = setInterval(pollJobInfo, 30000);
         await pollJobInfo();
 {% endblock %}

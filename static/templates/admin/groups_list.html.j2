@@ -4,6 +4,8 @@
 
 {% block banner_text %}Edition des groupes de {{ user.username }}{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <div id="groups-container">
     </div>
@@ -59,8 +61,7 @@
                     initialState[checkbox.id] = checkbox.checked;
                 });
             } catch (error) {
-                console.error(error);
-                alert(error.message);
+                showMessage('error', error);
             }
         }
 
@@ -97,15 +98,9 @@
                 else {
                     showMessage('info', getApiData(data));
                 }
-            } catch (e) {
-                showMessage('error', e);
+            } catch (error) {
+                showMessage('error', error);
             }
         }
-
-        window.addEventListener("DOMContentLoaded", async () => {
-            await init();
-        });
-
-
     </script>
 {% endblock %}

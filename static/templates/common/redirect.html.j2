@@ -6,6 +6,8 @@
 
 {% block messages %}{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <h1>{{ title }}</h1>
     <p>{{ message }}</p>
@@ -15,24 +17,18 @@
 
 {% block extra_js %}
     <script>
-        document.addEventListener('DOMContentLoaded', async function () {
+        async function init() {
             const target = "{{ target_url | safe }}";
             let secs = parseInt("{{ seconds }}", 10);
             if (isNaN(secs) || secs < 0) secs = 5;
-
             const el = document.getElementById('countdown');
-
-            async function countdown() {
+            el.textContent = secs;
+            while (secs > 0) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                secs -= 1;
                 el.textContent = secs;
-                while (secs > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    secs -= 1;
-                    el.textContent = secs;
-                }
-                window.location = target;
             }
-
-            await countdown();
-        });
+            window.location = target;
+        }
     </script>
 {% endblock %}

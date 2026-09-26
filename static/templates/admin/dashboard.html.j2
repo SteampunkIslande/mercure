@@ -8,6 +8,8 @@
 
 {% block banner_text %}Bienvenue, {{ user.username }}{% endblock %}
 
+{% block body_attrs %} onload="init()" onclick="closeDropdowns(event)"{% endblock %}
+
 {% block content %}
     <div class="dropdown">
         <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
@@ -23,7 +25,6 @@
         <div id="forms_dropdown" class="dropdown-content">
             <a href="/mercure/admin/newform">Créer un nouveau formulaire</a>
             <a href="/mercure/admin/show/forms">Liste des formulaires</a>
-            <a href="/mercure/admin/forms/updates">Mises à jour des formulaires</a>
         </div>
     </div>
     <div class="dropdown" style="float:right;">
@@ -70,20 +71,20 @@
                 } else {
                     showMessage("error", getApiMessage(json) || "Erreur inconnue");
                 }
-            } catch (e) {
-                showMessage(`error", "Erreur: ${e}`);
+            } catch (error) {
+                showMessage('error', error);
             }
         }
 
         function onDropDown(element) {
             document.getElementById(element).classList.toggle("show");
         }
+
         function navigateTo(uri) {
             window.location.href = uri;
         }
 
-        // Close the dropdown menu if the user clicks outside of it
-        window.onclick = function (event) {
+        function closeDropdowns(event) {
             if (!event.target.matches('.dropbtn')) {
                 var dropdowns = document.getElementsByClassName("dropdown-content");
                 var i;
@@ -96,10 +97,9 @@
             }
         }
 
-        document.addEventListener("DOMContentLoaded", async function () {
+        async function init() {
             await loadRuns("Running", "Aucun run en cours");
             await loadRuns("Failure", "Aucun run en échec");
-        });
-
+        }
     </script>
 {% endblock %}

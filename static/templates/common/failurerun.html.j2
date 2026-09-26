@@ -33,19 +33,15 @@
 {% block run_extra_js %}
         async function retryAnalysis(run_id) {
             try {
-                const resp = await fetch(`/mercure/api/retry/${run_id}`);
-                if (resp.ok) {
-                    const json = await resp.json();
-                    if (json.data) {
-                        location.href = `/mercure/show/run/${run_id}`;
-                    } else {
-                        alert('Relance de l\'analyse refusée');
-                    }
+                const response = await fetch(`/mercure/api/retry/${run_id}`);
+                const data = await response.json();
+                if (isApiSuccess(data)) {
+                    location.href = `/mercure/show/run/${run_id}`;
                 } else {
-                    console.error('Erreur lors de la requête de retry', resp.status);
+                    showMessage('error', getApiMessage(data) || "Relance de l'analyse refusée");
                 }
-            } catch (e) {
-                console.error('Exception lors de la requête de retry', e.message);
+            } catch (error) {
+                showMessage('error', error);
             }
         }
 {% endblock %}

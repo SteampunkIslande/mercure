@@ -4,6 +4,8 @@
 
 {% block banner_text %}Administration - Création d'utilisateur{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <form id="registerForm" class="form-vertical" style="margin: 1em auto;">
         <div>
@@ -20,14 +22,13 @@
             <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="off" required>
         </div>
         <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
-        <a id="create-user-button" class="btn btn-primary">Créer l'utilisateur</a>
+        <a id="create-user-button" class="btn btn-primary" onclick="submitForm()">Créer l'utilisateur</a>
     </form>
 {% endblock %}
 
 {% block extra_js %}
     <script>
-        document.getElementById('create-user-button').addEventListener('click', async (e) => {
-            e.preventDefault();
+        async function submitForm() {
             const usermail = document.getElementById('usermail').value;
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -40,9 +41,7 @@
                     },
                     body: JSON.stringify({ usermail, username, password })
                 });
-
                 const data = await response.json();
-
                 if (isApiSuccess(data)) {
                     showMessage('success', 'Utilisateur créé avec succès');
                     document.getElementById('registerForm').reset();
@@ -52,15 +51,10 @@
             } catch (error) {
                 showMessage('error', 'Erreur de connexion au serveur');
             }
-        });
+        }
 
         function init() {
             document.getElementById('registerForm').reset();
         }
-
-        window.onload = function () {
-            init();
-        };
-
     </script>
 {% endblock %}

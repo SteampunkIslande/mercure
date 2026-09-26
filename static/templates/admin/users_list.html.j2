@@ -4,6 +4,8 @@
 
 {% block banner_text %}Liste des utilisateurs{% endblock %}
 
+{% block body_attrs %} onload="init()"{% endblock %}
+
 {% block content %}
     <table>
         <thead>
@@ -59,11 +61,12 @@
                     });
                 }
             } catch (error) {
-                console.error('Error fetching user list:', error);
+                showMessage('error', error);
             }
         }
 
-        // Fetch users on page load
-        document.addEventListener("DOMContentLoaded", async () => { await fetchUsers() });
+        async function init() {
+            await fetchUsers();
+        }
     </script>
 {% endblock %}

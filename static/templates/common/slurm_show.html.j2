@@ -353,29 +353,5 @@
             }
         }
 
-        // Fonction de gestion des erreurs réseau
-        function handleNetworkError() {
-            showError('Impossible de se connecter au serveur. Vérifiez votre connexion réseau.');
-        }
-
-        // Initialisation au chargement de la page
-        document.addEventListener('DOMContentLoaded', async function () {
-            await loadFieldPresets();
-            applyFieldPreset();
-            filterTable();
-        });
-
-        // Gestion des erreurs globales
-        window.addEventListener('error', function (event) {
-            console.error('Erreur globale:', event.error);
-        });
-
-        // Gestion des erreurs de fetch
-        window.addEventListener('unhandledrejection', function (event) {
-            console.error('Promesse rejetée:', event.reason);
-            if (event.reason instanceof TypeError && event.reason.message.includes('fetch')) {
-                handleNetworkError();
-            }
-        });
     </script>
 </div>
