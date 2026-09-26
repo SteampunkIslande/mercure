@@ -1,20 +1,17 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Accès Protégé</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/mercure/static/styles/default.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-</head>
+{% block title %}Accès Protégé{% endblock %}
 
-<body class="bg-light flex-center vh-100">
+{% block banner %}{% endblock %}
+
+{% block messages %}{% endblock %}
+
+{% block body_attrs %} class="bg-light flex-center vh-100"{% endblock %}
+
+{% block content %}
     <div class="card">
         <h2 class="title text-danger">Accès protégé</h2>
         <p class="paragraph">Vous devez être administrateur pour accéder à cette ressource.</p>
         <a href="/mercure/home" class="btn btn-primary">Retour à l'accueil</a>
     </div>
-</body>
-
-</html>
+{% endblock %}

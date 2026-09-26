@@ -1,163 +1,14 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Group Forms</title>
-    <link rel="stylesheet" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+{% block title %}Group Forms{% endblock %}
 
-    <script src="/mercure/static/scripts/show_message.js"></script>
+{% block extra_head %}
     <script src="/mercure/static/scripts/json_table.js"></script>
-</head>
+{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Bienvenue, {{user.username }}</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span
-                        class="material-icons icon-align">logout</span>Déconnexion</a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Bienvenue, {{user.username }}{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
-    <script>
-        function onDropDown(element) {
-            document.getElementById(element).classList.toggle("show");
-        }
-        function navigateTo(uri) {
-            window.location.href = uri;
-        }
-
-        // Close the dropdown menu if the user clicks outside of it
-        window.onclick = function (event) {
-            if (!event.target.matches('.dropbtn')) {
-                var dropdowns = document.getElementsByClassName("dropdown-content");
-                var i;
-                for (i = 0; i < dropdowns.length; i++) {
-                    var openDropdown = dropdowns[i];
-                    if (openDropdown.classList.contains('show')) {
-                        openDropdown.classList.remove('show');
-                    }
-                }
-            }
-        }
-
-        function openTab(evt, group_id) {
-            // Declare all variables
-            var i, tabcontent, tablinks;
-
-            // Get all elements with class="tabcontent" and hide them
-            tabcontent = document.getElementsByClassName("tabcontent");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-
-            // Get all elements with class="tablinks" and remove the class "active"
-            tablinks = document.getElementsByClassName("tablinks");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-
-            // Show the current tab, and add an "active" class to the button that opened the tab
-            document.getElementById(`forms-container-${group_id}`).style.display = "block";
-            evt.currentTarget.className += " active";
-        }
-
-        const userGroups = {{ user_groups | tojson }};
-
-        async function loadGroupForms() {
-            if (userGroups.length > 0) {
-                for (let group of userGroups) {
-                    try {
-                        const response = await fetch(`/mercure/api/groups/forms/${group.id}`);
-                        const result = await response.json();
-                        if (!isApiSuccess(result)) {
-                            throw new Error(getApiMessage(result) || "Erreur inconnue");
-                        }
-                        const forms = getApiData(result);
-                        // Always append to tbody if present, otherwise to table
-                        let table = document.getElementById(`forms-container-${group.id}`);
-                        let container = table.querySelector('tbody');
-                        if (!container) {
-                            console.log("No tbody found, appending to table directly");
-                            container = table;
-                        }
-                        forms.with_group.forEach(form => {
-                            const formBox = document.createElement('tr');
-                            formBox.innerHTML = `
-                           <td class="content-column">${form.name}${form.description ? ` — ${form.description}` : ''}</td>
-                           <td class="numeric-column">
-                               <a href="/mercure/runs/submit/${form.branch}/${form.file_path}" class="inline-table centered">Lancer un run</a>
-                           </td>
-                        `;
-                            container.appendChild(formBox);
-                        });
-                    } catch (error) {
-                        showMessage("error", `Error fetching forms ${error}`);
-                    }
-                }
-            }
-            else {
-                console.log("User has no groups!");
-                document.getElementById("no-user-group").style.display = "block";
-            }
-        }
-
-
-        async function lastRuns() {
-            try {
-                // Permet d'afficher les cinq derniers runs de l'utilisateur (trié par date)
-                const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);
-                const json = await response.json();
-                if (isApiSuccess(json)) {
-                    const data = getApiData(json);
-                    if (data.table.length > 0) {
-                        generateJsonTable(data, "latest-runs-table");
-                    } else {
-                        document.getElementById("latest-runs-table").innerHTML = `<p>Aucune donnée à afficher.</p>`;
-                    }
-                } else {
-                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
-                }
-            } catch (e) {
-                showMessage(`error", "Erreur: ${e}`);
-            }
-        }
-
-        function filterForms() {
-            const queryString = document.querySelector('#search-forms input[name="q"]').value;
-            const lowerQuery = queryString.toLowerCase();
-            userGroups.forEach(group => {
-                const table = document.getElementById(`forms-container-${group.id}`);
-                const rows = table.getElementsByTagName('tr');
-                for (let i = 1; i < rows.length; i++) { // Skip header row
-                    const formNameCell = rows[i].getElementsByTagName('td')[0];
-                    if (formNameCell) {
-                        const formName = formNameCell.textContent || formNameCell.innerText;
-                        if (formName.toLowerCase().indexOf(lowerQuery) > -1) {
-                            rows[i].style.display = "";
-                        } else {
-                            rows[i].style.display = "none";
-                        }
-                    }
-                }
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', async function () {
-            await loadGroupForms();
-            await lastRuns();
-        });
-
-    </script>
+{% block content %}
     <div class="dropdown">
         <button onclick="navigateTo(`/mercure/show/runs`)" class="dropbtn"><span
                 class="material-icons icon-align">science</span> Voir tous mes runs</button>
@@ -212,7 +63,130 @@
     <h1>Runs récents</h1>
     <div id="latest-runs-table">
     </div>
+{% endblock %}
 
-</body>
+{% block extra_js %}
+    <script>
+        function onDropDown(element) {
+            document.getElementById(element).classList.toggle("show");
+        }
+        function navigateTo(uri) {
+            window.location.href = uri;
+        }
 
-</html>
+        window.onclick = function (event) {
+            if (!event.target.matches('.dropbtn')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                var i;
+                for (i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+
+        function openTab(evt, group_id) {
+            var i, tabcontent, tablinks;
+
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+
+            document.getElementById(`forms-container-${group_id}`).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        const userGroups = {{ user_groups | tojson }};
+
+        async function loadGroupForms() {
+            if (userGroups.length > 0) {
+                for (let group of userGroups) {
+                    try {
+                        const response = await fetch(`/mercure/api/groups/forms/${group.id}`);
+                        const result = await response.json();
+                        if (!isApiSuccess(result)) {
+                            throw new Error(getApiMessage(result) || "Erreur inconnue");
+                        }
+                        const forms = getApiData(result);
+                        let table = document.getElementById(`forms-container-${group.id}`);
+                        let container = table.querySelector('tbody');
+                        if (!container) {
+                            console.log("No tbody found, appending to table directly");
+                            container = table;
+                        }
+                        forms.with_group.forEach(form => {
+                            const formBox = document.createElement('tr');
+                            formBox.innerHTML = `
+                           <td class="content-column">${form.name}${form.description ? ` — ${form.description}` : ''}</td>
+                           <td class="numeric-column">
+                               <a href="/mercure/runs/submit/${form.branch}/${form.file_path}" class="inline-table centered">Lancer un run</a>
+                           </td>
+                        `;
+                            container.appendChild(formBox);
+                        });
+                    } catch (error) {
+                        showMessage("error", `Error fetching forms ${error}`);
+                    }
+                }
+            }
+            else {
+                console.log("User has no groups!");
+                document.getElementById("no-user-group").style.display = "block";
+            }
+        }
+
+
+        async function lastRuns() {
+            try {
+                const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);
+                const json = await response.json();
+                if (isApiSuccess(json)) {
+                    const data = getApiData(json);
+                    if (data.table.length > 0) {
+                        generateJsonTable(data, "latest-runs-table");
+                    } else {
+                        document.getElementById("latest-runs-table").innerHTML = `<p>Aucune donnée à afficher.</p>`;
+                    }
+                } else {
+                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
+                }
+            } catch (e) {
+                showMessage(`error", "Erreur: ${e}`);
+            }
+        }
+
+        function filterForms() {
+            const queryString = document.querySelector('#search-forms input[name="q"]').value;
+            const lowerQuery = queryString.toLowerCase();
+            userGroups.forEach(group => {
+                const table = document.getElementById(`forms-container-${group.id}`);
+                const rows = table.getElementsByTagName('tr');
+                for (let i = 1; i < rows.length; i++) {
+                    const formNameCell = rows[i].getElementsByTagName('td')[0];
+                    if (formNameCell) {
+                        const formName = formNameCell.textContent || formNameCell.innerText;
+                        if (formName.toLowerCase().indexOf(lowerQuery) > -1) {
+                            rows[i].style.display = "";
+                        } else {
+                            rows[i].style.display = "none";
+                        }
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            await loadGroupForms();
+            await lastRuns();
+        });
+
+    </script>
+{% endblock %}

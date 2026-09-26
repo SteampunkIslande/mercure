@@ -1,31 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liste des utilisateurs</title>
-    <link rel="stylesheet" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-    <script src="/mercure/static/scripts/show_message.js"></script>
-</head>
+{% block title %}Liste des utilisateurs{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Liste des utilisateurs</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span
-                        class="material-icons icon-align">logout</span>Déconnexion</a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Liste des utilisateurs{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
+{% block content %}
     <table>
         <thead>
             <tr>
@@ -38,6 +17,12 @@
             <!-- Rows will be dynamically populated -->
         </tbody>
     </table>
+    <div style="text-align: left; margin-top: 20px;">
+        <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
     <script>
         async function fetchUsers() {
             try {
@@ -81,9 +66,4 @@
         // Fetch users on page load
         document.addEventListener("DOMContentLoaded", async () => { await fetchUsers() });
     </script>
-    <div style="text-align: left; margin-top: 20px;">
-        <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
-    </div>
-</body>
-
-</html>
+{% endblock %}

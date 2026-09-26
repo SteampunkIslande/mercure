@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="{% block html_lang %}fr{% endblock %}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Mercure{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
+    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
+    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+    <script src="/mercure/static/scripts/show_message.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body{% block body_attrs %}{% endblock %}>
+    {% block banner %}
+    <div class="banner">
+        <div class="banner-content">
+            <span class="banner-text"{% block banner_text_attrs %}{% endblock %}>{% block banner_text %}{% endblock %}</span>
+            {% block banner_actions %}
+            <div class="logout-button">
+                <a href="/mercure/logout" class="btn btn-danger"><span
+                        class="material-icons icon-align">logout</span>Déconnexion</a>
+            </div>
+            {% endblock %}
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block messages %}
+    <div id="info-message" class="info-msg" style="display:none;"></div>
+    <div id="error-message" class="error-msg" style="display:none;"></div>
+    <div id="success-message" class="success-msg" style="display:none;"></div>
+    {% endblock %}
+
+    {% block content %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

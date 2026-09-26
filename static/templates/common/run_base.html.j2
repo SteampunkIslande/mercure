@@ -1,0 +1,65 @@
+{% extends "base.html.j2" %}
+
+{% block extra_js %}
+<script>
+    {% block run_extra_js %}{% endblock %}
+
+    document.addEventListener('DOMContentLoaded', async function () {
+        const userDefinedVars = {% block udv_schema %}{{ user_defined_vars_json | safe }}{% endblock %};
+        const currentUserDefinedVars = {% block udv_values %}{{ attempt.user_defined_vars | tojson }}{% endblock %};
+        const container = document.getElementById('user-defined-vars');
+        const advancedContainer = document.getElementById('user-defined-vars-advanced');
+        let hasAdvancedVars = false;
+
+        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
+            const isConstant = value && typeof value === 'object' && 'Constant' in value;
+
+            const div = document.createElement('div');
+            const label = document.createElement('label');
+            label.innerHTML = `<strong>${key}</strong>: `;
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(' '));
+            const span = document.createElement('span');
+            span.textContent = currentUserDefinedVars[key] || '';
+            div.appendChild(span);
+
+            if (isConstant) {
+                advancedContainer.appendChild(div);
+                hasAdvancedVars = true;
+            } else {
+                container.appendChild(div);
+            }
+        }
+
+        if (hasAdvancedVars) {
+            const toggleBtn = document.getElementById('toggle-advanced-btn');
+            const advancedDiv = document.getElementById('advanced-vars-container');
+            toggleBtn.style.display = 'inline-block';
+
+            toggleBtn.addEventListener('click', function () {
+                if (advancedDiv.style.display === 'none') {
+                    advancedDiv.style.display = 'block';
+                    toggleBtn.textContent = 'Masquer les paramètres avancés';
+                } else {
+                    advancedDiv.style.display = 'none';
+                    toggleBtn.textContent = 'Afficher les paramètres avancés';
+                }
+            });
+        }
+
+        const seqnameDiv = document.getElementById('seq-name');
+        const seqname = seqnameDiv.textContent;
+        try {
+            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
+            if (resp.ok) {
+                const data = await resp.text();
+                seqnameDiv.textContent = data;
+            }
+        } catch (e) {
+            console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
+        }
+
+        {% block run_on_ready %}{% endblock %}
+    });
+</script>
+{% endblock %}

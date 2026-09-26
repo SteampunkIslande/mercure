@@ -1,33 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "common/run_base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run terminé avec succès</title>
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-    <script src="/mercure/static/scripts/json_list.js"></script>
-    <script src="/mercure/static/scripts/show_message.js"></script>
-</head>
+{% block title %}Run terminé avec succès{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Succès</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger">
-                    <span class="material-icons icon-align">logout</span>Déconnexion
-                </a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Succès{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
+{% block content %}
     {% if is_pipeline_archived %}
     <div class="error-msg" style="display:block; margin-bottom: 20px;">
         <strong>⚠️ Pipeline archivé</strong><br>
@@ -55,12 +32,10 @@
         {% endif %}
     </div>
 
-    {% include 'common/runinfo' %}
+    {% include "common/runinfo.html.j2" %}
+{% endblock %}
 
-
-    <script>
-
-        // Retry logic
+{% block run_extra_js %}
         async function retryAnalysis(run_id) {
             try {
                 const resp = await fetch(`/mercure/api/retry/${run_id}`);
@@ -78,70 +53,4 @@
                 console.error('Exception lors de la requête de retry', e.message);
             }
         }
-
-        document.addEventListener('DOMContentLoaded', async function () {
-            // Affichage des variables utilisateur (readonly)
-            const userDefinedVars = {{ user_defined_vars_json | safe
-        }};
-        const currentUserDefinedVars = {{ attempt.user_defined_vars | tojson }};
-        const container = document.getElementById('user-defined-vars');
-        const advancedContainer = document.getElementById('user-defined-vars-advanced');
-        let hasAdvancedVars = false;
-
-        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
-            const isConstant = value && typeof value === 'object' && 'Constant' in value;
-
-            const div = document.createElement('div');
-            const label = document.createElement('label');
-            label.innerHTML = `<strong>${key}</strong>: `;
-            div.appendChild(label);
-            div.appendChild(document.createTextNode(' '));
-            const span = document.createElement('span');
-            span.textContent = currentUserDefinedVars[key] || '';
-            div.appendChild(span);
-
-            if (isConstant) {
-                advancedContainer.appendChild(div);
-                hasAdvancedVars = true;
-            } else {
-                container.appendChild(div);
-            }
-
-        }
-
-        if (hasAdvancedVars) {
-            const toggleBtn = document.getElementById('toggle-advanced-btn');
-            const advancedDiv = document.getElementById('advanced-vars-container');
-            toggleBtn.style.display = 'inline-block';
-
-            toggleBtn.addEventListener('click', function () {
-                if (advancedDiv.style.display === 'none') {
-                    advancedDiv.style.display = 'block';
-                    toggleBtn.textContent = 'Masquer les paramètres avancés';
-                } else {
-                    advancedDiv.style.display = 'none';
-                    toggleBtn.textContent = 'Afficher les paramètres avancés';
-                }
-            });
-        }
-
-        // Correction de l'affichage du séquenceur
-        const seqnameDiv = document.getElementById('seq-name');
-        const seqname = seqnameDiv.textContent;
-        try {
-            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
-            if (resp.ok) {
-                const data = await resp.text();
-                seqnameDiv.textContent = data;
-            }
-        } catch (e) {
-            console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
-            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
-        }
-        });
-
-
-    </script>
-</body>
-
-</html>
+{% endblock %}

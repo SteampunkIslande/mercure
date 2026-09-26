@@ -82,3 +82,140 @@ pub fn minijinja_fairing() -> AdHoc {
         Ok(rocket)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use minijinja::context;
+
+    fn load_env() -> Environment<'static> {
+        let mut env = Environment::new();
+        for file_path in TemplateAssets::iter() {
+            let file = TemplateAssets::get(&file_path).expect("template asset");
+            let content = std::str::from_utf8(&file.data).expect("utf8 template");
+            env.add_template_owned(file_path.to_string(), content.to_string())
+                .unwrap_or_else(|e| panic!("parse {}: {e}", file_path));
+        }
+        env
+    }
+
+    #[test]
+    fn all_templates_parse() {
+        let env = load_env();
+        assert!(env.get_template("base.html.j2").is_ok());
+        assert!(env.get_template("common/run_base.html.j2").is_ok());
+        assert!(env.get_template("common/welcome.html.j2").is_ok());
+        assert!(env.get_template("admin/dashboard.html.j2").is_ok());
+        assert!(env.get_template("common/runningrun.html.j2").is_ok());
+    }
+
+    #[test]
+    fn welcome_renders_from_base() {
+        let env = load_env();
+        let html = env
+            .get_template("common/welcome.html.j2")
+            .unwrap()
+            .render(context! {})
+            .unwrap();
+        assert!(html.contains("<!DOCTYPE html>"));
+        assert!(html.contains("Bienvenue sur Mercure"));
+        assert!(html.contains("/mercure/static/styles/default.css"));
+        assert!(!html.contains("Déconnexion"));
+    }
+
+    #[test]
+    fn login_renders_without_banner() {
+        let env = load_env();
+        let html = env
+            .get_template("common/login.html.j2")
+            .unwrap()
+            .render(context! {})
+            .unwrap();
+        assert!(html.contains("Connexion - Mercure"));
+        assert!(html.contains("show_message.js"));
+        assert!(!html.contains("banner-text"));
+    }
+
+    #[test]
+    fn error_pages_render() {
+        let env = load_env();
+        let unauthorized = env
+            .get_template("errors/unauthorized.html.j2")
+            .unwrap()
+            .render(context! { title => "x", h2 => "y", message => "z" })
+            .unwrap();
+        assert!(unauthorized.contains("class=\"bg-light flex-center vh-100\""));
+        assert!(unauthorized.contains("Se connecter"));
+
+        let admin_only = env
+            .get_template("errors/admin_only.html.j2")
+            .unwrap()
+            .render(context! {})
+            .unwrap();
+        assert!(admin_only.contains("Accès protégé"));
+    }
+
+    #[test]
+    fn inherited_pages_render_with_minimal_context() {
+        let env = load_env();
+        let pages = [
+            "admin/register.html.j2",
+            "admin/dashboard.html.j2",
+            "admin/users_list.html.j2",
+            "common/home.html.j2",
+            "common/listruns.html.j2",
+            "common/searchrun.html.j2",
+            "common/redirect.html.j2",
+            "common/error.html.j2",
+            "common/pendingrun.html.j2",
+            "common/successrun.html.j2",
+            "common/failurerun.html.j2",
+            "common/idlerun.html.j2",
+            "common/runningrun.html.j2",
+            "common/editrun.html.j2",
+            "admin/groups_list.html.j2",
+            "admin/passedit.html.j2",
+        ];
+        let ctx = context! {
+            title => "t",
+            h2 => "h",
+            message => "m",
+            seconds => 5,
+            target_url => "/",
+            user => context! { username => "u", id => 1 },
+            edited_user => context! { username => "u", id => 1 },
+            auth_user => context! { is_admin => false },
+            user_groups => Vec::<minijinja::Value>::new(),
+            is_admin => false,
+            pipelines_struct => context! {},
+            edit_mode => false,
+            form => context! { name => "f", version => 1, indir_type => "BclDir" },
+            run => context! {
+                run_id => 1,
+                run_name => "r",
+                status => "Idle",
+                user_defined_vars => context! {},
+                sample_sheet_adn_path => "",
+                sample_sheet_arn_path => "",
+                metadata_file_path => "",
+            },
+            attempt => context! {
+                attempt_number => 1,
+                run_date => "",
+                run_sequencer => "",
+                run_flowcellid => "",
+                indir => "",
+                user_defined_vars => context! {},
+            },
+            history => Vec::<minijinja::Value>::new(),
+            user_defined_vars_json => "{}",
+            fail_reason => "",
+        };
+        for page in pages {
+            env.get_template(page)
+                .unwrap_or_else(|e| panic!("load {page}: {e}"))
+                .render(ctx.clone())
+                .unwrap_or_else(|e| panic!("render {page}: {e}"));
+        }
+    }
+}

@@ -1,21 +1,15 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-</head>
+{% block title %}{{ title }}{% endblock %}
 
-<body>
+{% block banner %}{% endblock %}
+
+{% block messages %}{% endblock %}
+
+{% block content %}
     <div>
         <h2>{{ h2 }}</h2>
         <p>{{ message | safe }}</p>
         <a href="/mercure/home" class="btn btn-primary">Retour</a>
     </div>
-</body>
-
-</html>
+{% endblock %}

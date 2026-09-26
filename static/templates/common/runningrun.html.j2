@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "common/run_base.html.j2" %}
 
-<head>
-    <meta charset="utf-8" />
-    <title>Run en cours d'analyse - {{ run.run_name }}</title>
-    <link rel="stylesheet" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+{% block title %}Run en cours d'analyse - {{ run.run_name }}{% endblock %}
+
+{% block extra_head %}
     <style>
         .progress {
             background: hsl(0, 0%, 50%);
@@ -36,22 +32,13 @@
             }
         }
     </style>
-</head>
+{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Run en cours d'analyse<br><span> {{
+{% block banner_text %}Run en cours d'analyse<br><span> {{
                     run.run_name
-                    }}</span></span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger">
-                    <span class="material-icons icon-align">logout</span>Déconnexion
-                </a>
-            </div>
-        </div>
-    </div>
+                    }}</span>{% endblock %}
 
+{% block content %}
     <div class="field">
         <strong>Formulaire:</strong> {{ form.form_name }} v{{ form.version }}
     </div>
@@ -82,14 +69,15 @@
         </span>
     </div>
 
-    {% include 'common/slurm_show' %}
-    {% include 'common/runinfo' %}
+    {% include "common/slurm_show.html.j2" %}
+    {% include "common/runinfo.html.j2" %}
 
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
     </div>
+{% endblock %}
 
-    <script>
+{% block run_extra_js %}
         const runId = {{ run.run_id }};
         const attemptNumber = {{ attempt.attempt_number }};
 
@@ -153,74 +141,9 @@
                 clearInterval(intervalId);
             }
         });
+{% endblock %}
 
-        document.addEventListener('DOMContentLoaded', async function () {
-            // Affichage des variables utilisateur (readonly)
-            const userDefinedVars = {{ user_defined_vars_json | safe
-        }};
-        const currentUserDefinedVars = {{ attempt.user_defined_vars | tojson }};
-        const container = document.getElementById('user-defined-vars');
-        const advancedContainer = document.getElementById('user-defined-vars-advanced');
-        let hasAdvancedVars = false;
-
-        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
-            const isConstant = value && typeof value === 'object' && 'Constant' in value;
-
-            const div = document.createElement('div');
-            const label = document.createElement('label');
-            label.innerHTML = `<strong>${key}</strong>: `;
-            div.appendChild(label);
-            div.appendChild(document.createTextNode(' '));
-            const span = document.createElement('span');
-            span.textContent = currentUserDefinedVars[key] || '';
-            div.appendChild(span);
-
-            if (isConstant) {
-                advancedContainer.appendChild(div);
-                hasAdvancedVars = true;
-            } else {
-                container.appendChild(div);
-            }
-
-        }
-
-        if (hasAdvancedVars) {
-            const toggleBtn = document.getElementById('toggle-advanced-btn');
-            const advancedDiv = document.getElementById('advanced-vars-container');
-            toggleBtn.style.display = 'inline-block';
-
-            toggleBtn.addEventListener('click', function () {
-                if (advancedDiv.style.display === 'none') {
-                    advancedDiv.style.display = 'block';
-                    toggleBtn.textContent = 'Masquer les paramètres avancés';
-                } else {
-                    advancedDiv.style.display = 'none';
-                    toggleBtn.textContent = 'Afficher les paramètres avancés';
-                }
-            });
-        }
-
-        // Correction de l'affichage du séquenceur
-        const seqnameDiv = document.getElementById('seq-name');
-        const seqname = seqnameDiv.textContent;
-        try {
-            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
-            if (resp.ok) {
-                const data = await resp.text();
-                seqnameDiv.textContent = data;
-            }
-        } catch (e) {
-            console.log("Erreur lors de la récupération du nom de séquenceur joli: " + e.message);
-            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
-        }
-
+{% block run_on_ready %}
         intervalId = setInterval(pollJobInfo, 30000);
         await pollJobInfo();
-        }
-        );
-
-
-    </script>
-</body>
-
-</html>
+{% endblock %}

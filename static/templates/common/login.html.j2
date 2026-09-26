@@ -1,18 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-    <script src="/mercure/static/scripts/json_table.js"></script>
-    <script src="/mercure/static/scripts/show_message.js"></script>
-    <title>Connexion - Mercure</title>
-</head>
+{% block title %}Connexion - Mercure{% endblock %}
 
-<body>
+{% block banner %}{% endblock %}
+
+{% block content %}
     <div class="container">
         <h1 class="title">Connexion</h1>
         <form id="loginForm">
@@ -24,12 +16,13 @@
                 <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
-            <div class="error-msg" id="error-message" style="display: none;"></div>
         </form>
         <a id="loginButton" class="btn btn-primary" onclick="onConnect()">Se connecter</a>
         <a href="/mercure" class="btn btn-secondary">Retour</a>
     </div>
+{% endblock %}
 
+{% block extra_js %}
     <script>
         async function onConnect() {
             const usermail = document.getElementById('usermail').value;
@@ -58,6 +51,4 @@
             document.getElementById('loginForm').reset();
         };
     </script>
-</body>
-
-</html>
+{% endblock %}

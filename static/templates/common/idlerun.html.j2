@@ -1,34 +1,19 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "common/run_base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run en attente</title>
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+{% block title %}Run en attente{% endblock %}
+
+{% block extra_head %}
     <script src="/mercure/static/scripts/json_list.js"></script>
-    <script src="/mercure/static/scripts/show_message.js"></script>
-</head>
+{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Run en attente<br>{{ form.form_name }} (version {{ form.version }})</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger">
-                    <span class="material-icons icon-align">logout</span>Déconnexion
-                </a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Run en attente<br>{{ form.form_name }} (version {{ form.version }}){% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
+{% block udv_schema %}JSON.parse({{ user_defined_vars_json | tojson }}){% endblock %}
 
-    {% include 'common/runinfo' %}
+{% block udv_values %}{{ run.user_defined_vars | tojson }}{% endblock %}
+
+{% block content %}
+    {% include "common/runinfo.html.j2" %}
 
     <div class="tab">
         <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>
@@ -68,9 +53,9 @@
         <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
         <a id="validate-btn" class="btn btn-primary">Valider</a>
     </div>
+{% endblock %}
 
-    <script>
-        // Tabs
+{% block run_extra_js %}
         function openTab(evt, tabName) {
             evt.preventDefault();
             var i, tabcontent, tablinks;
@@ -86,8 +71,6 @@
             evt.currentTarget.className += " active";
         }
 
-
-        // Affichage des samples détectés (comme editrun)
         async function checkSampleSheet(filename) {
             const formData = new FormData();
             formData.append('file_name', filename);
@@ -108,90 +91,6 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', async function () {
-            // ADN
-            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
-            if (adnPath) {
-                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
-                document.getElementById('sample_sheet_adn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_adn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
-                }
-            }
-            // ARN
-            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
-            if (arnPath) {
-                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
-                document.getElementById('sample_sheet_arn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_arn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
-                }
-            }
-            // Affichage des variables utilisateur (readonly)
-            const userDefinedVars = JSON.parse({{ user_defined_vars_json | tojson }});
-        const currentUserDefinedVars = {{ run.user_defined_vars | tojson }};
-        const container = document.getElementById('user-defined-vars');
-        const advancedContainer = document.getElementById('user-defined-vars-advanced');
-        let hasAdvancedVars = false;
-
-        for (const [key, value] of Object.entries(userDefinedVars).sort()) {
-            const isConstant = value && typeof value === 'object' && 'Constant' in value;
-
-            const div = document.createElement('div');
-            const label = document.createElement('label');
-            label.innerHTML = `<strong>${key}</strong>: `;
-            div.appendChild(label);
-            div.appendChild(document.createTextNode(' '));
-            const span = document.createElement('span');
-            span.textContent = currentUserDefinedVars[key] || '';
-            div.appendChild(span);
-
-            if (isConstant) {
-                advancedContainer.appendChild(div);
-                hasAdvancedVars = true;
-            } else {
-                container.appendChild(div);
-            }
-
-        }
-
-        if (hasAdvancedVars) {
-            const toggleBtn = document.getElementById('toggle-advanced-btn');
-            const advancedDiv = document.getElementById('advanced-vars-container');
-            toggleBtn.style.display = 'inline-block';
-
-            toggleBtn.addEventListener('click', function () {
-                if (advancedDiv.style.display === 'none') {
-                    advancedDiv.style.display = 'block';
-                    toggleBtn.textContent = 'Masquer les paramètres avancés';
-                } else {
-                    advancedDiv.style.display = 'none';
-                    toggleBtn.textContent = 'Afficher les paramètres avancés';
-                }
-            });
-        }
-
-        // Correction de l'affichage du séquenceur
-        const seqnameDiv = document.getElementById('seq-name');
-        const seqname = seqnameDiv.textContent;
-        try {
-            const resp = await fetch(`/mercure/api/prettify/seqname/${encodeURIComponent(seqname)}`);
-            if (resp.ok) {
-                const data = await resp.text();
-                seqnameDiv.textContent = data;
-            }
-        } catch (e) {
-            // Pas gênant, dans tous les cas c'est le nom du dossier qui s'affichera
-        }
-
-
-        });
-
-        // Bouton valider (même logique que editrun)
         document.getElementById('validate-btn').addEventListener('click', async function () {
             const runId = "{{ run.run_id }}";
             if (!runId) {
@@ -221,7 +120,6 @@
             }
         });
 
-        // Fonction pour migrer vers un formulaire compatible
         async function migrateToForm(targetFormId) {
             if (!confirm("Créer un nouveau run à partir de ce formulaire compatible ? Cela créera une copie de ce run avec le nouveau formulaire.")) {
                 return;
@@ -249,7 +147,27 @@
                 alert('Erreur lors de la migration: ' + error.message);
             }
         }
-    </script>
-</body>
+{% endblock %}
 
-</html>
+{% block run_on_ready %}
+            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
+            if (adnPath) {
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
+                document.getElementById('sample_sheet_adn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_adn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
+                }
+            }
+            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
+            if (arnPath) {
+                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
+                document.getElementById('sample_sheet_arn_check').innerHTML = message;
+                if (sample_names) {
+                    const container = document.getElementById('sample_sheet_arn_list');
+                    container.innerHTML = "";
+                    createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
+                }
+            }
+{% endblock %}

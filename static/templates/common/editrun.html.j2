@@ -1,35 +1,16 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if run %}Editer un run{% else %}Nouveau Run{% endif %}</title>
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
+{% block title %}{%- if run %}Editer un run{% else %}Nouveau Run{% endif %}{% endblock %}
 
-    <script src="/mercure/static/scripts/show_message.js"></script>
+{% block extra_head %}
     <script src="/mercure/static/scripts/form_variables.js"></script>
-</head>
+{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">{% if run %}Editer un run{% else %}Nouveau Run{% endif %}<br>
+{% block banner_text %}{% if run %}Editer un run{% else %}Nouveau Run{% endif %}<br>
                 <span class="banner-text">Pipeline: {{ form.name }}{% if form.branch %} (branche {{ form.branch
-                    }}{% if form.file_path %}, {{ form.file_path }}{% endif %}){% endif %}</span></span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span
-                        class="material-icons icon-align">logout</span>Déconnexion</a>
-            </div>
-        </div>
-    </div>
+                    }}{% if form.file_path %}, {{ form.file_path }}{% endif %}){% endif %}</span>{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
+{% block content %}
     <h2>{% if run %}Edition du run{% else %}Déclarer un nouveau run{% endif %}</h2>
 
     <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
@@ -58,10 +39,10 @@
             {% endif %}
         </div>
     </form>
+{% endblock %}
 
+{% block extra_js %}
     <script>
-        // Le formulaire est fourni tel quel par la route : le rendu des variables
-        // est entièrement à la charge de la page (cf. form_variables.js).
         const formSchema = {{ form | tojson }};
         const currentUser = {{ user | tojson }};
         {% if run %}
@@ -134,6 +115,4 @@
             }
         }
     </script>
-</body>
-
-</html>
+{% endblock %}

@@ -1,20 +1,14 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenue sur Mercure</title>
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-</head>
+{% block title %}Bienvenue sur Mercure{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Bienvenue sur Mercure</span>
-        </div>
-    </div>
+{% block banner_text %}Bienvenue sur Mercure{% endblock %}
+
+{% block banner_actions %}{% endblock %}
+
+{% block messages %}{% endblock %}
+
+{% block content %}
     <div class="container">
         <h1 class="title">Mercure</h1>
         <p class="paragraph">Le portail de lancement des analyses de la plateforme GenoBiomics</p>
@@ -22,6 +16,4 @@
             <a href="/mercure/login" class="btn btn-primary">Se connecter</a>
         </div>
     </div>
-</body>
-
-</html>
+{% endblock %}

@@ -1,4 +1,4 @@
-use std::{collections::HashSet,path::PathBuf,};
+use std::{collections::HashSet, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -237,7 +237,6 @@ mod test {
 
     #[test]
     fn test_form_serialize() {
-
         let expected = Form {
                         name: "Smaug-v3 simple".to_string(),
                         description: "Démultiplexe à partir d'un dossier de run brut, \
@@ -314,10 +313,14 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 "#.to_string() }};
         let form: Form = yaml_serde::from_str(include_str!("../../../.forms/smaug-basique.yaml"))
             .expect("Cannot serialize");
-        
+
         let expected_str = serde_json::to_string(&expected).expect("Cannot serialize");
         let form_str = serde_json::to_string(&form).expect("Cannot serialize back");
 
-        assert_eq!(expected_str,form_str,"Left should be:\n-----\n {} and right should be:\n------\n {}",expected_str,form_str);
+        assert_eq!(
+            expected_str, form_str,
+            "Left should be:\n-----\n {} and right should be:\n------\n {}",
+            expected_str, form_str
+        );
     }
 }

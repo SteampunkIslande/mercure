@@ -1,30 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Modifier le mot de passe</title>
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-    <script src="/mercure/static/scripts/show_message.js"></script>
-</head>
+{% block title %}Modifier le mot de passe{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Modifier le mot de passe de {{edited_user.username }}</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span
-                        class="material-icons icon-align">logout</span>Déconnexion</a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Modifier le mot de passe de {{edited_user.username }}{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
+{% block content %}
     <div class="form-vertical" style="margin: 1em auto;">
         <input type="hidden" name="user_id" id="user_id" value="{{ edited_user.id }}">
         {% if not auth_user.is_admin %}
@@ -50,6 +30,10 @@
                 <a class="btn btn-primary" onclick="submitForm()">Modifier le mot de passe</a>
             </div>
         </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
         <script>
             function submitForm() {
                 {% if not auth_user.is_admin %}
@@ -109,6 +93,4 @@
                 })
             }
         </script>
-</body>
-
-</html>
+{% endblock %}

@@ -1,31 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% extends "base.html.j2" %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Administration - Création d'utilisateur</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/styles/default.css">
-    <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
-    <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
-    <script src="/mercure/static/scripts/show_message.js"></script>
-</head>
+{% block title %}Administration - Création d'utilisateur{% endblock %}
 
-<body>
-    <div class="banner">
-        <div class="banner-content">
-            <span class="banner-text">Administration - Création d'utilisateur</span>
-            <div class="logout-button">
-                <a href="/mercure/logout" class="btn btn-danger"><span
-                        class="material-icons icon-align">logout</span>Déconnexion</a>
-            </div>
-        </div>
-    </div>
+{% block banner_text %}Administration - Création d'utilisateur{% endblock %}
 
-    <div id="info-message" class="info-msg" style="display:none;"></div>
-    <div id="error-message" class="error-msg" style="display:none;"></div>
-    <div id="success-message" class="success-msg" style="display:none;"></div>
-
+{% block content %}
     <form id="registerForm" class="form-vertical" style="margin: 1em auto;">
         <div>
             <label for="username">Nom d'utilisateur:</label>
@@ -40,12 +19,12 @@
             <label for="password">Mot de passe:</label>
             <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="off" required>
         </div>
-        <div class="error-msg" id="error-message" style="display: none;"></div>
-        <div class="success-msg" id="success-message" style="display: none;"></div>
         <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
         <a id="create-user-button" class="btn btn-primary">Créer l'utilisateur</a>
     </form>
+{% endblock %}
 
+{% block extra_js %}
     <script>
         document.getElementById('create-user-button').addEventListener('click', async (e) => {
             e.preventDefault();
@@ -84,6 +63,4 @@
         };
 
     </script>
-</body>
-
-</html>
+{% endblock %}
