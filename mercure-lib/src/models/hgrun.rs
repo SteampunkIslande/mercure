@@ -8,7 +8,6 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::PathBuf;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
@@ -89,7 +88,7 @@ pub struct Run {
     pub user_defined_vars: HashMap<String, String>,
 
     /// Path to the yaml file within said `branch`
-    pub form_path: PathBuf,
+    pub form_path: String,
 
     /// Name of the branch this run will take its code from
     pub branch_name: String,
@@ -118,7 +117,7 @@ impl Run {
         .bind(0)
         .bind(&run_submission.branch_name)
         .bind(&user_defined_vars)
-        .bind(run_submission.form_path.display().to_string())
+        .bind(&run_submission.form_path)
         .fetch_one(pool)
         .await?
         .try_get("run_id")?;
@@ -192,7 +191,7 @@ impl Run {
         // Le nom de la branche à utiliser pour l'exécution
         let branch_name: String = row.try_get("branch_name")?;
 
-        let form_path = PathBuf::from_str(row.try_get("form_path")?)?;
+        let form_path: String = row.try_get("form_path")?;
 
         // Construire l'instance HgRun
         let hgrun = Run {

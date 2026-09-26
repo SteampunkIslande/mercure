@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet,path::PathBuf,};
 
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -103,7 +100,7 @@ impl Form {
                                 owner,
                                 repo,
                                 branch_name,
-                                Path::new(&dir_item.path),
+                                &dir_item.path,
                             )
                             .await?,
                         )?;
@@ -172,7 +169,7 @@ impl Form {
         Ok((forms_with_groups, forms_without_groups))
     }
 
-    pub async fn get_form(branch: &str, form_path: &Path) -> Result<Form, ModelError> {
+    pub async fn get_form(branch: &str, form_path: &str) -> Result<Form, ModelError> {
         let MercureConfig { pipelines, .. } = crate::config::get_mercure_config();
 
         match &pipelines {
@@ -185,7 +182,7 @@ impl Form {
                     versionning::get_file_giteav1(base_url, owner, repo, branch, form_path).await?;
                 let mut form: Form = yaml_serde::from_str(&content)?;
                 form.branch = Some(branch.to_string());
-                form.file_path = Some(form_path.display().to_string());
+                form.file_path = Some(form_path.to_string());
                 Ok(form)
             }
             GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(

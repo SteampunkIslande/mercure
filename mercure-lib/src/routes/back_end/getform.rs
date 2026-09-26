@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use rocket::{State, get, serde::json::Json};
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -31,9 +29,9 @@ pub async fn get_all_forms_for_group(
     }
 }
 
-#[get("/forms/get/<branch>/<form_path..>")]
-pub async fn get_form_from_id(branch: String, form_path: PathBuf) -> Json<ApiResponse<Form>> {
-    match Form::get_form(&branch, &form_path).await {
+#[get("/forms/get?<branch>&<form_path>")]
+pub async fn get_form_from_id(branch: &str, form_path: &str) -> Json<ApiResponse<Form>> {
+    match Form::get_form(branch, form_path).await {
         Ok(formdef) => Json(ApiResponse::success(formdef)),
         Err(e) => Json(ApiResponse::error(format!("{:?}", e))),
     }

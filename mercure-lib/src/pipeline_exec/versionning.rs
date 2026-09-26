@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::config::{GitWebConfig, MercureConfig, get_mercure_config};
 use reqwest::Client;
 use serde::Deserialize;
@@ -136,17 +134,13 @@ pub async fn get_file_giteav1(
     owner: &str,
     repo: &str,
     branch_name: &str,
-    path: &Path,
+    path: &str,
 ) -> Result<String, GitCheckError> {
     let client = Client::new();
     // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
     let url = format!(
         "{}/{}/{}/raw/branch/{}/{}",
-        base_url,
-        owner,
-        repo,
-        branch_name,
-        path.display()
+        base_url, owner, repo, branch_name, path
     );
     Ok(client.get(&url).send().await?.text().await?)
 }
