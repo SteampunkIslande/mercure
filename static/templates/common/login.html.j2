@@ -2,14 +2,14 @@
 
 {% block title %}Connexion - Mercure{% endblock %}
 
-{% block banner %}{% endblock %}
+{% block banner_text %} Connexion {% endblock %}
+{% block banner_actions %}{% endblock %}
 
 {% block body_attrs %} onload="init()"{% endblock %}
 
 {% block content %}
     <div class="container">
-        <h1 class="title">Connexion</h1>
-        <form id="loginForm">
+        <form id="loginForm" onsubmit="onConnect(event)">
             <div>
                 <label for="usermail">Adresse e-mail:</label>
                 <input type="text" id="usermail" name="usermail" placeholder="Adresse e-mail" required>
@@ -18,15 +18,19 @@
                 <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
-        </form>
-        <a id="loginButton" class="btn btn-primary" onclick="onConnect()">Se connecter</a>
+        <a id="loginButton" class="btn btn-primary" onclick="onConnect(event)" type="submit">Se connecter</a>
         <a href="/mercure" class="btn btn-secondary">Retour</a>
+        <button type="submit" style="display: none;" tabindex="-1" aria-hidden="true"></button>
+        </form>
     </div>
 {% endblock %}
 
 {% block extra_js %}
     <script>
-        async function onConnect() {
+        async function onConnect(event) {
+            if (event) {
+                event.preventDefault();
+            }
             const usermail = document.getElementById('usermail').value;
             const password = document.getElementById('password').value;
 
@@ -44,9 +48,11 @@
                 } else {
                     const data = await response.json();
                     showMessage("error", getApiMessage(data));
+                    init();
                 }
             } catch (error) {
                 showMessage("error", error);
+                init();
             }
         }
 
