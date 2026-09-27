@@ -15,12 +15,16 @@ pub enum FormDefinitionError {
     SerdeError(#[from] yaml_serde::Error),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+    #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
+    DuplicateVarError(String),
+    #[error(transparent)]
+    MinijinjaError(#[from] minijinja::Error),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(tag = "type")]
 pub enum VariableType {
-    FromURL {
+    ListFromURL {
         source: String,
     },
     ValuesList {
@@ -31,8 +35,68 @@ pub enum VariableType {
     /// By default, a variable is set by the user from a text field
     #[default]
     LineEdit,
-    /// The user will have to upload a file to the server
+    /// The user will have to upload a file to the server. It is the html's responsibility to post a valid, server-side file name as the variable value
     ExistingFile,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct Variable {
+    pub name: String,
+    pub title: String,
+    pub description: String,
+    #[serde(flatten)]
+    pub variable_type: VariableType,
+}
+
+impl Variable {
+    pub fn to_html_safe(&self) -> String {
+        let Variable {
+            name,
+            title,
+            description,
+            variable_type,
+        } = self;
+
+        let description = description.replace('\n', "<br>");
+
+        let widget: String = match variable_type {
+            VariableType::DateEdit => {
+                format!(r#"<input type="date" id="{name}" name="{name}">"#)
+            }
+            VariableType::ExistingFile => {
+                format!(r#"<input type="file" id="{name}" name="{name}">"#)
+            }
+            VariableType::ListFromURL { source } => {
+                // Render an empty select with a data-source attribute.
+                // The JS reads `dataset.source`, fetch the URL, and populate the <option>s.
+                format!(r#"<select id="{name}" name="{name}" data-source="{source}"></select>"#)
+            }
+            VariableType::ValuesList { values } => {
+                let options = values
+                    .iter()
+                    .map(|v| format!(r#"<option value="{v}">{v}</option>"#))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                format!(
+                    r#"<select id="{name}" name="{name}">
+                    {options}
+                    </select>"#
+                )
+            }
+            VariableType::LineEdit => {
+                format!(r#"<input type="text" id="{name}" name="{name}">"#)
+            }
+        };
+
+        format!(
+            r#"<div class="card-container" id="{name}-card">
+            <label>{title}</label>
+            <span>{description}</span>
+            {widget}
+        </div>"#
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -50,15 +114,6 @@ impl Default for FormExecType {
             exec: Default::default(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct Variable {
-    pub name: String,
-    pub title: String,
-    pub description: String,
-    #[serde(flatten)]
-    pub variable_type: VariableType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -226,12 +281,18 @@ impl Form {
     pub async fn check_validity(&self) -> Result<(), FormDefinitionError> {
         Ok(())
     }
+
+    pub fn try_render_template(&self) -> Result<(), FormDefinitionError> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod test {
 
-    use crate::models::VariableType::ValuesList;
+    use std::fmt::{Debug, Display};
+
+    use crate::models::VariableType::{DateEdit, ExistingFile, ValuesList};
 
     use super::*;
 
@@ -248,15 +309,13 @@ mod test {
                                 name: "bed".to_string(),
                                 title: "BED".to_string(),
                                 description: "Le fichier BED à utiliser pour cette analyse".to_string(),
-                                variable_type: VariableType::FromURL {
+                                variable_type: VariableType::ListFromURL {
                                     source: "/mercure/api/aux/list_beds".to_string()
                                 },
-                                
                             },
                             Variable {
                                 name: "genome".to_string(),
                                 title: "Génome".to_string(),
-                                
                                 description: "Le génome à utiliser".to_string(),
                                 variable_type: ValuesList {
                                     values: vec!["hg19".to_string(), "hg38".to_string()]
@@ -266,7 +325,7 @@ mod test {
                                 name: "indir".to_string(),
                                 title: "Dossier BCL".to_string(),
                                 description: "Le dossier de run brut Illumina".to_string(),
-                                variable_type: VariableType::FromURL {
+                                variable_type: VariableType::ListFromURL {
                                     source: "/mercure/api/aux/list_illumina_dirs".to_string()
                                 },
                             },
@@ -280,7 +339,7 @@ mod test {
                                 name: "panel".to_string(),
                                 title: "Nom du panel".to_string(),
                                 description: "Le nom du panel".to_string(),
-                                variable_type: VariableType::FromURL {
+                                variable_type: VariableType::ListFromURL {
                                     source: "/mercure/api/aux/list_panels".to_string()
                                 },
                             },
@@ -321,6 +380,86 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
             expected_str, form_str,
             "Left should be:\n-----\n {} and right should be:\n------\n {}",
             expected_str, form_str
+        );
+    }
+
+    /// Just a helper to print what the assert_eq actually got on the left side.
+    /// Applies to types that implement the Display trait.
+    #[track_caller]
+    fn assert_eq_display_helper<T, U>(left: &T, right: &U)
+    where
+        T: Display + Debug + PartialEq<U> + ?Sized,
+        U: Debug + ?Sized,
+    {
+        assert_eq!(
+            left, right,
+            "\n------BEGIN_LEFT------\n{}\n-------END_LEFT-------\n",
+            left
+        );
+    }
+
+    #[test]
+    fn test_vars_to_html_values_list() {
+        // Test d'une variable de type ValuesList
+        let v = Variable {
+            title: "Une variable".to_string(),
+            name: "v1".to_string(),
+            description: "Une simple description".to_string(),
+            variable_type: ValuesList {
+                values: vec!["A".to_string(), "B".to_string()],
+            },
+        };
+        let v_html = v.to_html_safe();
+        assert_eq_display_helper(
+            &v_html,
+            r#"<div class="card-container" id="v1-card">
+            <label>Une variable</label>
+            <span>Une simple description</span>
+            <select id="v1" name="v1">
+                    <option value="A">A</option>
+<option value="B">B</option>
+                    </select>
+        </div>"#,
+        );
+    }
+
+    #[test]
+    fn test_vars_to_html_existing_file() {
+        //
+        let v = Variable {
+            title: "Une autre variable".to_string(),
+            name: "v2".to_string(),
+            description: "Whatever".to_string(),
+            variable_type: ExistingFile,
+        };
+        let v_html = v.to_html_safe();
+        assert_eq_display_helper(
+            &v_html,
+            r#"<div class="card-container" id="v2-card">
+            <label>Une autre variable</label>
+            <span>Whatever</span>
+            <input type="file" id="v2" name="v2">
+        </div>"#,
+        );
+    }
+
+    #[test]
+    fn test_vars_to_html_date_edit() {
+        // Test d'une variable de type ValuesList
+        let v1 = Variable {
+            title: "Une variable".to_string(),
+            name: "v1".to_string(),
+            description: "Une simple description".to_string(),
+            variable_type: DateEdit,
+        };
+        let v1_html = v1.to_html_safe();
+        assert_eq_display_helper(
+            &v1_html,
+            r#"<div class="card-container" id="v1-card">
+            <label>Une variable</label>
+            <span>Une simple description</span>
+            <input type="date" id="v1" name="v1">
+        </div>"#,
         );
     }
 }

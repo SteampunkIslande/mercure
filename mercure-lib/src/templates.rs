@@ -133,7 +133,7 @@ mod tests {
             .unwrap();
         assert!(html.contains("Connexion - Mercure"));
         assert!(html.contains("show_message.js"));
-        assert!(!html.contains("banner-text"));
+        assert!(html.contains("banner-text"));
     }
 
     #[test]

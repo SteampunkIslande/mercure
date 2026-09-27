@@ -4,7 +4,7 @@ variables:
   - name: bed
     title: BED
     description: Le fichier BED à utiliser pour cette analyse
-    type: FromURL
+    type: ListFromURL
     source: /mercure/api/aux/list_beds
   - name: genome
     title: Génome
@@ -16,7 +16,7 @@ variables:
   - name: indir
     title: Dossier BCL
     description: Le dossier de run brut Illumina
-    type: FromURL
+    type: ListFromURL
     source: /mercure/api/aux/list_illumina_dirs
   - name: outdir
     title: Dossier de sortie
@@ -25,7 +25,7 @@ variables:
   - name: panel
     title: Nom du panel
     description: "Le nom du panel"
-    type: FromURL
+    type: ListFromURL
     source: /mercure/api/aux/list_panels
   - name: sample_sheet
     title: SampleSheet
@@ -41,16 +41,15 @@ exec_type: shell
 exec: |
   # Copie de la samplesheet dans le bon dossier
   rsync {{ sample_sheet }} {{ indir }}/SampleSheet.csv
-  
+
   # Démultiplexage
   snakemake -s pipelines/demul/Snakefile --config indir={{ indir }} outdir={{ outdir }}
-  
+
   # Copie vers MOABI 
   rsync -a --info=progress2 "{{ outdir }}/fastq" user@depot:/where/it/should/go
-  
+
   # Smaug v3
   snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}
-  
+
   # Copie NAS
   rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ panel }}
-
