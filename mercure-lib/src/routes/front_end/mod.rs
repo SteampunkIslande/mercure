@@ -4,9 +4,9 @@ mod editrun;
 mod editusers;
 mod generics;
 mod home;
+mod newrun;
 mod redirect;
 mod showrun;
-mod submitrun;
 
 pub use admin::*;
 pub use editgroups::*;
@@ -14,10 +14,10 @@ pub use editrun::*;
 pub use editusers::*;
 pub use generics::*;
 pub use home::*;
+pub use newrun::*;
 pub use redirect::*;
 use rocket::{Response, http::Status, response::Responder};
 pub use showrun::*;
-pub use submitrun::*;
 
 use crate::templates::{Template, context};
 

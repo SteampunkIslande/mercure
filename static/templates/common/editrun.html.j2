@@ -2,18 +2,14 @@
 
 {% block title %}{%- if run %}Editer un run{% else %}Nouveau Run{% endif %}{% endblock %}
 
-{% block extra_head %}
-    <script src="/mercure/static/scripts/form_variables.js"></script>
-{% endblock %}
 
-{% block banner_text %}{% if run %}Editer un run{% else %}Nouveau Run{% endif %}<br>
-                <span class="banner-text">Pipeline: {{ form.name }}{% if form.branch %} (branche {{ form.branch
-                    }}{% if form.file_path %}, {{ form.file_path }}{% endif %}){% endif %}</span>{% endblock %}
+{% block banner_text %}{% if run %}Editer le run {{ run.run_name }} {% else %}Nouveau Run{% endif %}<br>
+                <span class="banner-text">Pipeline: {{ form.title }}</span>{% endblock %}
 
 {% block body_attrs %} onload="init()"{% endblock %}
 
 {% block content %}
-    <h2>{% if run %}Edition du run{% else %}Déclarer un nouveau run{% endif %}</h2>
+    <h2>{% if run %}Edition du run {{ run.run_name }}{% else %}Déclarer un nouveau run{% endif %}</h2>
 
     <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
 
