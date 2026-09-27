@@ -1,5 +1,8 @@
+use crate::auth::NoQuery;
 use crate::templates::{Template, context};
 use crate::{auth::Authenticated, models::User};
+use rocket::http::uri::Origin;
+use rocket::response::Redirect;
 use rocket::{State, get};
 use sqlx::SqlitePool;
 
@@ -33,9 +36,16 @@ pub async fn password_edit_get(
 
 /// Route to show the admin a page to register new user.
 #[get("/register")]
-pub async fn register_get(auth: Authenticated) -> Option<Template> {
+pub async fn register_get(auth: Authenticated, _noquery: NoQuery) -> Option<Template> {
     if !auth.user.is_admin {
         return Some(Template::render("errors/admin_only", context! {}));
     }
     Some(Template::render("admin/register", context! {}))
+}
+
+#[get("/register", rank = 2)]
+pub fn redirect_register_get(origin: &Origin<'_>) -> Redirect {
+    let clean_path = origin.path().as_str().to_string();
+
+    Redirect::to(clean_path)
 }

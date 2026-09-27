@@ -79,7 +79,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 // Recherche avancée de runs
                 routes::frontend::search_run,
                 // Edition d'un run
-                routes::frontend::edit_run_get
+                routes::frontend::edit_run_get,
             ],
         )
         .mount(
@@ -87,6 +87,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             //Routes réservées à l'admin
             routes![
                 routes::frontend::register_get,
+                routes::frontend::redirect_register_get,
                 routes::frontend::admin_dashboard_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
