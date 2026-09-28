@@ -23,6 +23,6 @@ pub async fn newgroup_get(
             "group_id":group_id,
             "group_name":group_name
         }))),
-        Err(e) => Json(ApiResponse::error(format!("{:?}", e))),
+        Err(_) => Json(ApiResponse::error("Ce groupe existe déjà!".to_string())),
     }
 }

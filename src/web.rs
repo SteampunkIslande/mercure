@@ -87,6 +87,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::admin_dashboard_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
+                routes::frontend::new_group
             ],
         )
         .mount(
