@@ -142,23 +142,35 @@ impl Form {
                 owner,
                 repo,
             } => {
+                // For each branch
                 for branch_name in all_branches.iter() {
                     // 1. List yaml files on this branch
                     let items =
                         versionning::list_yaml_forms_giteav1(base_url, owner, repo, branch_name)
-                            .await?;
-                    // 2. Deserialize each form
+                            .await
+                            .unwrap_or_default();
+                    // For each form in given branch
                     for dir_item in items {
-                        let mut form: Form = yaml_serde::from_str(
-                            &versionning::get_file_giteav1(
-                                base_url,
-                                owner,
-                                repo,
-                                branch_name,
-                                &dir_item.path,
-                            )
-                            .await?,
-                        )?;
+                        // fetch file
+                        let content = match versionning::get_file_giteav1(
+                            base_url,
+                            owner,
+                            repo,
+                            branch_name,
+                            &dir_item.path,
+                        )
+                        .await
+                        {
+                            Ok(c) => c,
+                            Err(_) => continue,
+                        };
+
+                        // parse yaml
+                        let mut form: Form = match yaml_serde::from_str(&content) {
+                            Ok(f) => f,
+                            Err(_) => continue,
+                        };
+
                         form.branch = Some(branch_name.clone());
                         form.file_path = Some(dir_item.path);
                         all_forms.push(form);
