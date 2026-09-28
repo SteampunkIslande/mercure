@@ -35,9 +35,6 @@ async fn unauthorized() -> Template {
 }
 
 async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
-    use rocket_include_dir::{Dir, StaticFiles, include_dir};
-    static PROJECT_DIR: Dir = include_dir!("static");
-
     let config = config::get_mercure_config();
 
     let shutdown_config = Shutdown {
@@ -54,11 +51,10 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         figment = figment.merge(("port", port));
     }
 
-    rocket::custom(figment)
+    let mut r = rocket::custom(figment)
         .register("/mercure", catchers![unauthorized])
         .mount("/mercure/uploads", FileServer::from(&config.upload_dir))
         .mount("/mercure/logs", FileServer::from(&config.logs_dir))
-        .mount("/mercure/static", StaticFiles::from(&PROJECT_DIR))
         .mount(
             "/mercure",
             routes![
@@ -131,7 +127,24 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         )
         .manage(pool)
         .manage(config)
-        .attach(minijinja_fairing())
+        .attach(minijinja_fairing());
+
+    #[cfg(debug_assertions)]
+    {
+        use std::path::Path;
+        let static_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("static")
+            .canonicalize()
+            .expect("Impossible de trouver le dossier static");
+        r = r.mount("/mercure/static", FileServer::from(static_path));
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        use rocket_include_dir::{Dir, StaticFiles, include_dir};
+        static PROJECT_DIR: Dir = include_dir!("static");
+        r = r.mount("/mercure/static", StaticFiles::from(&PROJECT_DIR));
+    }
+    r
 }
 
 #[derive(Parser)]

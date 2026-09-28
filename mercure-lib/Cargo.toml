@@ -25,6 +25,6 @@ minijinja = { version = "2.24.0", features = ["builtins", "json", "urlencode"] }
 rust-embed = "8.12.0"
 log = "0.4.34"
 yaml_serde = "0.10.7"
-
+walkdir = "2.5.0"
 
 [dev-dependencies]

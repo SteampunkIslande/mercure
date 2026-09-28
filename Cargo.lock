@@ -1641,6 +1641,7 @@ dependencies = [
  "sqlx",
  "thiserror",
  "time",
+ "walkdir",
  "yaml_serde",
 ]
 

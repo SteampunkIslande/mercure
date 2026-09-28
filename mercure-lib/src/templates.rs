@@ -4,12 +4,15 @@ use rocket::fairing::AdHoc;
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{self, Responder, content::RawHtml};
+
+#[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
 
 // Re-export de context
 pub use minijinja::context;
 
 /// Ces assets sont contenus dans le binaire final
+#[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "../static/templates"]
 struct TemplateAssets;
@@ -61,6 +64,78 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Template {
     }
 }
 
+#[cfg(debug_assertions)]
+pub fn minijinja_fairing() -> AdHoc {
+    AdHoc::try_on_ignite("Minijinja Embedded Templates", |rocket| async {
+        use std::path::Path;
+
+        let mut env = Environment::new();
+
+        // Racine des templates au moment du run
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let template_root = match manifest_dir
+            .join("..")
+            .join("static")
+            .join("templates")
+            .canonicalize()
+        {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("Impossible de trouver le dossier des templates: {}", e);
+                return Err(rocket);
+            }
+        };
+        eprintln!("{}", template_root.display());
+
+        if !template_root.exists() {
+            log::error!("Dossier templates introuvable: {}", template_root.display());
+            return Err(rocket);
+        }
+
+        for entry in walkdir::WalkDir::new(&template_root) {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    log::error!("Walkdir error: {}", e);
+                    continue;
+                }
+            };
+
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+
+            // Chemin relatif utilisé comme nom de template
+            let rel = match path.strip_prefix(&template_root) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            // On garde le même préfixe que RustEmbed pour que les `render!` restent identiques
+            let template_name = rel.display().to_string();
+            log::info!("Adding template {}", template_name);
+
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Err(e) = env.add_template_owned(template_name, content) {
+                        log::error!("Erreur lors de l'ajout d'un template: {}", e);
+                        return Err(rocket);
+                    }
+                }
+                Err(e) => {
+                    log::error!("Impossible de lire {}: {}", path.display(), e);
+                    return Err(rocket);
+                }
+            }
+        }
+
+        let rocket = rocket.manage(env);
+        Ok(rocket)
+    })
+}
+
+#[cfg(not(debug_assertions))]
 pub fn minijinja_fairing() -> AdHoc {
     AdHoc::try_on_ignite("Minijinja Embedded Templates", |rocket| async {
         let mut env = Environment::new();
