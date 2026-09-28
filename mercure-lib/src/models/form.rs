@@ -211,25 +211,26 @@ impl Form {
     ) -> Result<(Vec<Form>, Vec<Form>), ModelError> {
         let group_name = groups::Group::group_name_from_id(pool, group_id).await?;
 
-        let forms_with_groups = Self::get_all_form_defs(config)
-            .await?
-            .into_iter()
+        let all_forms = Self::get_all_form_defs(config).await?;
+
+        let forms_with_groups = all_forms
+            .iter()
             .filter(|f| {
                 f.groups
                     .as_ref()
                     .map(|grps| grps.contains(&group_name))
                     .unwrap_or(false)
             })
+            .map(Form::clone)
             .collect();
 
-        let forms_without_groups = Self::get_all_form_defs(config)
-            .await?
+        let forms_without_groups = all_forms
             .into_iter()
             .filter(|f| {
                 f.groups
                     .as_ref()
-                    .map(|grps| grps.contains(&group_name))
-                    .unwrap_or(false)
+                    .and_then(|grps| Some(grps.is_empty()))
+                    .unwrap_or(true)
             })
             .collect();
 
