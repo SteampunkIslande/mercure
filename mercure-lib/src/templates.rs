@@ -160,16 +160,30 @@ pub fn minijinja_fairing() -> AdHoc {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
     use minijinja::context;
+    use walkdir::WalkDir;
 
     fn load_env() -> Environment<'static> {
         let mut env = Environment::new();
-        for file_path in TemplateAssets::iter() {
-            let file = TemplateAssets::get(&file_path).expect("template asset");
-            let content = std::str::from_utf8(&file.data).expect("utf8 template");
-            env.add_template_owned(file_path.to_string(), content.to_string())
-                .unwrap_or_else(|e| panic!("parse {}: {e}", file_path));
+
+        let template_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("static")
+            .join("templates")
+            .canonicalize()
+            .unwrap();
+        for file_path in WalkDir::new(&template_root) {
+            let file_path = file_path.unwrap();
+            if file_path.file_type().is_file() {
+                let rel = file_path.path().strip_prefix(&template_root).unwrap();
+
+                let content = std::fs::read_to_string(file_path.path()).unwrap();
+                env.add_template_owned(rel.display().to_string(), content)
+                    .unwrap_or_else(|e| panic!("parse {}: {e}", file_path.file_name().display()));
+            }
         }
         env
     }
