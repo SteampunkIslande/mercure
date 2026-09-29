@@ -1,116 +1,138 @@
 {% extends "base.html.j2" %}
 
+{% block extra_head %}
+<script src="/mercure/static/scripts/form_variables.js"></script>
+{% endblock extra_head %}
+
 {% block title %}{%- if run %}Editer un run{% else %}Nouveau Run{% endif %}{% endblock %}
 
+{% block banner_text %}
+{% if run %}Editer le run {{ run.run_name }}
+{% else %}Nouveau Run
+{% endif %}
+<br><span class="banner-text">{{ form.name }}{% if form.branch %} (sur la branche {{ form.branch }}){% endif %}</span>
+{%endblock %}
 
-{% block banner_text %}{% if run %}Editer le run {{ run.run_name }} {% else %}Nouveau Run{% endif %}<br>
-                <span class="banner-text">Pipeline: {{ form.title }}</span>{% endblock %}
-
-{% block body_attrs %} onload="init()"{% endblock %}
+{% block body_attrs %}
+onload="init()"
+{% endblock %}
 
 {% block content %}
-    <h2>{% if run %}Edition du run {{ run.run_name }}{% else %}Déclarer un nouveau run{% endif %}</h2>
+<h2>{% if run %}Edition du run {{ run.run_name }}{% else %}Déclarer un nouveau run{% endif %}</h2>
 
-    <form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
+<form id="{% if run %}editrun-form{% else %}newrun-form{% endif %}" class="form-vertical" style="margin: 1em auto;">
 
-        <input type="hidden" id="run_id" value="{{ run_id }}">
+    {% if run %}
+    <input type="hidden" id="run_id" value="{{ run.run_id }}">
+    {% endif %}
 
-        <div>
-            <label for="run_name">Nom du run:</label>
-            {% if run %}
-            <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
-            {% else %}
-            <input type="text" id="run_name" required>
-            {% endif %}
-        </div>
+    <div>
+        <label for="run_name">Nom du run:</label>
+        {% if run %}
+        <span id="run_name" style="font-weight: bold;">{{ run.run_name }}</span>
+        {% else %}
+        <input type="text" id="run_name" required>
+        {% endif %}
+    </div>
 
-        <h3>Variables du formulaire</h3>
-        <div id="form-variables"></div>
+    {% if form.description %}
+    <p>{{ form.description }}</p>
+    {% endif %}
 
-        <div style="text-align: left; margin-top: 20px;">
-            {% if run %}
-            <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/run/{{ run_id }}">Retour</a>
-            <a id="save-changes" onclick="handleSubmit()" class="btn btn-primary">Enregistrer les modifications</a>
-            {% else %}
-            <a class="btn btn-secondary" href="/mercure/home">Retour</a>
-            <a class="btn btn-primary" onclick="handleSubmit()">Soumettre</a>
-            {% endif %}
-        </div>
-    </form>
+    <h3>Variables du formulaire...</h3>
+    <div id="form-variables"></div>
+
+    <div style="text-align: left; margin-top: 20px;">
+        {% if run %}
+        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/run/{{ run.run_id }}">Retour</a>
+        <a id="save-changes" onclick="handleSubmit()" class="btn btn-primary">Enregistrer les modifications</a>
+        {% else %}
+        <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+        <a class="btn btn-primary" onclick="handleSubmit()">Soumettre</a>
+        {% endif %}
+    </div>
+</form>
 {% endblock %}
 
 {% block extra_js %}
-    <script>
-        const formSchema = {{ form | tojson }};
-        const currentUser = {{ user | tojson }};
-        {% if run %}
-        const currentRun = {{ run | tojson }};
-        {% else %}
-        const currentRun = null;
-        {% endif %}
+<script>
+    const formSchema = {{ form | tojson }};
+    const currentUser = {{ user | tojson }};
+    {% if run %}
+    const currentRun = {{ run | tojson }};
+    {% else %}
+    const currentRun = null;
+    {% endif %}
 
-        async function init() {
-            await renderFormVariables(formSchema, currentRun ? currentRun.user_defined_vars : {});
+    async function init() {
+        await renderFormVariables(formSchema, currentRun ? currentRun.user_defined_vars : {});
+    }
+
+    async function handleSubmit() {
+        const missing = missingFormVariables();
+        if (missing.length > 0) {
+            showMessage("error", "Valeur(s) manquante(s) pour : " + missing.join(", "));
+            return;
         }
+        const userDefinedVars = collectFormVariables();
 
-        async function handleSubmit() {
-            const missing = missingFormVariables();
-            if (missing.length > 0) {
-                showMessage("error", "Valeur(s) manquante(s) pour : " + missing.join(", "));
+        try {
+            {% if run %}
+            const payload = {
+                ...currentRun,
+                user_defined_vars: userDefinedVars
+            };
+            const endpoint = '/mercure/api/editrun';
+            {% else %}
+            const run_name = document.getElementById('run_name').value;
+            if (!run_name) {
+                showMessage("error", "Le nom du run est obligatoire.");
                 return;
             }
-            const userDefinedVars = collectFormVariables();
-
-            try {
-                {% if run %}
-                const payload = {
-                    run_id: parseInt(document.getElementById('run_id').value),
-                    user_defined_vars: userDefinedVars
-                };
-                const endpoint = '/mercure/api/editrun';
-                {% else %}
-                const run_name = document.getElementById('run_name').value;
-                if (!run_name) {
-                    showMessage("error", "Le nom du run est obligatoire.");
-                    return;
-                }
-                const payload = {
-                    user_id: currentUser.id,
-                    run_name: run_name,
-                    user_defined_vars: userDefinedVars,
-                    form_path: formSchema.file_path,
-                    branch_name: formSchema.branch
-                };
-                const endpoint = '/mercure/api/newrun';
-                {% endif %}
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                if (response.status !== 200) {
-                    throw new Error(response.statusText || 'Erreur lors de la sauvegarde du run.');
-                }
-                if (isApiSuccess(data)) {
-                    {% if run %}
-                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run_id }}";
-                    {% else %}
-                    let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + getApiData(data).run_id;
-                    {% endif %}
-                    new_url += "&title=" + encodeURIComponent("Succès") +
-                        "&message=" + encodeURIComponent(getApiData(data).message) +
-                        "&seconds=5";
-                    window.location.href = new_url;
-                } else {
-                    showMessage("error", getApiMessage(data));
-                }
-            } catch (error) {
-                showMessage("error", error);
+            if (!formSchema.file_path || !formSchema.branch) {
+                showMessage("error", "Formulaire incomplet: branche ou fichier manquant.");
+                return;
             }
+            const payload = {
+                user_id: currentUser.id,
+                run_name: run_name,
+                user_defined_vars: userDefinedVars,
+                form_path: formSchema.file_path,
+                branch_name: formSchema.branch,
+                creation_date: "",
+                status: "Idle",
+                attempt_count: 0
+            };
+            const endpoint = '/mercure/api/newrun';
+            {% endif %}
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.status !== 200) {
+                throw new Error(response.statusText || 'Erreur lors de la sauvegarde du run.');
+            }
+            if (isApiSuccess(data)) {
+                {% if run %}
+                let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}";
+                {% else %}
+                let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + getApiData(data).run_id;
+                {% endif %}
+                new_url += "&title=" + encodeURIComponent("Succès") +
+                    "&message=" + encodeURIComponent(getApiData(data).message) +
+                    "&seconds=5";
+                window.location.href = new_url;
+            } else {
+                showMessage("error", getApiMessage(data));
+            }
+        } catch (error) {
+            showMessage("error", error);
         }
-    </script>
+    }
+</script>
 {% endblock %}

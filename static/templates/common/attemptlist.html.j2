@@ -1,47 +1,25 @@
 {% for att in history %}
-
+{% set status_label = "Echec" %}
+{% set status_class = "failure" %}
 {% if att.status == "Pending" %}
-<div class="run-attempt pending">
+    {% set status_label = "En attente" %}
+    {% set status_class = "pending" %}
+{% elif att.status == "Running" %}
+    {% set status_label = "Analyses en cours" %}
+    {% set status_class = "running" %}
+{% elif att.status == "Success" %}
+    {% set status_label = "Succès" %}
+    {% set status_class = "success" %}
+{% endif %}
+<div class="run-attempt {{ status_class }}">
     <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
         <strong>Tentative {{ att.attempt_number }}:</strong>
         <span>
-            En attente
+            {{ status_label }}
+            {% if att.commit_hash %}
+            <small>({{ att.commit_hash[:7] }})</small>
+            {% endif %}
         </span>
     </a>
 </div>
-{%endif%}
-
-{% if att.status == "Running" %}
-<div class="run-attempt running">
-    <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
-        <strong>Tentative {{ att.attempt_number }}:</strong>
-        <span>
-            Analyses en cours
-        </span>
-    </a>
-</div>
-{%endif%}
-
-{% if att.status == "Success" %}
-<div class="run-attempt success">
-    <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
-        <strong>Tentative {{ att.attempt_number }}:</strong>
-        <span>
-            Succès
-        </span>
-    </a>
-</div>
-{%endif%}
-
-{% if not att.status.Failure is undefined %}
-<div class="run-attempt failure">
-    <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
-        <strong>Tentative {{ att.attempt_number }}:</strong>
-        <span>
-            Echec
-        </span>
-    </a>
-</div>
-{%endif%}
-
 {% endfor %}

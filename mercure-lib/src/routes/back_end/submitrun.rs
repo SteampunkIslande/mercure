@@ -41,7 +41,7 @@ pub async fn validate_run_post(
         )));
     }
 
-    match analysis::validate_form(run_id, pool).await {
+    match analysis::validate_form(run_id, pool, None).await {
         Ok(_) => Json(ApiResponse::success(
             json!({"message":"Run validé avec succès!","run_id":run_id}),
         )),
@@ -49,11 +49,13 @@ pub async fn validate_run_post(
     }
 }
 
-#[get("/retry/<run_id>")]
+#[get("/retry/<run_id>?<mode>&<commit_hash>")]
 pub async fn retry_run_get(
     _auth: Authenticated,
     pool: &State<SqlitePool>,
     run_id: i64,
+    mode: Option<&str>,
+    commit_hash: Option<&str>,
 ) -> Json<ApiResponse<Value>> {
     if let Err(e) = Run::get_run_from_id(run_id, pool).await {
         return Json(ApiResponse::error(format!(
@@ -61,8 +63,29 @@ pub async fn retry_run_get(
         )));
     }
 
-    match analysis::relaunch_run(run_id, pool).await {
-        Ok(_) => Json(ApiResponse::success(json!({"data":true}))),
+    let pinned_commit = match mode {
+        Some("reproduce") => match commit_hash.filter(|h| !h.is_empty()) {
+            Some(hash) => Some(hash.to_string()),
+            None => {
+                return Json(ApiResponse::error(
+                    "Commit manquant pour la reproduction à l'identique.",
+                ));
+            }
+        },
+        Some("latest") | None => None,
+        Some(other) => {
+            return Json(ApiResponse::error(format!(
+                "Mode de relance inconnu: {other}"
+            )));
+        }
+    };
+
+    if let Err(e) = analysis::relaunch_run(run_id, pool).await {
+        return Json(ApiResponse::error(format!("{e}")));
+    }
+
+    match analysis::validate_form(run_id, pool, pinned_commit.as_deref()).await {
+        Ok(_) => Json(ApiResponse::success(json!({"data": true, "run_id": run_id}))),
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }
 }

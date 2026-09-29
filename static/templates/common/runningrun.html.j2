@@ -40,7 +40,7 @@
 
 {% block content %}
     <div class="field">
-        <strong>Formulaire:</strong> {{ form.form_name }} v{{ form.version }}
+        <strong>Formulaire:</strong> {{ form.name }}
     </div>
 
     <div class="field">
@@ -80,9 +80,6 @@
 {% block run_body_attrs %} onbeforeunload="stopPolling()"{% endblock %}
 
 {% block run_extra_js %}
-        const runId = {{ run.run_id }};
-        const attemptNumber = {{ attempt.attempt_number }};
-
         let intervalId = null;
 
         function stopPolling() {
@@ -147,7 +144,6 @@
 {% endblock %}
 
 {% block run_on_ready %}
-        await loadFieldPresets();
         intervalId = setInterval(pollJobInfo, 30000);
         await pollJobInfo();
 {% endblock %}

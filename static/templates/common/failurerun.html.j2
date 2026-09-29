@@ -5,43 +5,24 @@
 {% block banner_text %}Echec de l'analyse{% endblock %}
 
 {% block content %}
-
     {% if attempt.attempt_number == run.attempt_count %}
     <h2>Dernière tentative échouée</h2>
     {% else %}
     <h2>Tentative {{ attempt.attempt_number }} échouée</h2>
     {% endif %}
-    <p>
     <p>L'analyse du run <strong>{{ run.run_name }}</strong> a échoué.</p>
     <h3>Raison</h3>
     <p>{{ fail_reason }}</p>
 
     <div style="margin-top: 30px; text-align: left;">
         <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-        {% if run.status == "Idle" %}
-        <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
-            actuelle</a>
+        {% if run.status in ("Idle", "Pending", "Running") %}
+        <a id="analysis-current" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative actuelle</a>
         {% else %}
-        <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
-            l'analyse</a>
+        <a id="analysis-reproduce" class="btn btn-secondary" onclick="restartRun('reproduce')">Reproduire à l'identique</a>
+        <a id="analysis-retry-latest" class="btn btn-primary" onclick="restartRun('latest')">Relancer avec le pipeline corrigé</a>
         {% endif %}
     </div>
 
     {% include "common/runinfo.html.j2" %}
-{% endblock %}
-
-{% block run_extra_js %}
-        async function retryAnalysis(run_id) {
-            try {
-                const response = await fetch(`/mercure/api/retry/${run_id}`);
-                const data = await response.json();
-                if (isApiSuccess(data)) {
-                    location.href = `/mercure/show/run/${run_id}`;
-                } else {
-                    showMessage('error', getApiMessage(data) || "Relance de l'analyse refusée");
-                }
-            } catch (error) {
-                showMessage('error', error);
-            }
-        }
 {% endblock %}

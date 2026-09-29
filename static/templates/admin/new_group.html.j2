@@ -28,8 +28,12 @@
             event.preventDefault();
         }
         try {
-            const new_group_name = new FormData().name;
-            const response = await fetch(`/mercure/api/newgroup/${new_group_name}`);
+            const new_group_name = document.querySelector('input[name="new_group_name"]').value.trim();
+            if (!new_group_name) {
+                showMessage('error', 'Veuillez entrer un nom de groupe.');
+                return;
+            }
+            const response = await fetch(`/mercure/api/newgroup/${encodeURIComponent(new_group_name)}`);
             const data = await response.json();
 
             if (isApiSuccess(data)) {

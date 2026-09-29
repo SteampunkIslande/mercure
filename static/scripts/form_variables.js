@@ -76,6 +76,15 @@ function appendTextWidget(div, varDef, currentValue) {
   div.appendChild(input);
 }
 
+function appendDateWidget(div, varDef, currentValue) {
+  const input = document.createElement("input");
+  input.type = "date";
+  input.id = VAR_ID_PREFIX + varDef.name;
+  input.className = "var-input";
+  input.value = currentValue || "";
+  div.appendChild(input);
+}
+
 function appendFileWidget(div, varDef, currentValue) {
   const hidden = document.createElement("input");
   hidden.type = "hidden";
@@ -202,7 +211,7 @@ async function renderFormVariables(schema, currentValues) {
     const div = document.createElement("div");
     div.className = "form-variable";
     div.dataset.varName = varDef.name;
-    div.dataset.varType = varDef.type || "Text";
+    div.dataset.varType = varDef.type || "LineEdit";
 
     const label = document.createElement("label");
     label.htmlFor = VAR_ID_PREFIX + varDef.name;
@@ -211,12 +220,14 @@ async function renderFormVariables(schema, currentValues) {
 
     const currentValue = values[varDef.name] || "";
 
-    if (varDef.type === "FromURL" && varDef.source) {
+    if ((varDef.type === "ListFromURL" ) && varDef.source) {
       await appendSelectWidget(div, varDef, currentValue, fetchVariableChoices(varDef.source));
     } else if (varDef.type === "ValuesList" && Array.isArray(varDef.values)) {
       await appendSelectWidget(div, varDef, currentValue, Promise.resolve(varDef.values.map(choiceFromItem)));
     } else if (varDef.type === "ExistingFile") {
       appendFileWidget(div, varDef, currentValue);
+    } else if (varDef.type === "DateEdit") {
+      appendDateWidget(div, varDef, currentValue);
     } else {
       appendTextWidget(div, varDef, currentValue);
     }
@@ -234,7 +245,7 @@ async function renderFormVariables(schema, currentValues) {
 
 function variableValue(div) {
   const type = div.dataset.varType;
-  if (type === "FromURL" || type === "ValuesList") {
+  if (type === "ListFromURL" || type === "ValuesList") {
     const select = div.querySelector("select");
     if (!select) {
       const fallback = div.querySelector("input[type='text']");
@@ -249,6 +260,10 @@ function variableValue(div) {
   if (type === "ExistingFile") {
     const hidden = div.querySelector("input[type='hidden']");
     return hidden ? hidden.value.trim() : "";
+  }
+  if (type === "DateEdit") {
+    const input = div.querySelector("input[type='date']");
+    return input ? input.value.trim() : "";
   }
   const input = div.querySelector("input[type='text']");
   return input ? input.value.trim() : "";

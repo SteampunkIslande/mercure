@@ -1,6 +1,42 @@
-<div id="run-details" style="display: flex;height: 400px;">
+<div id="run-details" style="display: flex; height: 400px;">
     <div id="basic-info" style="flex: 1;">
         <h2>Détails du run</h2>
+        <div>
+            <label><strong>Identifiant:</strong></label>
+            <span>{{ run.run_id }}</span>
+        </div>
+        <div>
+            <label><strong>Nom du run:</strong></label>
+            <span>{{ run.run_name }}</span>
+        </div>
+        <div>
+            <label><strong>Formulaire:</strong></label>
+            <span>{{ form.name }}</span>
+        </div>
+        <div>
+            <label><strong>Branche:</strong></label>
+            <span>{{ run.branch_name }}</span>
+        </div>
+        <div>
+            <label><strong>Fichier:</strong></label>
+            <span>{{ run.form_path }}</span>
+        </div>
+        <div>
+            <label><strong>Créé le:</strong></label>
+            <span>{{ run.creation_date }}</span>
+        </div>
+        {% if attempt.commit_hash %}
+        <div>
+            <label><strong>Commit:</strong></label>
+            <span><code>{{ attempt.commit_hash }}</code></span>
+        </div>
+        {% endif %}
+        {% if attempt.comment %}
+        <div>
+            <label><strong>Commentaire:</strong></label>
+            <span>{{ attempt.comment }}</span>
+        </div>
+        {% endif %}
     </div>
 
     <div id="attempts" style="display: flex; flex-direction: column; flex: 1; margin-left: 20px;">
@@ -15,3 +51,20 @@
         </div>
     </div>
 </div>
+
+<h3>Variables</h3>
+{% if form.variables %}
+<div id="run-variables">
+    {% for var in form.variables %}
+    <div class="form-variable">
+        <label><strong>{{ var.title }}:</strong></label>
+        <span>{% if attempt.user_defined_vars[var.name] %}{{ attempt.user_defined_vars[var.name] }}{% else %}—{% endif %}</span>
+        {% if var.description %}
+        <small class="var-description">{{ var.description }}</small>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>Aucune variable définie pour ce formulaire.</p>
+{% endif %}

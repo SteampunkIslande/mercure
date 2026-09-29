@@ -5,22 +5,18 @@
 {% block banner_text %}Succès{% endblock %}
 
 {% block content %}
-
 <h2>L'analyse s'est terminée avec succès</h2>
-<p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.
-</p>
+<p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.</p>
 
 <div style="margin-top: 30px; text-align: left;">
     <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-    {% if run.status in ("Idle","Pending","Running") %}
-    <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
-        actuelle</a>
+    {% if run.status in ("Idle", "Pending", "Running") %}
+    <a id="analysis-current" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative actuelle</a>
     {% else %}
-    <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
-        l'analyse</a>
+    <a id="analysis-reproduce" class="btn btn-secondary" onclick="restartRun('reproduce')">Reproduire à l'identique</a>
+    <a id="analysis-retry-latest" class="btn btn-primary" onclick="restartRun('latest')">Relancer avec le pipeline corrigé</a>
     {% endif %}
 </div>
 
 {% include "common/runinfo.html.j2" %}
-
-{% endblock content %}
+{% endblock %}

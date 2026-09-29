@@ -1,19 +1,15 @@
 {% extends "common/run_base.html.j2" %}
 
-{% block title %}Run en attente{% endblock %}
+{% block title %}Run en attente de validation{% endblock %}
 
-{% block extra_head %}
-<script src="/mercure/static/scripts/json_list.js"></script>
-{% endblock %}
-
-{% block banner_text %}Run en attente de validation<br> {{ form.form_name }} {% endblock %}
+{% block banner_text %}Run en attente de validation<br>{{ form.name }}{% endblock %}
 
 {% block content %}
+    {% include "common/runinfo.html.j2" %}
 
-<div style="margin-top: 30px; text-align: left;">
-    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-    <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
-    <a id="validate-btn" class="btn btn-primary" onclick="validateRun()">Valider</a>
-</div>
-
+    <div style="margin-top: 30px; text-align: left;">
+        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+        <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
+        <a id="validate-btn" class="btn btn-primary" onclick="validateRun()">Valider</a>
+    </div>
 {% endblock %}

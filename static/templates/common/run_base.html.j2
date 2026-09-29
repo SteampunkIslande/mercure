@@ -1,0 +1,77 @@
+{% extends "base.html.j2" %}
+
+{% block body_attrs %} onload="init()"{% block run_body_attrs %}{% endblock %}{% endblock %}
+
+{% block extra_js %}
+<script>
+    const runId = {{ run.run_id }};
+    const attemptNumber = {{ attempt.attempt_number }};
+    const attemptCommit = {{ attempt.commit_hash | tojson }};
+
+    async function validateRun() {
+        if (!runId) {
+            showMessage("error", "ID du run introuvable.");
+            return;
+        }
+        if (!confirm("Valider ce run ? Une nouvelle tentative sera créée et l'analyse pourra démarrer.")) {
+            return;
+        }
+        try {
+            const response = await fetch('/mercure/api/validate/' + runId, { method: 'POST' });
+            const data = await response.json();
+            if (isApiSuccess(data)) {
+                window.location = "/mercure/api/redirect?target_url=/mercure/show/run/" + runId +
+                    "&title=" + encodeURIComponent("Succès") +
+                    "&message=" + encodeURIComponent(getApiData(data).message) +
+                    "&seconds=5";
+            } else {
+                showMessage("error", getApiMessage(data));
+            }
+        } catch (error) {
+            showMessage("error", error);
+        }
+    }
+
+    async function restartRun(mode) {
+        if (!runId) {
+            showMessage("error", "ID du run introuvable.");
+            return;
+        }
+        const params = new URLSearchParams({ mode });
+        if (mode === "reproduce") {
+            if (!attemptCommit) {
+                showMessage("error", "Impossible de reproduire : aucun commit n'est associé à cette tentative.");
+                return;
+            }
+            params.set("commit_hash", attemptCommit);
+            if (!confirm("Reproduire cette tentative à l'identique (mêmes variables, même commit " + attemptCommit + ") ?")) {
+                return;
+            }
+        } else if (mode === "latest") {
+            if (!confirm("Relancer ce run avec la version actuelle du pipeline sur la branche « {{ run.branch_name }} » ? Les variables restent identiques.")) {
+                return;
+            }
+        } else {
+            showMessage("error", "Mode de relance inconnu.");
+            return;
+        }
+        try {
+            const response = await fetch(`/mercure/api/retry/${runId}?${params.toString()}`);
+            const data = await response.json();
+            if (isApiSuccess(data)) {
+                window.location.href = `/mercure/show/run/${runId}`;
+            } else {
+                showMessage("error", getApiMessage(data) || "Relance de l'analyse refusée");
+            }
+        } catch (error) {
+            showMessage("error", error);
+        }
+    }
+
+    {% block run_extra_js %}{% endblock %}
+
+    async function init() {
+        {% block run_on_ready %}{% endblock %}
+    }
+</script>
+{% endblock %}

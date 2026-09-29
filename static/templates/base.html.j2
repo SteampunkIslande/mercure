@@ -9,6 +9,7 @@
     <link rel="stylesheet" type="text/css" href="/mercure/static/icon-font/material-icons.css">
     <link rel="icon" type="image/x-icon" href="/mercure/static/favicon.ico" />
     <script src="/mercure/static/scripts/show_message.js"></script>
+    <script src="/mercure/static/scripts/api_helper.js"></script>
     {% block extra_head %}{% endblock %}
 </head>
 
@@ -16,7 +17,8 @@
     {% block banner %}
     <div class="banner">
         <div class="banner-content">
-            <span class="banner-text"{% block banner_text_attrs %}{% endblock %}>{% block banner_text %}{% endblock %}</span>
+            <span class="banner-text" {% block banner_text_attrs %}{% endblock %}>{% block banner_text %}{% endblock
+                %}</span>
             {% block banner_actions %}
             <div class="logout-button">
                 <a href="/mercure/logout" class="btn btn-danger"><span

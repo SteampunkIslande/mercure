@@ -23,15 +23,20 @@ pub enum AnalysisStateMachineError {
 pub async fn validate_form(
     run_id: i64,
     pool: &SqlitePool,
+    commit_hash: Option<&str>,
 ) -> Result<(), AnalysisStateMachineError> {
     let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
-    let current_commit_hash = versionning::get_latest_commit(Some(&run.branch_name))
-        .await?
-        .into_iter()
-        .next()
-        .ok_or(GitCheckError::NoSuchBranch(run.branch_name.to_string()))?
-        .last_commit;
+    let current_commit_hash = if let Some(hash) = commit_hash.filter(|h| !h.is_empty()) {
+        hash.to_string()
+    } else {
+        versionning::get_latest_commit(Some(&run.branch_name))
+            .await?
+            .into_iter()
+            .next()
+            .ok_or(GitCheckError::NoSuchBranch(run.branch_name.to_string()))?
+            .last_commit
+    };
 
     if !matches!(run.status, RunStatus::Idle) {
         return Err(AnalysisStateMachineError::InvalidTransition {

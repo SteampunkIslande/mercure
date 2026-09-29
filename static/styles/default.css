@@ -645,3 +645,37 @@ fieldset {
   padding: 1rem;
   margin-bottom: 1rem;
 }
+
+.form-variable {
+  margin-bottom: 1rem;
+}
+
+.form-variable label {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.25rem;
+}
+
+.form-variable .var-input,
+.form-variable select,
+.form-variable input[type="text"],
+.form-variable input[type="date"],
+.form-variable input[type="file"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.var-description {
+  display: block;
+  color: #666;
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+.var-file-status,
+.var-source-status {
+  display: block;
+  margin-top: 0.35rem;
+  color: #555;
+  font-size: 0.9rem;
+}
