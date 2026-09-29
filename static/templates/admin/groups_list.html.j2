@@ -7,61 +7,82 @@
 {% block body_attrs %} onload="init()"{% endblock %}
 
 {% block content %}
-    <div id="groups-container">
-    </div>
-    <div style="text-align: left; margin-top: 20px;">
-        <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
-        <a class="btn btn-primary" onclick="submitForm()">Mettre à jour les groupes</a>
-    </div>
+<!-- Use a data attribute to pass server-side variables to JS -->
+<div id="groups-container" data-user-id="{{ user.id }}">
+    <p>Chargement...</p>
+</div>
+
+<!-- Removed inline styles in favor of classes and removed inline onclick handler -->
+<div class="mt-4 d-flex justify-content-start gap-2">
+    <a class="btn btn-secondary" href="/mercure/admin/editusers/">Retour à la liste des utilisateurs</a>
+    <a class="btn btn-primary" id="btn-update-groups">Mettre à jour les groupes</a>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-    <script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const groupsContainer = document.getElementById("groups-container");
+        const btnUpdate = document.getElementById("btn-update-groups");
+        const userId = groupsContainer.dataset.userId;
 
-        var initialState = {};
-        var userId = "{{ user.id }}";
+        // Use a Set to store initial group IDs for highly efficient lookups
+        let initialGroupIds = new Set();
 
         async function init() {
-            const userId = "{{ user.id }}";
-            initialState = {};
-            const groupsContainer = document.getElementById("groups-container");
-            groupsContainer.innerHTML = ""; // Clear existing groups
-
             try {
-                const response = await fetch("/mercure/api/groups/list");
-                if (!response.ok) {
-                    throw new Error("Erreur lors du chargement des groupes.");
-                }
-                const data = await response.json();
-                const groups = getApiData(data);
-                if (isApiSuccess(data) && Array.isArray(groups) && groups.length > 0) {
-                    groups.forEach((group) => {
-                        const groupDiv = document.createElement("div");
-                        groupDiv.className = "group-checkbox";
-                        groupDiv.innerHTML = `
-            <input type="checkbox" id="group-${group.id}" name="selected_groups" value="${group.id}">
-            <label id="label-group-${group.id}" for="group_${group.id}">${group.name}</label>
-          `;
-                        groupsContainer.appendChild(groupDiv);
-                    });
-                }
-                if (isApiSuccess(data) && Array.isArray(groups) && groups.length == 0) {
-                    groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
+                // Fetch both API endpoints concurrently to halve the loading time
+                const [groupsRes, userGroupsRes] = await Promise.all([
+                    fetch("/mercure/api/groups/list"),
+                    fetch(`/mercure/api/groups/list/${userId}`)
+                ]);
+
+                if (!groupsRes.ok || !userGroupsRes.ok) {
+                    throw new Error("Erreur lors du chargement des données.");
                 }
 
-                const userGroupsRes = await fetch(`/mercure/api/groups/list/${userId}`);
+                const data = await groupsRes.json();
                 const userGroupsData = await userGroupsRes.json();
-                getApiData(userGroupsData).forEach(userGroup => {
-                    const checkbox = document.getElementById(`group-${userGroup.id}`);
-                    if (checkbox) checkbox.checked = true;
+
+                const groups = getApiData(data);
+                const userGroups = getApiData(userGroupsData);
+
+                if (!isApiSuccess(data) || !Array.isArray(groups) || groups.length === 0) {
+                    groupsContainer.innerHTML = "<p>Aucun groupe n'est défini.</p>";
+                    return;
+                }
+
+                // Populate initial state Set
+                initialGroupIds = new Set(userGroups.map(g => String(g.id)));
+
+                // Use DocumentFragment to batch DOM inserts (prevents layout thrashing)
+                const fragment = document.createDocumentFragment();
+
+                groups.forEach((group) => {
+                    const isChecked = initialGroupIds.has(String(group.id));
+                    const groupDiv = document.createElement("div");
+                    groupDiv.className = "group-checkbox";
+
+                    // Store group name in a data attribute to avoid querying the DOM later.
+                    // Fixed the label 'for' attribute to match input 'id'.
+                    groupDiv.innerHTML = `
+                    <input type="checkbox" 
+                           id="group-${group.id}" 
+                           name="selected_groups" 
+                           value="${group.id}" 
+                           data-name="${group.name}"
+                           ${isChecked ? "checked" : ""}>
+                    <label id="label-group-${group.id}" for="group-${group.id}">${group.name}</label>
+                `;
+                    fragment.appendChild(groupDiv);
                 });
 
-                const checkboxes = document.querySelectorAll("input[name='selected_groups']");
-                checkboxes.forEach(checkbox => {
-                    initialState[checkbox.id] = checkbox.checked;
-                });
+                groupsContainer.innerHTML = "";
+                groupsContainer.appendChild(fragment);
+
             } catch (error) {
-                showMessage('error', error);
+                groupsContainer.innerHTML = "";
+                showMessage("error", error.message);
             }
         }
 
@@ -71,36 +92,53 @@
             const to_remove = [];
 
             checkboxes.forEach(checkbox => {
-                if (checkbox.checked && !initialState[checkbox.id]) {
-                    group_name = document.getElementById(`label-group-${checkbox.value}`).textContent;
-                    to_add.push({ id: parseInt(checkbox.value), name: group_name });
-                } else if (!checkbox.checked && initialState[checkbox.id]) {
-                    group_name = document.getElementById(`label-group-${checkbox.value}`).textContent;
-                    to_remove.push({ id: parseInt(checkbox.value), name: group_name });
+                const groupId = checkbox.value;
+                const groupName = checkbox.dataset.name;
+                const wasChecked = initialGroupIds.has(groupId);
+                const isChecked = checkbox.checked;
+
+                if (isChecked && !wasChecked) {
+                    to_add.push({ id: parseInt(groupId, 10), name: groupName });
+                } else if (!isChecked && wasChecked) {
+                    to_remove.push({ id: parseInt(groupId, 10), name: groupName });
                 }
             });
 
-            const payload = JSON.stringify({ user_id: parseInt(userId), to_add, to_remove });
+            // Optional: Prevent unnecessary API calls if nothing changed
+            if (to_add.length === 0 && to_remove.length === 0) {
+                return showMessage("info", "Aucune modification à enregistrer.");
+            }
+
+            const payload = JSON.stringify({
+                user_id: parseInt(userId, 10),
+                to_add,
+                to_remove
+            });
 
             try {
                 const response = await fetch("/mercure/api/groups/update", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: payload
                 });
                 const data = await response.json();
-                await init(); // Re-initialize to reflect changes
+
                 if (!isApiSuccess(data)) {
-                    showMessage('error', "Erreur lors de la mise à jour des groupes : " + getApiMessage(data));
-                }
-                else {
-                    showMessage('info', getApiData(data));
+                    showMessage("error", `Erreur lors de la mise à jour : ${getApiMessage(data)}`);
+                } else {
+                    showMessage("info", getApiData(data));
+                    await init(); // Re-initialize to reflect changes safely
                 }
             } catch (error) {
-                showMessage('error', error);
+                showMessage("error", error.message);
             }
         }
-    </script>
+
+        // Attach events using Listeners instead of inline HTML properties
+        btnUpdate.addEventListener("click", submitForm);
+
+        // Bootstrap the module
+        init();
+    });
+</script>
 {% endblock %}
