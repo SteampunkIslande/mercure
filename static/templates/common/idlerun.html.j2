@@ -3,165 +3,17 @@
 {% block title %}Run en attente{% endblock %}
 
 {% block extra_head %}
-    <script src="/mercure/static/scripts/json_list.js"></script>
+<script src="/mercure/static/scripts/json_list.js"></script>
 {% endblock %}
 
-{% block banner_text %}Run en attente<br>{{ form.form_name }} (version {{ form.version }}){% endblock %}
-
-{% block udv_schema %}JSON.parse({{ user_defined_vars_json | tojson }}){% endblock %}
-
-{% block udv_values %}{{ run.user_defined_vars | tojson }}{% endblock %}
+{% block banner_text %}Run en attente de validation<br> {{ form.form_name }} {% endblock %}
 
 {% block content %}
-    {% include "common/runinfo.html.j2" %}
 
-    <div class="tab">
-        <button id="tab-adn" class="tablinks active" onclick="openTab(event,'adn')">ADN</button>
-        <button id="tab-arn" class="tablinks" onclick="openTab(event,'arn')">ARN</button>
-        <button id="tab-metadata" class="tablinks" onclick="openTab(event,'metadata')">Metadata</button>
-    </div>
+<div style="margin-top: 30px; text-align: left;">
+    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+    <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
+    <a id="validate-btn" class="btn btn-primary" onclick="validateRun()">Valider</a>
+</div>
 
-    <div class="tabcontent" id="tabcontent-adn" style="display:block; overflow:auto; height:400px;">
-        {% if not samplesheet_adn_static_name %}
-        <span>Aucune sample sheet ADN fournie.</span>
-        {% endif %}
-        <input type="hidden" id="sample_sheet_adn_path" value="{{ run.sample_sheet_adn_path }}">
-        <div id="sample_sheet_adn_check"></div>
-        <div id="sample_sheet_adn_list" class="sample-list" style="overflow:auto;"></div>
-    </div>
-
-    <div class="tabcontent" id="tabcontent-arn" style="display:none; overflow:auto; height:400px;">
-        {% if not samplesheet_arn_static_name %}
-        <span>Aucune sample sheet ARN fournie.</span>
-        {% endif %}
-        <input type="hidden" id="sample_sheet_arn_path" value="{{ run.sample_sheet_arn_path }}">
-        <div id="sample_sheet_arn_check"></div>
-        <div id="sample_sheet_arn_list" class="sample-list" style="overflow:auto;"></div>
-    </div>
-
-    <div class="tabcontent" id="tabcontent-metadata" style="display:none; overflow:auto; height:400px;">
-        {% if not run.metadata_file_path %}
-        <span>Aucun fichier de métadonnées fourni.</span>
-        {% else %}
-        <a href="{{ run.metadata_file_static_name | safe }}" download>Télécharger le fichier de métadonnées</a>
-        {% endif %}
-    </div>
-
-
-    <div style="margin-top: 30px; text-align: left;">
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-        <a href="/mercure/editrun/{{ run.run_id }}" class="btn btn-primary">Editer</a>
-        <a id="validate-btn" class="btn btn-primary" onclick="validateRun()">Valider</a>
-    </div>
-{% endblock %}
-
-{% block run_extra_js %}
-        function openTab(evt, tabName) {
-            evt.preventDefault();
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tabcontent");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            tablinks = document.getElementsByClassName("tablinks");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById("tabcontent-" + tabName).style.display = "block";
-            evt.currentTarget.className += " active";
-        }
-
-        async function checkSampleSheet(filename) {
-            try {
-                const formData = new FormData();
-                formData.append('file_name', filename);
-                const response = await fetch('/mercure/api/samplesheet/check', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (isApiSuccess(result)) {
-                    return getApiData(result);
-                }
-                throw new Error(getApiMessage(result));
-            } catch (error) {
-                return { file_name: filename, sample_names: [], unique_sample_count: 0, message: "Erreur lors de la vérification de la samplesheet: " + error.message };
-            }
-        }
-
-        async function validateRun() {
-            const runId = "{{ run.run_id }}";
-            if (!runId) {
-                showMessage("error", "ID du run introuvable dans l'URL.");
-                return;
-            }
-            if (!confirm("Êtes-vous sûr de vouloir valider ce run ? L'analyse sera lancée dès que le run sera terminé.")) {
-                return;
-            }
-            try {
-                const response = await fetch('/mercure/api/validate/' + runId, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const data = await response.json();
-                if (isApiSuccess(data)) {
-                    window.location = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}" +
-                        "&title=" + encodeURIComponent("Succès") +
-                        "&message=" + encodeURIComponent(getApiData(data).message) +
-                        "&seconds=5";
-                } else {
-                    showMessage("error", getApiMessage(data));
-                }
-            } catch (error) {
-                showMessage("error", error);
-            }
-        }
-
-        async function migrateToForm(targetFormId) {
-            if (!confirm("Créer un nouveau run à partir de ce formulaire compatible ? Cela créera une copie de ce run avec le nouveau formulaire.")) {
-                return;
-            }
-            try {
-                const response = await fetch(`/api/migrate/run?from_run_id={{ run.run_id }}&to_form_id=${targetFormId}`, {
-                    method: 'GET'
-                });
-                const data = await response.json();
-                if (isApiSuccess(data)) {
-                    const redirectUrl = `/mercure/api/redirect?target_url=/mercure/editrun/${getApiData(data).new_run_id}` +
-                        `&title=${encodeURIComponent("Migration réussie")}` +
-                        `&message=${encodeURIComponent(getApiData(data).message)}` +
-                        `&seconds=3`;
-                    window.location.href = redirectUrl;
-                } else {
-                    showMessage('error', getApiMessage(data));
-                }
-            } catch (error) {
-                showMessage('error', error);
-            }
-        }
-{% endblock %}
-
-{% block run_on_ready %}
-            const adnPath = document.getElementById('sample_sheet_adn_path') ? document.getElementById('sample_sheet_adn_path').value : '';
-            if (adnPath) {
-                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(adnPath);
-                document.getElementById('sample_sheet_adn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_adn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, `Echantillons ADN détectés (${unique_sample_count} uniques)`);
-                }
-            }
-            const arnPath = document.getElementById('sample_sheet_arn_path') ? document.getElementById('sample_sheet_arn_path').value : '';
-            if (arnPath) {
-                const { file_name, sample_names, message, unique_sample_count } = await checkSampleSheet(arnPath);
-                document.getElementById('sample_sheet_arn_check').innerHTML = message;
-                if (sample_names) {
-                    const container = document.getElementById('sample_sheet_arn_list');
-                    container.innerHTML = "";
-                    createFormattedList(sample_names, container, `Echantillons ARN détectés (${unique_sample_count} uniques)`);
-                }
-            }
 {% endblock %}

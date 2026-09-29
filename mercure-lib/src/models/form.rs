@@ -1,5 +1,7 @@
 use std::{collections::HashSet, path::PathBuf};
 
+use anyhow::Context;
+use minijinja::Environment;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -19,6 +21,8 @@ pub enum FormDefinitionError {
     DuplicateVarError(String),
     #[error(transparent)]
     MinijinjaError(#[from] minijinja::Error),
+    #[error(transparent)]
+    AnyHowError(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -291,11 +295,24 @@ impl Form {
         Ok(ids)
     }
 
-    pub async fn check_validity(&self) -> Result<(), FormDefinitionError> {
+    pub async fn check_validity(
+        &self,
+        context: &impl Serialize,
+    ) -> Result<(), FormDefinitionError> {
+        self.try_render_template(context)?;
         Ok(())
     }
 
-    pub fn try_render_template(&self) -> Result<(), FormDefinitionError> {
+    pub fn try_render_template(&self, context: &impl Serialize) -> Result<(), FormDefinitionError> {
+        let template = match &self.exec_type {
+            FormExecType::Script { script_name } => {
+                std::fs::read_to_string(&script_name).context("Impossible de lire le template")?
+            }
+            FormExecType::Shell { exec } => exec.to_string(),
+        };
+        let env = Environment::new();
+        env.render_str(&template, context)
+            .context("Erreur jinja (template incorrect)")?;
         Ok(())
     }
 }

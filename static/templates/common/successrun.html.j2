@@ -5,48 +5,22 @@
 {% block banner_text %}Succès{% endblock %}
 
 {% block content %}
-    {% if is_pipeline_archived %}
-    <div class="error-msg" style="display:block; margin-bottom: 20px;">
-        <strong>⚠️ Pipeline archivé</strong><br>
-        Ce pipeline a été archivé. Il n'est plus possible de relancer l'analyse.
-        Veuillez contacter votre administrateur pour plus d'informations.
-    </div>
+
+<h2>L'analyse s'est terminée avec succès</h2>
+<p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.
+</p>
+
+<div style="margin-top: 30px; text-align: left;">
+    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+    {% if run.status in ("Idle","Pending","Running") %}
+    <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
+        actuelle</a>
+    {% else %}
+    <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
+        l'analyse</a>
     {% endif %}
+</div>
 
-    <h2>L'analyse s'est terminée avec succès</h2>
-    <p>La tentative {{ attempt.attempt_number }} s'est terminée avec succès.
-    </p>
+{% include "common/runinfo.html.j2" %}
 
-    <div style="margin-top: 30px; text-align: left;">
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-        {% if run.status in ("Idle","Pending","Running") %}
-        <a id="analysis-retry" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
-            actuelle</a>
-        {% elif is_pipeline_archived %}
-        <span id="analysis-retry" class="btn btn-primary"
-            style="background-color: #ccc; cursor: not-allowed; opacity: 0.6;"
-            title="Pipeline archivé - relance impossible">Relancer l'analyse (désactivé)</span>
-        {% else %}
-        <a id="analysis-retry" class="btn btn-primary" onclick="retryAnalysis({{ run.run_id }})">Relancer
-            l'analyse</a>
-        {% endif %}
-    </div>
-
-    {% include "common/runinfo.html.j2" %}
-{% endblock %}
-
-{% block run_extra_js %}
-        async function retryAnalysis(run_id) {
-            try {
-                const response = await fetch(`/mercure/api/retry/${run_id}`);
-                const data = await response.json();
-                if (isApiSuccess(data)) {
-                    location.href = `/mercure/show/run/${run_id}`;
-                } else {
-                    showMessage('error', getApiMessage(data) || "Relance de l'analyse refusée");
-                }
-            } catch (error) {
-                showMessage('error', error);
-            }
-        }
-{% endblock %}
+{% endblock content %}
