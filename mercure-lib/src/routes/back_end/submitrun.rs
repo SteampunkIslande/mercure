@@ -11,13 +11,16 @@ use crate::models::analysis;
 use crate::models::hgrun;
 
 /// Route: /mercure/api/newrun
-#[post("/newrun", data = "<form>")]
+#[post("/newrun", data = "<run>")]
 pub async fn newrun_post(
-    _auth: Authenticated,
+    auth: Authenticated,
     pool: &State<SqlitePool>,
-    form: Json<Run>,
+    mut run: Json<Run>,
 ) -> Json<ApiResponse<Value>> {
-    match hgrun::Run::new_run(form.0, pool).await {
+    // No matter what was posted, we overwrite the run submitter here anyways
+    run.0.user_id = auth.user.id;
+
+    match hgrun::Run::new_run(run.0, pool).await {
         Ok(run_id) => Json(ApiResponse::success(
             json!({"message":"Run créé avec succès!","run_id":run_id}),
         )),
