@@ -21,6 +21,7 @@ pub async fn edit_run_get(
 ) -> Result<Template, FrontendError> {
     let run: Run = Run::get_run_from_id(run_id, pool).await?;
     let form = run.get_form().await?;
+    let variables: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
     let can_see_run = {
         if auth.user.is_admin {
             true
@@ -55,6 +56,7 @@ pub async fn edit_run_get(
                     run=> &run,
                     user=> &auth.user,
                     form=> &form,
+                    user_defined_vars=> &variables,
                 },
             )),
             status => {
