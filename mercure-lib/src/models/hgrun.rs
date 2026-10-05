@@ -1,12 +1,16 @@
 use crate::models::Form;
+use crate::models::Group;
 use crate::models::User;
 
+use crate::config::get_mercure_config;
 use crate::models::ModelError;
 use crate::utils::format_french_date;
 use rocket::form::FromFormField;
 use rocket::form::ValueField;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use serde_json::Value;
+use serde_json::json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -43,6 +47,12 @@ impl<'r> FromFormField<'r> for RunStatus {
         Some(RunStatus::Idle)
     }
     fn from_value(field: ValueField<'r>) -> rocket::form::Result<'r, Self> {
+        // Failure seul (filtre du front) désigne tous les statuts d'échec :
+        // la raison est vide, et le filtre préfixe `Failure:%` les couvre tous
+        if field.value == "Failure" {
+            return Ok(RunStatus::Failure(String::new()));
+        }
+
         Ok(Self::from_str(field.value)
             .map_err(|_| rocket::form::Error::validation("Statut de run invalide"))?)
     }
@@ -165,6 +175,360 @@ impl Run {
         .await?;
 
         Ok(())
+    }
+
+    /// Sérialise le run en une ligne de tableau pour le front.
+    ///
+    /// La sortie doit correspondre colonne par colonne à `Run::runs_table_header`.
+    fn to_json(&self, user_name: &str) -> Option<Value> {
+        Some(json!([
+            // Colonne 1 - Nom du run
+            json!({
+                "content": &self.run_name,
+                "href": Some(format!("/mercure/show/run/{}", self.run_id?)),
+                "td_class": "content-column"
+            }),
+            // Colonne 2 - Utilisateur
+            json!({
+                "content": user_name,
+                "td_class": "content-column"
+            }),
+            // Colonne 3 - Date du run
+            json!({
+                "content": format_french_date(&self.creation_date),
+                "td_class": "content-column"
+            }),
+            // Colonne 4 - Statut
+            json!({
+                "content": match self.status {
+                    RunStatus::Idle => "A valider",
+                    RunStatus::Failure(_) => "Echec",
+                    RunStatus::Pending => "En attente",
+                    RunStatus::Running => "Analyses en cours",
+                    RunStatus::Success => "Succès"
+                },
+                "class": format!("run-status {}", match self.status {
+                    RunStatus::Idle => "idle",
+                    RunStatus::Failure(_) => "failure",
+                    RunStatus::Pending => "pending",
+                    RunStatus::Running => "running",
+                    RunStatus::Success => "success"
+                }),
+                "td_class": "badge-column"
+            }),
+            // Colonne 5 - Tentatives
+            json!({
+                "content": &self.attempt_count.to_string(),
+                "td_class": "numeric-column"
+            })
+        ]))
+    }
+
+    /// Entête du tableau des runs.
+    ///
+    /// La sortie doit correspondre colonne par colonne à `Run::to_json`.
+    fn runs_table_header() -> Vec<Value> {
+        vec![
+            json!({"content": "Nom du run", "class": "content-column"}),
+            json!({"content": "Utilisateur", "class": "content-column"}),
+            json!({"content": "Date du run", "class": "content-column"}),
+            json!({"content": "Statut", "class": "badge-column"}),
+            json!({"content": "Tentative", "class": "numeric-column"}),
+        ]
+    }
+
+    /// Construit le JSON attendu par le front : titre, en-tête de tableau,
+    /// lignes de runs paginées et pagination.
+    fn runs_payload(
+        title: &str,
+        table: Vec<Value>,
+        current_page: i64,
+        page_size: i64,
+        total_count: i64,
+    ) -> Value {
+        let total_pages = ((total_count + page_size - 1) / page_size).max(1);
+
+        json!({
+            "title": title,
+            "header": Self::runs_table_header(),
+            "table": table,
+            "pagination": {
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "page_size": page_size,
+                "total_count": total_count
+            }
+        })
+    }
+
+    /// Résout côté Rust les paires (`branch_name`, `form_path`) des formulaires
+    /// accessibles aux groupes donnés.
+    ///
+    /// L'association formulaire <-> groupes n'est pas stockée en base : elle provient
+    /// du champ `groups` des définitions YAML des formulaires. Une jointure SQL est donc
+    /// impossible : les paires sont résolues ici, puis injectées dans la requête en
+    /// tant que bindings (voir `Run::fetch_runs_table`).
+    async fn visible_form_pairs(groups: Vec<Group>) -> Result<Vec<(String, String)>, ModelError> {
+        let group_names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
+
+        Ok(Form::get_all_form_defs(&get_mercure_config())
+            .await?
+            .into_iter()
+            .filter(|form| {
+                form.groups
+                    .as_ref()
+                    .map(|form_groups| {
+                        form_groups
+                            .iter()
+                            .any(|g| group_names.contains(&g.as_str()))
+                    })
+                    .unwrap_or(false)
+            })
+            .filter_map(|form| Some((form.branch.clone()?, form.file_path.clone()?)))
+            .collect())
+    }
+
+    /// Noyau SQL commun à `Run::list_runs` et `Run::search_runs`.
+    ///
+    /// Construit dynamiquement la clause WHERE à partir :
+    ///
+    /// 1. de la visibilité : seul un admin (`user = None`) voit tous les runs, un
+    ///    utilisateur standard ne voit que les runs des formulaires associés à au moins
+    ///    un de ses groupes (les paires `branch_name`/`form_path` étant résolues depuis
+    ///    les définitions YAML, voir `Run::visible_form_pairs`) ;
+    /// 2. des filtres optionnels passés dans `filters`.
+    ///
+    /// Renvoie le JSON prêt pour le front : `{title, header, table, pagination}`.
+    async fn fetch_runs_table(
+        pool: &SqlitePool,
+        user: Option<&User>,
+        groups: Option<Vec<Group>>,
+        page_size: Option<i64>,
+        page: Option<i64>,
+        title: &str,
+        filters: RunFilters<'_>,
+    ) -> Result<Value, ModelError> {
+        let limit = page_size.unwrap_or(DEFAULT_RUNS_PAGE_SIZE).max(1);
+        let current_page = page.unwrap_or(1).max(1);
+        let offset = (current_page - 1) * limit;
+
+        let mut where_parts: Vec<String> = Vec::new();
+        let mut where_binds: Vec<String> = Vec::new();
+
+        // 1. Visibilité par groupes
+        if let Some(u) = user {
+            let viewer_groups = match groups {
+                Some(groups) => groups,
+                // Repli : relire les groupes de l'utilisateur depuis la base
+                None => Group::get_user_groups(pool, u.id).await?,
+            };
+
+            let form_pairs = Self::visible_form_pairs(viewer_groups).await?;
+
+            if form_pairs.is_empty() {
+                // L'utilisateur n'a accès à aucun formulaire : liste vide
+                return Ok(Self::runs_payload(
+                    title,
+                    Vec::new(),
+                    current_page,
+                    limit,
+                    0,
+                ));
+            }
+
+            where_parts.push(format!(
+                "({})",
+                form_pairs
+                    .iter()
+                    .map(|_| "(r.branch_name = ? AND r.form_path = ?)".to_string())
+                    .collect::<Vec<_>>()
+                    .join(" OR ")
+            ));
+            for (branch, form_path) in &form_pairs {
+                where_binds.push(branch.clone());
+                where_binds.push(form_path.clone());
+            }
+        }
+
+        // 2. Filtres optionnels
+        if let Some(status) = filters.status {
+            where_parts.push("r.status LIKE ?".to_string());
+            where_binds.push(format!("{status}%"));
+        }
+        if let Some(date_from) = filters.date_from {
+            where_parts.push("r.creation_date >= ?".to_string());
+            where_binds.push(date_from.to_string());
+        }
+        if let Some(date_to) = filters.date_to {
+            where_parts.push("r.creation_date <= ?".to_string());
+            where_binds.push(date_to.to_string());
+        }
+        if let Some(run_name_search) = filters.run_name_search {
+            where_parts.push("r.run_name LIKE ?".to_string());
+            where_binds.push(format!("%{run_name_search}%"));
+        }
+
+        let where_sql = if where_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", where_parts.join(" AND "))
+        };
+
+        // Compte total pour la pagination
+        let count_query_str = format!("SELECT COUNT(r.run_id) as total FROM Runs r{where_sql}");
+
+        // Résultats paginés, triés par date de création, les plus récents d'abord
+        let base_query_str = format!(
+            "SELECT r.run_id, r.user_id, r.run_name, r.creation_date, r.status,
+             r.attempt_count, r.user_defined_vars, r.form_path, r.branch_name, u.username
+             FROM Runs r
+             INNER JOIN Users u ON r.user_id = u.id{where_sql}
+             ORDER BY r.creation_date DESC
+             LIMIT ? OFFSET ?"
+        );
+
+        let mut count_query = sqlx::query(&count_query_str);
+        let mut base_query = sqlx::query(&base_query_str);
+        for bind in &where_binds {
+            count_query = count_query.bind(bind);
+            base_query = base_query.bind(bind);
+        }
+
+        let total_count: i64 = count_query.fetch_one(pool).await?.try_get("total")?;
+
+        let rows = base_query.bind(limit).bind(offset).fetch_all(pool).await?;
+
+        let mut table = Vec::with_capacity(rows.len());
+        for row in &rows {
+            if let Some(row_json) = run_row_to_json(row) {
+                table.push(row_json);
+            }
+        }
+
+        Ok(Self::runs_payload(
+            title,
+            table,
+            current_page,
+            limit,
+            total_count,
+        ))
+    }
+
+    /// Liste les runs visibles, paginés et triés par date de création décroissante.
+    ///
+    /// Un utilisateur non-admin ne voit que les runs des formulaires associés à au
+    /// moins un de ses groupes ; passer `user = None` (admin) désactive ce filtre.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` - connexion à la base de données
+    /// - `user` - l'utilisateur demandeur ; `None` signifie `admin`, donc voit tout
+    /// - `groups` - les groupes dont l'utilisateur est membre ; si `None` pour un
+    ///   utilisateur non-admin, ses groupes sont relus depuis la base
+    /// - `page_size` - nombre de runs par page (défaut : 5)
+    /// - `page` - page à afficher, à partir de 1 (défaut : 1)
+    /// - `status` - filtre optionnel de statut, appliqué en préfixe
+    ///   (`LIKE '{status}%'`, ce qui couvre aussi `Failure:raison`) ; `None` n'applique aucun filtre
+    ///
+    /// # Returns
+    ///
+    /// - Le JSON prêt à consommer par le front : `{title, header, table, pagination}`
+    ///
+    /// # Errors
+    ///
+    /// En cas d'erreur SQL, d'erreur de lecture des définitions de formulaires, ou
+    /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
+    pub async fn list_runs(
+        pool: &SqlitePool,
+        user: Option<&User>,
+        page_size: Option<i64>,
+        page: Option<i64>,
+        status: Option<RunStatus>,
+        groups: Option<Vec<Group>>,
+    ) -> Result<Value, ModelError> {
+        let title = if user.is_none() {
+            "Liste des runs (tous les groupes)"
+        } else {
+            "Liste des runs de vos groupes"
+        };
+
+        let status_str = status.map(|s| s.to_string());
+
+        Self::fetch_runs_table(
+            pool,
+            user,
+            groups,
+            page_size,
+            page,
+            title,
+            RunFilters {
+                status: status_str.as_deref(),
+                date_from: None,
+                date_to: None,
+                run_name_search: None,
+            },
+        )
+        .await
+    }
+
+    /// Recherche paginée de runs visibles, triés par date de création décroissante.
+    ///
+    /// Même visibilité que `Run::list_runs` : un utilisateur non-admin ne voit que les
+    /// runs des formulaires associés à au moins un de ses groupes.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` - connexion à la base de données
+    /// - `user` - l'utilisateur demandeur ; `None` signifie « admin, voit tout »
+    /// - `groups` - les groupes dont l'utilisateur est membre ; si `None` pour un
+    ///   utilisateur non-admin, ses groupes sont relus depuis la base
+    /// - `page_size` - nombre de runs par page (défaut : 5)
+    /// - `page` - page à afficher, à partir de 1 (défaut : 1)
+    /// - `status` - préfixe de statut recherché (`LIKE '{status}%'`)
+    /// - `date_from` / `date_to` - bornes de dates de création au format `YYYY-MM-DD`
+    /// - `run_name_search` - sous-chaîne à retrouver dans le nom du run
+    ///
+    /// # Returns
+    ///
+    /// - Le JSON prêt à consommer par le front : `{title, header, table, pagination}`
+    ///
+    /// # Errors
+    ///
+    /// En cas d'erreur SQL, d'erreur de lecture des définitions de formulaires, ou
+    /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn search_runs(
+        pool: &SqlitePool,
+        user: Option<&User>,
+        page_size: Option<i64>,
+        page: Option<i64>,
+        status: Option<&str>,
+        date_from: Option<&str>,
+        date_to: Option<&str>,
+        run_name_search: Option<&str>,
+        groups: Option<Vec<Group>>,
+    ) -> Result<Value, ModelError> {
+        let title = if user.is_none() {
+            "Résultats de la recherche (tous les groupes)"
+        } else {
+            "Résultats de la recherche de vos groupes"
+        };
+
+        Self::fetch_runs_table(
+            pool,
+            user,
+            groups,
+            page_size,
+            page,
+            title,
+            RunFilters {
+                status,
+                date_from,
+                date_to,
+                run_name_search,
+            },
+        )
+        .await
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
@@ -318,4 +682,34 @@ impl Run {
 
         Ok(())
     }
+}
+
+/// Nombre de runs par page si `page_size` n'est pas fourni.
+const DEFAULT_RUNS_PAGE_SIZE: i64 = 5;
+
+/// Critères de filtrage partagés par `Run::list_runs` et `Run::search_runs`.
+struct RunFilters<'a> {
+    status: Option<&'a str>,
+    date_from: Option<&'a str>,
+    date_to: Option<&'a str>,
+    run_name_search: Option<&'a str>,
+}
+
+/// Reconstruit un `Run` depuis une ligne de la requête de listing,
+/// puis le sérialise pour le tableau du front.
+fn run_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Option<Value> {
+    let run = Run {
+        run_id: row.try_get("run_id").ok()?,
+        user_id: row.try_get("user_id").ok()?,
+        run_name: row.try_get("run_name").ok()?,
+        creation_date: row.try_get("creation_date").ok()?,
+        status: RunStatus::from_str(row.try_get("status").ok()?).ok()?,
+        attempt_count: row.try_get("attempt_count").ok()?,
+        user_defined_vars: serde_json::from_str(row.try_get("user_defined_vars").ok()?).ok()?,
+        form_path: row.try_get("form_path").ok()?,
+        branch_name: row.try_get("branch_name").ok()?,
+    };
+    let username: String = row.try_get("username").ok()?;
+
+    run.to_json(&username)
 }

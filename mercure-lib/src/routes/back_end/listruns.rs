@@ -1,181 +1,28 @@
-use std::str::FromStr;
-
-use crate::models::{ModelError, RunStatus};
-use crate::utils::format_french_date;
-use crate::{auth::Authenticated, models::User, routes::ApiResponse};
+use crate::auth::Authenticated;
+use crate::models::{Group, ModelError, Run, RunStatus, User};
+use crate::routes::ApiResponse;
 use rocket::serde::json::Json;
 use rocket::{State, get};
-use serde_json::{Value, json};
-use sqlx::Row;
+use serde_json::Value;
 use sqlx::SqlitePool;
 
-fn create_header() -> Vec<Value> {
-    vec![
-        json!({"content": "Nom du run", "class": "content-column"}),
-        json!({"content": "Utilisateur", "class": "content-column"}),
-        json!({"content": "Date du run", "class": "content-column"}),
-        json!({"content": "Statut", "class": "badge-column"}),
-        json!({"content": "Tentative", "class": "numeric-column"}),
-    ]
-}
-
-fn create_run_row(
-    run_id: i64,
-    run_name: &str,
-    user_name: &str,
-    run_date: &str,
-    status: RunStatus,
-    attempt_count: i64,
-) -> Value {
-    json!(vec![
-        // Colonne 1 - Nom du run
-        json!({
-            "content": run_name,
-            "href": Some(format!("/mercure/show/run/{}", run_id)),
-            "td_class": "content-column"
-        }),
-        // Colonne 2 - Utilisateur
-        json!({
-            "content": user_name,
-            "td_class": "content-column"
-        }),
-        // Colonne 3 - Date du run
-        json!({
-            "content": format_french_date(run_date),
-            "td_class": "content-column"
-        }),
-        // Colonne 4 - Statut
-        json!({
-            "content": match status {
-                RunStatus::Idle => "A valider",
-                RunStatus::Failure(_) => "Echec",
-                RunStatus::Pending => "En attente",
-                RunStatus::Running => "Analyses en cours",
-                RunStatus::Success => "Succès"
-            },
-            "class": format!("run-status {}", match status {
-                RunStatus::Idle => "idle",
-                RunStatus::Failure(_) => "failure",
-                RunStatus::Pending => "pending",
-                RunStatus::Running => "running",
-                RunStatus::Success => "success"
-            }),
-            "td_class": "badge-column"
-        }),
-        // Colonne 5 - Tentatives
-        json!({
-            "content": attempt_count.to_string(),
-            "td_class": "numeric-column"
-        })
-    ])
-}
-
-/// List runs regarding specific user. Returned vec is sorted by run date, most recent first. This behavior cannot be changed.
+/// Résout ce que l'utilisateur courant est autorisé à voir :
 ///
-/// # Arguments
+/// - un admin voit tous les runs (`user = None` côté modèle) ;
+/// - un utilisateur standard ne voit que les runs des formulaires associés à au
+///   moins un de ses groupes (voir `Run::fetch_runs_table`).
 ///
-/// - `pool` (`&SqlitePool`) - The sqlite database connection
-/// - `user` (`Option<&User>`) - The user to list runs of. `None` means no filter will be applied regarding user. Use for admin users.
-/// - `page_size` (`Option<i64>`) - How many runs should be returned per page (default: 20)
-/// - `page` (`Option<i64>`) - Page to show, starting at 1 (default: 1)
-/// - `status` (`Option<String>`) - An optional string value to filter run status on. Final filter will be `LIKE '{status}%', meaning it will filter by this prefix`
-///
-/// # Returns
-///
-/// - `Result<(Vec<serde_json::Value>, i64), sqlx::Error>` - A `Vec<serde_json::Value>` (empty means that the query returned nothing).
-///
-/// # Errors
-///
-/// This function should not return any error, if it did, it would be from a sql syntax error or if the database is not accessible.
-async fn list_runs(
+/// Le couple renvoyé est à passer tel quel au modèle : (`user`, `groups`).
+async fn resolve_viewer<'a>(
     pool: &SqlitePool,
-    user: Option<&User>,
-    page_size: Option<i64>,
-    page: Option<i64>,
-    status: Option<String>,
-) -> Result<(Vec<serde_json::Value>, i64), ModelError> {
-    // On prépare la valeur du LIKE pour le bind ("valeur%")
-    let status_bind = format!("{}%", status.unwrap_or_default());
-
-    let limit = page_size.unwrap_or(20);
-    let offset = (page.unwrap_or(1) - 1) * limit;
-
-    // Le filtre contient désormais le placeholder "?" à la place de l'ID direct
-    let user_filter = match user {
-        Some(_) => {
-            r#"r.form_id IN (
-                SELECT f.form_id
-                FROM Formdef f
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id
-                WHERE gu.user_id = ? 
-            ) AND "#
-        }
-        None => "",
-    };
-
-    let count_query_str = format!(
-        "SELECT COUNT(r.run_id) as total FROM Runs r WHERE {} r.status LIKE ?",
-        user_filter
-    );
-
-    let base_query_str = format!(
-        r#"
-        SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username
-        FROM Runs r
-        INNER JOIN Users u ON r.user_id = u.id
-        WHERE {} r.status LIKE ?
-        ORDER BY r.run_date DESC
-        LIMIT ? OFFSET ?
-        "#,
-        user_filter
-    );
-
-    // Initialisation des requêtes sqlx
-    let mut count_query = sqlx::query(&count_query_str);
-    let mut base_query = sqlx::query(&base_query_str);
-
-    // 1. Bind conditionnel de l'utilisateur (doit être le premier "?" s'il existe)
-    if let Some(u) = user {
-        count_query = count_query.bind(u.id);
-        base_query = base_query.bind(u.id);
+    user: &'a User,
+) -> Result<(Option<&'a User>, Option<Vec<Group>>), ModelError> {
+    if user.is_admin {
+        Ok((None, None))
+    } else {
+        let groups = Group::get_user_groups(pool, user.id).await?;
+        Ok((Some(user), Some(groups)))
     }
-
-    // 2. Bind du statut pour les deux requêtes (second "?")
-    count_query = count_query.bind(&status_bind);
-    base_query = base_query.bind(&status_bind);
-
-    // Exécution du count
-    let total_count: i64 = count_query.fetch_one(pool).await?.try_get("total")?;
-
-    // 3. Bind finaux pour la pagination (troisième et quatrième "?") puis exécution
-    let runs_data = base_query
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await?
-        .iter()
-        .filter_map(|row| {
-            let run_id: i64 = row.try_get("run_id").ok()?;
-            let run_name: String = row.try_get("run_name").ok()?;
-            let username: String = row.try_get("username").ok()?;
-            let run_date: String = row.try_get("run_date").ok()?;
-            let attempt_count: i64 = row.try_get("attempt_count").ok()?;
-            let status_str: String = row.try_get("status").ok()?;
-            let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
-
-            Some(create_run_row(
-                run_id,
-                &run_name,
-                &username,
-                &run_date,
-                status,
-                attempt_count,
-            ))
-        })
-        .collect();
-
-    Ok((runs_data, total_count))
 }
 
 #[get("/listruns?<page>&<page_size>&<status>")]
@@ -186,49 +33,23 @@ pub async fn list_runs_get(
     page_size: Option<i64>,
     status: Option<RunStatus>,
 ) -> Json<ApiResponse<Value>> {
-    match list_runs(
-        pool,
-        if !authenticated.user.is_admin {
-            Some(&authenticated.user)
-        } else {
-            None
-        },
-        page_size,
-        page,
-        status,
-    )
-    .await
-    {
-        Ok((runs_list, total_count)) => {
-            let page_size_val = page_size.unwrap_or(5);
-            let current_page = page.unwrap_or(1);
-            let total_pages = (total_count + page_size_val - 1) / page_size_val;
-
-            let title = if authenticated.user.is_admin {
-                "Liste des runs (tous les groupes)"
-            } else {
-                "Liste des runs de vos groupes"
-            };
-
-            Json(ApiResponse::success(json!({
-                    "title": title,
-                    "header": create_header(),
-                    "table": runs_list,
-                    "pagination": {
-                        "current_page": current_page,
-                        "total_pages": total_pages,
-                        "page_size": page_size_val,
-                        "total_count": total_count
-                    }
-            })))
+    let (user, groups) = match resolve_viewer(pool, &authenticated.user).await {
+        Ok(viewer) => viewer,
+        Err(_) => {
+            return Json(ApiResponse::error(
+                "Erreur lors de la récupération de vos groupes.".to_string(),
+            ));
         }
-        Err(_e) => Json(ApiResponse::error(
+    };
+
+    match Run::list_runs(pool, user, page_size, page, status, groups).await {
+        Ok(payload) => Json(ApiResponse::success(payload)),
+        Err(_) => Json(ApiResponse::error(
             "Erreur lors de la récupération des runs.".to_string(),
         )),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[get("/searchrun?<page>&<page_size>&<status>&<date_from>&<date_to>&<run_name_search>")]
 pub async fn search_run_get(
     pool: &State<SqlitePool>,
@@ -240,125 +61,31 @@ pub async fn search_run_get(
     date_to: Option<String>,
     run_name_search: Option<String>,
 ) -> Json<ApiResponse<Value>> {
-    let user = if !authenticated.user.is_admin {
-        Some(&authenticated.user)
-    } else {
-        None
-    };
-
-    let page_size_val = page_size.unwrap_or(5);
-    let page_val = page.unwrap_or(1);
-
-    // Construction dynamique de la requête SQL
-    let mut query = String::from(
-        "SELECT r.run_id, r.run_name, r.attempt_count, r.status, r.run_date, u.username \
-         FROM Runs r \
-         INNER JOIN Users u ON r.user_id = u.id",
-    );
-    let mut where_clauses = Vec::new();
-
-    if let Some(u) = user {
-        where_clauses.push(format!(
-            "r.form_id IN (SELECT f.form_id FROM Formdef f \
-                INNER JOIN FormdefHasGroup fg ON f.form_id = fg.form_id \
-                INNER JOIN GroupHasUser gu ON fg.group_id = gu.group_id \
-                WHERE gu.user_id = {})",
-            u.id
-        ));
-    }
-
-    if let Some(ref s) = status {
-        where_clauses.push(format!("r.status LIKE '{}%'", s));
-    }
-
-    if let Some(ref df) = date_from {
-        where_clauses.push(format!("r.run_date >= '{}'", df));
-    }
-    if let Some(ref dt) = date_to {
-        where_clauses.push(format!("r.run_date <= '{}'", dt));
-    }
-    if let Some(ref name) = run_name_search {
-        where_clauses.push(format!("r.run_name LIKE '%{}%'", name.replace('\'', "''")));
-    }
-
-    if !where_clauses.is_empty() {
-        query.push_str(" WHERE ");
-        query.push_str(&where_clauses.join(" AND "));
-    }
-    query.push_str(" ORDER BY r.run_date DESC LIMIT ? OFFSET ?");
-
-    // Compte total pour la pagination
-    let mut count_query = String::from("SELECT COUNT(r.run_id) as total FROM Runs r");
-    if !where_clauses.is_empty() {
-        count_query.push_str(" WHERE ");
-        count_query.push_str(&where_clauses.join(" AND "));
-    }
-
-    // Récupérer le nombre total de résultats
-    let total_count: i64 = match sqlx::query(&count_query)
-        .fetch_one(pool as &SqlitePool)
-        .await
-        .and_then(|row| row.try_get("total"))
-    {
-        Ok(count) => count,
+    let (user, groups) = match resolve_viewer(pool, &authenticated.user).await {
+        Ok(viewer) => viewer,
         Err(_) => {
             return Json(ApiResponse::error(
-                "Erreur lors du comptage des runs.".to_string(),
+                "Erreur lors de la récupération de vos groupes.".to_string(),
             ));
         }
     };
 
-    // Récupérer les résultats paginés
-    let runs_data = match sqlx::query(&query)
-        .bind(page_size_val)
-        .bind((page_val - 1) * page_size_val)
-        .fetch_all(pool as &SqlitePool)
-        .await
+    match Run::search_runs(
+        pool,
+        user,
+        page_size,
+        page,
+        status.as_deref(),
+        date_from.as_deref(),
+        date_to.as_deref(),
+        run_name_search.as_deref(),
+        groups,
+    )
+    .await
     {
-        Ok(rows) => rows
-            .iter()
-            .filter_map(|row| {
-                let run_id: i64 = row.try_get("run_id").ok()?;
-                let run_name: String = row.try_get("run_name").ok()?;
-                let username: String = row.try_get("username").ok()?;
-                let run_date: String = row.try_get("run_date").ok()?;
-                let attempt_count: i64 = row.try_get("attempt_count").ok()?;
-                let status_str: String = row.try_get("status").ok()?;
-                let status: RunStatus = RunStatus::from_str(&status_str).ok()?;
-
-                Some(create_run_row(
-                    run_id,
-                    &run_name,
-                    &username,
-                    &run_date,
-                    status,
-                    attempt_count,
-                ))
-            })
-            .collect::<Vec<_>>(),
-        Err(_) => {
-            return Json(ApiResponse::error(
-                "Erreur lors de la récupération des runs.".to_string(),
-            ));
-        }
-    };
-
-    let total_pages = (total_count + page_size_val - 1) / page_size_val;
-    let title = if authenticated.user.is_admin {
-        "Résultats de la recherche (tous les groupes)"
-    } else {
-        "Résultats de la recherche de vos groupes"
-    };
-
-    Json(ApiResponse::success(json!({
-        "title": title,
-        "header": create_header(),
-        "table": runs_data,
-        "pagination": {
-            "current_page": page_val,
-            "total_pages": total_pages,
-            "page_size": page_size_val,
-            "total_count": total_count
-        }
-    })))
+        Ok(payload) => Json(ApiResponse::success(payload)),
+        Err(_) => Json(ApiResponse::error(
+            "Erreur lors de la recherche des runs.".to_string(),
+        )),
+    }
 }
