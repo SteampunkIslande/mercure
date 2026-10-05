@@ -14,10 +14,12 @@ pub async fn new_run_get(
     _pool: &State<SqlitePool>,
 ) -> Result<Template, FrontendError> {
     let form = Form::get_form(branch, form_path).await?;
+    let variables: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
     Ok(Template::render(
         "common/editrun",
         context! {
-            form,
+            form=> form,
+            user_defined_vars=> &variables,
             user=>&auth.user
         },
     ))
