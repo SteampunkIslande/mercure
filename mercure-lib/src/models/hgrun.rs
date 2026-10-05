@@ -2,6 +2,9 @@ use crate::models::Form;
 use crate::models::User;
 
 use crate::models::ModelError;
+use crate::utils::format_french_date;
+use rocket::form::FromFormField;
+use rocket::form::ValueField;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
@@ -32,6 +35,17 @@ pub enum RunStatus {
     Success,
     /// Le formulaire a été validé mais l'analyse a échoué avec une erreur
     Failure(String),
+}
+
+#[rocket::async_trait]
+impl<'r> FromFormField<'r> for RunStatus {
+    fn default() -> Option<Self> {
+        Some(RunStatus::Idle)
+    }
+    fn from_value(field: ValueField<'r>) -> rocket::form::Result<'r, Self> {
+        Ok(Self::from_str(field.value)
+            .map_err(|_| rocket::form::Error::validation("Statut de run invalide"))?)
+    }
 }
 
 impl Display for RunStatus {

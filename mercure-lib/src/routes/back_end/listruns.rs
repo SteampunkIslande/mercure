@@ -184,7 +184,7 @@ pub async fn list_runs_get(
     authenticated: Authenticated,
     page: Option<i64>,
     page_size: Option<i64>,
-    status: Option<String>,
+    status: Option<RunStatus>,
 ) -> Json<ApiResponse<Value>> {
     match list_runs(
         pool,
