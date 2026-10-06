@@ -25,6 +25,7 @@ pub struct MercureConfig {
     pub upload_dir: String,
     pub logs_dir: String,
     pub pipelines: GitWebConfig,
+    pub webhook_secret: String,
 }
 
 impl Default for GitWebConfig {
@@ -44,6 +45,7 @@ impl Default for MercureConfig {
             upload_dir: "/home/charles/mercure/uploads".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),
             pipelines: GitWebConfig::default(),
+            webhook_secret: String::new(),
         }
     }
 }

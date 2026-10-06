@@ -13,7 +13,7 @@ use crate::auth::Authenticated;
 use crate::models::Attempt;
 use crate::models::Run;
 use crate::models::RunStatus;
-use crate::models::{Form, Group};
+use crate::models::{FormDef, Group};
 
 #[get("/show/run/<run_id>?<attempt_number>")]
 pub async fn show_run_get(
@@ -28,21 +28,17 @@ pub async fn show_run_get(
         .await
         .context(format!("Impossible d'obtenir le run {}", run_id))?;
 
-    let form: Form = run.get_form().await.context(format!(
-        "Impossible d'obtenir le formulaire pour le run {}",
-        run_id
-    ))?;
     let can_see_run =
         {
             if auth.user.is_admin {
                 true
             } else {
-                let form_groups: HashSet<i64> = form
-                    .get_group_ids(pool)
-                    .await
-                    .ok()
-                    .map(|v| v.into_iter().collect())
-                    .unwrap_or_default();
+                let form_groups: HashSet<i64> =
+                    FormDef::get_group_ids(pool, &run.branch_name, &run.form_path)
+                        .await
+                        .ok()
+                        .map(|v| v.into_iter().collect())
+                        .unwrap_or_default();
 
                 let auth_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                     .await

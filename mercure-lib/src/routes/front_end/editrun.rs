@@ -11,7 +11,7 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::models::Group;
-use crate::models::{Run, RunStatus};
+use crate::models::{FormDef, Run, RunStatus};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(
@@ -26,7 +26,11 @@ pub async fn edit_run_get(
         if auth.user.is_admin {
             true
         } else {
-            let form_groups: HashSet<i64> = form.get_group_ids(pool).await?.into_iter().collect();
+            let form_groups: HashSet<i64> =
+                FormDef::get_group_ids(pool, &run.branch_name, &run.form_path)
+                    .await?
+                    .into_iter()
+                    .collect();
             let auth_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                 .await?
                 .iter()

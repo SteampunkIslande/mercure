@@ -1,4 +1,5 @@
 mod editgroups;
+mod forms_cache;
 mod getform;
 mod jobprogresswatch;
 mod listgroups;
@@ -15,6 +16,7 @@ mod submitrun;
 mod upload;
 
 pub use editgroups::*;
+pub use forms_cache::*;
 pub use getform::*;
 pub use jobprogresswatch::*;
 pub use listgroups::*;

@@ -1,8 +1,9 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use minijinja::Environment;
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use sqlx::SqlitePool;
 
 use crate::{
@@ -193,54 +194,6 @@ impl Form {
         Ok(all_forms)
     }
 
-    /// Returns a tuple of (forms with an assigned group, forms with no assigned group).
-    /// Forms with no assigned group are available to admin users only
-    ///
-    /// # Arguments
-    ///
-    /// - `pool` (`&SqlitePool`) - Database connection handle (not sure this is useful)
-    /// - `group_id` (`i64`) - Group ID to retrieve available forms to
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(Vec<Form>,Vec<Form>),ModelError>` - (forms with an assigned group, forms with no assigned group) as a result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if...
-    pub async fn get_form_list_items_for_group(
-        pool: &SqlitePool,
-        config: &MercureConfig,
-        group_id: i64,
-    ) -> Result<(Vec<Form>, Vec<Form>), ModelError> {
-        let group_name = groups::Group::group_name_from_id(pool, group_id).await?;
-
-        let all_forms = Self::get_all_form_defs(config).await?;
-
-        let forms_with_groups = all_forms
-            .iter()
-            .filter(|f| {
-                f.groups
-                    .as_ref()
-                    .map(|grps| grps.contains(&group_name))
-                    .unwrap_or(false)
-            })
-            .map(Form::clone)
-            .collect();
-
-        let forms_without_groups = all_forms
-            .into_iter()
-            .filter(|f| {
-                f.groups
-                    .as_ref()
-                    .and_then(|grps| Some(grps.is_empty()))
-                    .unwrap_or(true)
-            })
-            .collect();
-
-        Ok((forms_with_groups, forms_without_groups))
-    }
-
     pub async fn get_form(branch: &str, form_path: &str) -> Result<Form, ModelError> {
         let MercureConfig { pipelines, .. } = crate::config::get_mercure_config();
 
@@ -264,37 +217,6 @@ impl Form {
         }
     }
 
-    /// Returns all the groups this form is part of (according to its definition of groups: Vec<String>)
-    ///
-    /// # Arguments
-    ///
-    /// - `pool` (`&SqlitePool`) - A handle to the database
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Vec<i64>, ModelError>` - On success, the list of group ids that are associated with this form
-    ///
-    /// # Errors
-    ///
-    /// Returns an error in case we cannot retrieve the list of groups from the database
-    pub async fn get_group_ids(&self, pool: &SqlitePool) -> Result<Vec<i64>, ModelError> {
-        let self_groups: HashSet<&str> = self
-            .groups
-            .as_ref()
-            .map(|groups| groups.iter().map(String::as_str).collect())
-            .unwrap_or(HashSet::new());
-
-        let groups = groups::Group::get_groups_with_ids(pool).await?;
-
-        let ids = groups
-            .into_iter()
-            .filter(|g| self_groups.contains(g.name.as_str()))
-            .map(|g| g.id)
-            .collect();
-
-        Ok(ids)
-    }
-
     pub async fn check_validity(
         &self,
         context: &impl Serialize,
@@ -315,6 +237,291 @@ impl Form {
             .context("Erreur jinja (template incorrect)")?;
         Ok(())
     }
+}
+
+/// Existence d'un formulaire, mise en cache en base de données.
+///
+/// Un formulaire est défini de façon source de vérité par sa paire
+/// (`branch`, `file_path`) dans le dépôt git : cette structure ne retient
+/// exactement que cette paire, sans les champs instables du YAML (`name`,
+/// `description`, `variables`,...).
+///
+/// La visibilité d'un `FormDef` pour un groupe est portée par la table
+/// `FormDefHasGroup` (jointure simple en SQL). Cette table est reconstruite
+/// par `FormDef::refresh_cache`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FormDef {
+    pub form_def_id: i64,
+    pub branch: String,
+    pub file_path: String,
+}
+
+impl FormDef {
+    /// Rebuild the FormDef cache from the actual Form repository.
+    ///
+    /// This is an all-in-one transaction: it deletes every stale cached FormDef,
+    /// then re-inserts all the forms found on the git repository
+    /// (see `Form::get_all_form_defs`), and rebuilds `FormDefHasGroup` from the
+    /// `groups` field of each form definition.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` (`&SqlitePool`) - A handle to the database
+    /// - `config` (`&MercureConfig`) - Application configuration (git repository, mainly)
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<FormDef>, ModelError>` - On success, the whole cache (which is equal to
+    ///   the `FormDef`s found in the repository)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in case of database or git repository issues.
+    pub async fn refresh_cache(pool: &SqlitePool, config: &MercureConfig) -> Result<Vec<Self>, ModelError> {
+        let all_forms = Form::get_all_form_defs(config).await?;
+        Self::rebuild_cache_from_forms(pool, all_forms).await
+    }
+
+    /// Synchronously rebuilds `FormDefs` and `FormDefHasGroup` from an
+    /// already-scanned list of form definitions (see `Form::get_all_form_defs`).
+    pub(crate) async fn rebuild_cache_from_forms(
+        pool: &SqlitePool,
+        all_forms: Vec<Form>,
+    ) -> Result<Vec<Self>, ModelError> {
+        let all_groups = groups::Group::get_groups_with_ids(pool).await?;
+
+        let mut tx = pool.begin().await?;
+
+        sqlx::query("DELETE FROM FormDefHasGroup").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM FormDefs").execute(&mut *tx).await?;
+
+        let mut cached = Vec::new();
+        for form in all_forms {
+            let (Some(branch), Some(file_path)) = (form.branch, form.file_path) else {
+                continue;
+            };
+
+            let form_def_id: i64 = sqlx::query(
+                r#"
+                INSERT INTO FormDefs (branch, file_path) VALUES (?, ?)
+                RETURNING form_def_id
+                "#,
+            )
+            .bind(&branch)
+            .bind(&file_path)
+            .fetch_one(&mut *tx)
+            .await?
+            .try_get("form_def_id")?;
+
+            if let Some(form_groups) = form.groups {
+                for group_name in form_groups {
+                    match all_groups.iter().find(|g| g.name == group_name) {
+                        Some(group) => {
+                            sqlx::query(
+                                r#"INSERT INTO FormDefHasGroup (form_def_id, group_id) VALUES (?, ?)"#,
+                            )
+                            .bind(form_def_id)
+                            .bind(group.id)
+                            .execute(&mut *tx)
+                            .await?;
+                        }
+                        None => log::warn!(
+                            "Le formulaire {branch}/{file_path} attend le groupe {group_name}, qui n'existe pas en base"
+                        ),
+                    }
+                }
+            }
+
+            cached.push(FormDef {
+                form_def_id,
+                branch,
+                file_path,
+            });
+        }
+
+        tx.commit().await?;
+
+        Ok(cached)
+    }
+
+    /// All the cached `FormDef`s (from the database only, no HTTP request)
+    pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Self>, ModelError> {
+        Ok(sqlx::query(
+            r#"
+            SELECT form_def_id, branch, file_path FROM FormDefs ORDER BY branch, file_path
+            "#,
+        )
+        .fetch_all(pool)
+        .await?
+        .iter()
+        .filter_map(form_def_from_row)
+        .collect())
+    }
+
+    /// Lists (branch, file_path) pairs that are visible to given groups.
+    ///
+    /// Until now, that info was scattered in form definitions; it now lives in the
+    /// `FormDefs` and `FormDefHasGroup` tables, and is resolved with a simple SQL query.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` (`&SqlitePool`) - A handle to the database
+    /// - `groups` (`Vec<Group>`) - The groups doing the search
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<(String, String)>, ModelError>` - The list of visible (branch, file_path) pairs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in case of database issues.
+    pub async fn visible_form_pairs(
+        pool: &SqlitePool,
+        groups: Vec<groups::Group>,
+    ) -> Result<Vec<(String, String)>, ModelError> {
+        let group_ids: Vec<i64> = groups.into_iter().map(|g| g.id).collect();
+
+        if group_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders = vec!["?"; group_ids.len()].join(", ");
+
+        let query_str = format!(
+            r#"
+            SELECT DISTINCT fd.branch, fd.file_path
+            FROM FormDefs fd
+            JOIN FormDefHasGroup fhg ON fhg.form_def_id = fd.form_def_id
+            WHERE fhg.group_id IN ({placeholders})
+            ORDER BY fd.branch, fd.file_path
+            "#
+        );
+
+        let mut query = sqlx::query(&query_str);
+
+        for group_id in group_ids {
+            query = query.bind(group_id);
+        }
+
+        Ok(query
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .filter_map(|row| Some((row.try_get("branch").ok()?, row.try_get("file_path").ok()?)))
+            .collect())
+    }
+
+    /// The group ids that a (branch, file_path) pair is associated with.
+    ///
+    /// This is a simple SQL query, and does not require any HTTP request to the
+    /// git repository: the association lives in the `FormDefHasGroup` table. A
+    /// form that is not cached (or has no group) returns an empty list; it is
+    /// then considered admin-only.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` (`&SqlitePool`) - A handle to the database
+    /// - `branch` (`&str`) - The branch the form lives on
+    /// - `form_path` (`&str`) - The path to the form yaml file, within said branch
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<i64>, ModelError>` - On success, the list of group ids that are associated with this form
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in case of database issues.
+    pub async fn get_group_ids(
+        pool: &SqlitePool,
+        branch: &str,
+        form_path: &str,
+    ) -> Result<Vec<i64>, ModelError> {
+        Ok(sqlx::query(
+            r#"
+            SELECT fhg.group_id
+            FROM FormDefs fd
+            JOIN FormDefHasGroup fhg ON fhg.form_def_id = fd.form_def_id
+            WHERE fd.branch = ? AND fd.file_path = ?
+            "#,
+        )
+        .bind(branch)
+        .bind(form_path)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .filter_map(|row| row.try_get("group_id").ok())
+        .collect())
+    }
+
+    /// Returns a tuple of (cached form defs with an assigned group, cached form defs
+    /// with no assigned group).
+    /// Form defs with no assigned group are available to admin users only.
+    ///
+    /// Both lists come straight from the cache, with a simple SQL query each.
+    ///
+    /// # Arguments
+    ///
+    /// - `pool` (`&SqlitePool`) - A handle to the database
+    /// - `group_id` (`i64`) - Group ID to retrieve available forms to
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(Vec<FormDef>, Vec<FormDef>), ModelError>` - (form defs with an assigned group,
+    ///   form defs with no assigned group) as a result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in case of database issues.
+    pub async fn get_form_defs_for_group(
+        pool: &SqlitePool,
+        group_id: i64,
+    ) -> Result<(Vec<FormDef>, Vec<FormDef>), ModelError> {
+        let forms_with_groups = sqlx::query(
+            r#"
+            SELECT fd.form_def_id, fd.branch, fd.file_path
+            FROM FormDefs fd
+            JOIN FormDefHasGroup fhg ON fhg.form_def_id = fd.form_def_id
+            WHERE fhg.group_id = ?
+            ORDER BY fd.branch, fd.file_path
+            "#,
+        )
+        .bind(group_id)
+        .fetch_all(pool)
+        .await?;
+
+        let forms_without_groups = sqlx::query(
+            r#"
+            SELECT fd.form_def_id, fd.branch, fd.file_path
+            FROM FormDefs fd
+            WHERE NOT EXISTS (
+                SELECT 1 FROM FormDefHasGroup fhg WHERE fhg.form_def_id = fd.form_def_id
+            )
+            ORDER BY fd.branch, fd.file_path
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok((
+            forms_with_groups
+                .iter()
+                .filter_map(form_def_from_row)
+                .collect(),
+            forms_without_groups
+                .iter()
+                .filter_map(form_def_from_row)
+                .collect(),
+        ))
+    }
+}
+
+/// Builds a `FormDef` from a row selecting `form_def_id`, `branch` and `file_path`
+fn form_def_from_row(row: &sqlx::sqlite::SqliteRow) -> Option<FormDef> {
+    Some(FormDef {
+        form_def_id: row.try_get("form_def_id").ok()?,
+        branch: row.try_get("branch").ok()?,
+        file_path: row.try_get("file_path").ok()?,
+    })
 }
 
 #[cfg(test)]
@@ -491,5 +698,149 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
             <input type="date" id="v1" name="v1">
         </div>"#,
         );
+    }
+}
+
+/// Tests du cache SQL (`FormDefs` / `FormDefHasGroup`)
+#[cfg(test)]
+mod form_def_cache_tests {
+    use sqlx::SqlitePool;
+
+    use crate::models::{Form, FormDef, Group};
+
+    async fn test_pool() -> SqlitePool {
+        // Le cache en mémoire vit par connexion : une seule connexion dans le pool
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("pool en mémoire");
+        crate::db::run_migrations(&pool).await.expect("migrations");
+        pool
+    }
+
+    fn form(name: &str, branch: &str, path: &str, groups: &[&str]) -> Form {
+        Form {
+            name: name.to_string(),
+            description: String::new(),
+            variables: vec![],
+            exec_type: Default::default(),
+            workdir: String::new(),
+            branch: Some(branch.to_string()),
+            file_path: Some(path.to_string()),
+            groups: Some(groups.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
+    fn group(id: i64) -> Group {
+        Group { id, name: format!("g{id}") }
+    }
+
+    #[tokio::test]
+    async fn test_cache_lists_and_visibility() {
+        let pool = test_pool().await;
+
+        let bio = Group::add_group(&pool, "Bio").await.expect("add Bio");
+        let chimie = Group::add_group(&pool, "Chimie").await.expect("add Chimie");
+
+        let cached = FormDef::rebuild_cache_from_forms(
+            &pool,
+            vec![
+                form("F1", "main", ".forms/f1.yaml", &["Bio"]),
+                form("F2", "dev", ".forms/f2.yaml", &[]),
+                // Groupe inexistant en base : ignoré
+                form("F3", "main", ".forms/f3.yaml", &["Fantome"]),
+            ],
+        )
+        .await
+        .expect("rebuild cache");
+
+        assert_eq!(cached.len(), 3);
+
+        let all = FormDef::get_all(&pool).await.expect("get_all");
+        assert_eq!(
+            all,
+            vec![
+                FormDef {
+                    form_def_id: all[0].form_def_id,
+                    branch: "dev".into(),
+                    file_path: ".forms/f2.yaml".into()
+                },
+                FormDef {
+                    form_def_id: all[1].form_def_id,
+                    branch: "main".into(),
+                    file_path: ".forms/f1.yaml".into()
+                },
+                FormDef {
+                    form_def_id: all[2].form_def_id,
+                    branch: "main".into(),
+                    file_path: ".forms/f3.yaml".into()
+                },
+            ]
+        );
+
+        let (with_group, without_group) =
+            FormDef::get_form_defs_for_group(&pool, bio).await.expect("for group");
+        assert_eq!(with_group.len(), 1);
+        assert_eq!((with_group[0].branch.as_str(), with_group[0].file_path.as_str()), ("main", ".forms/f1.yaml"));
+        assert_eq!(without_group.len(), 2);
+
+        assert_eq!(
+            FormDef::get_group_ids(&pool, "main", ".forms/f1.yaml").await.expect("ids"),
+            vec![bio]
+        );
+        assert!(FormDef::get_group_ids(&pool, "dev", ".forms/f2.yaml")
+            .await
+            .expect("ids")
+            .is_empty());
+        assert!(FormDef::get_group_ids(&pool, "main", ".forms/f3.yaml")
+            .await
+            .expect("ids")
+            .is_empty());
+
+        assert_eq!(
+            FormDef::visible_form_pairs(&pool, vec![group(bio)]).await.expect("pairs"),
+            vec![("main".to_string(), ".forms/f1.yaml".to_string())]
+        );
+        assert!(FormDef::visible_form_pairs(&pool, vec![group(chimie)]).await.unwrap().is_empty());
+        assert!(FormDef::visible_form_pairs(&pool, vec![]).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cache_refresh_purges_stale_entries() {
+        let pool = test_pool().await;
+
+        Group::add_group(&pool, "Bio").await.expect("add Bio");
+
+        FormDef::rebuild_cache_from_forms(
+            &pool,
+            vec![form("F1", "main", ".forms/f1.yaml", &["Bio"])],
+        )
+        .await
+        .expect("first rebuild");
+
+        // Un nouveau scan ne trouve plus que F1, sans groupe
+        FormDef::rebuild_cache_from_forms(
+            &pool,
+            vec![form("F1", "main", ".forms/f1.yaml", &[])],
+        )
+        .await
+        .expect("second rebuild");
+
+        let all = FormDef::get_all(&pool).await.expect("get_all");
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].branch, "main");
+        assert_eq!(all[0].file_path, ".forms/f1.yaml");
+
+        // L'ancienne association (F1 -> Bio) ne doit plus exister
+        assert!(FormDef::get_group_ids(&pool, "main", ".forms/f1.yaml")
+            .await
+            .expect("ids")
+            .is_empty());
+
+        let (with_group, without_group) =
+            FormDef::get_form_defs_for_group(&pool, 1).await.expect("for group");
+        assert!(with_group.is_empty());
+        assert_eq!(without_group.len(), 1);
     }
 }

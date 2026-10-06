@@ -98,6 +98,33 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS FormDefs (
+            form_def_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            branch TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            UNIQUE (branch, file_path)
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS FormDefHasGroup (
+            form_def_id INTEGER NOT NULL,
+            group_id INTEGER NOT NULL,
+            PRIMARY KEY (form_def_id, group_id),
+            FOREIGN KEY (form_def_id) REFERENCES FormDefs(form_def_id) ON DELETE CASCADE,
+            FOREIGN KEY (group_id) REFERENCES Groups(group_id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 

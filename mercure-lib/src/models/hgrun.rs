@@ -1,8 +1,8 @@
 use crate::models::Form;
+use crate::models::FormDef;
 use crate::models::Group;
 use crate::models::User;
 
-use crate::config::get_mercure_config;
 use crate::models::ModelError;
 use crate::utils::format_french_date;
 use rocket::form::FromFormField;
@@ -261,33 +261,6 @@ impl Run {
         })
     }
 
-    /// Résout côté Rust les paires (`branch_name`, `form_path`) des formulaires
-    /// accessibles aux groupes donnés.
-    ///
-    /// L'association formulaire <-> groupes n'est pas stockée en base : elle provient
-    /// du champ `groups` des définitions YAML des formulaires. Une jointure SQL est donc
-    /// impossible : les paires sont résolues ici, puis injectées dans la requête en
-    /// tant que bindings (voir `Run::fetch_runs_table`).
-    async fn visible_form_pairs(groups: Vec<Group>) -> Result<Vec<(String, String)>, ModelError> {
-        let group_names: Vec<&str> = groups.iter().map(|g| g.name.as_str()).collect();
-
-        Ok(Form::get_all_form_defs(&get_mercure_config())
-            .await?
-            .into_iter()
-            .filter(|form| {
-                form.groups
-                    .as_ref()
-                    .map(|form_groups| {
-                        form_groups
-                            .iter()
-                            .any(|g| group_names.contains(&g.as_str()))
-                    })
-                    .unwrap_or(false)
-            })
-            .filter_map(|form| Some((form.branch.clone()?, form.file_path.clone()?)))
-            .collect())
-    }
-
     /// Noyau SQL commun à `Run::list_runs` et `Run::search_runs`.
     ///
     /// Construit dynamiquement la clause WHERE à partir :
@@ -295,7 +268,7 @@ impl Run {
     /// 1. de la visibilité : seul un admin (`user = None`) voit tous les runs, un
     ///    utilisateur standard ne voit que les runs des formulaires associés à au moins
     ///    un de ses groupes (les paires `branch_name`/`form_path` étant résolues depuis
-    ///    les définitions YAML, voir `Run::visible_form_pairs`) ;
+    ///    le cache `FormDef`/`FormDefHasGroup`, voir `Run::visible_form_pairs`) ;
     /// 2. des filtres optionnels passés dans `filters`.
     ///
     /// Renvoie le JSON prêt pour le front : `{title, header, table, pagination}`.
@@ -323,7 +296,7 @@ impl Run {
                 None => Group::get_user_groups(pool, u.id).await?,
             };
 
-            let form_pairs = Self::visible_form_pairs(viewer_groups).await?;
+            let form_pairs = FormDef::visible_form_pairs(pool, viewer_groups).await?;
 
             if form_pairs.is_empty() {
                 // L'utilisateur n'a accès à aucun formulaire : liste vide
@@ -436,7 +409,7 @@ impl Run {
     ///
     /// # Errors
     ///
-    /// En cas d'erreur SQL, d'erreur de lecture des définitions de formulaires, ou
+    /// En cas d'erreur SQL, d'erreur de lecture du cache des formulaires (`FormDef`), ou
     /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
     pub async fn list_runs(
         pool: &SqlitePool,
@@ -494,7 +467,7 @@ impl Run {
     ///
     /// # Errors
     ///
-    /// En cas d'erreur SQL, d'erreur de lecture des définitions de formulaires, ou
+    /// En cas d'erreur SQL, d'erreur de lecture du cache des formulaires (`FormDef`), ou
     /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
     #[allow(clippy::too_many_arguments)]
     pub async fn search_runs(

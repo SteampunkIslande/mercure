@@ -154,10 +154,22 @@ Les routes backend utilisent principalement des méthodes POST pour les opérati
 
 ### Gestion des formulaires
 
+Un formulaire est défini de façon source de vérité par sa paire
+(`branch`, `file_path`) dans le dépôt git surveillé. Son existence est mise en
+cache en base (table `FormDefs`), de même que sa visibilité par groupe
+(table `FormDefHasGroup`) : la liste des formulaires visibles par un groupe
+s'obtient alors par une simple requête SQL, sans requête HTTP vers Gitea.
+La définition complète (variables, template,...) n'est relue dans git qu'au
+moment d'afficher/éditer le formulaire lui-même.
+
+Le cache est reconstruit par `POST /mercure/api/forms/cache` (voir ci-dessous) :
+pensez à l'appeler après chaque création/modification de formulaire dans le
+dépôt (idéal depuis un webhook Gitea).
+
 #### `/mercure/api/forms/all` (GET)
 
 - **Méthode**: [`get_all_forms()`](mercure-lib/src/routes/back_end/getform.rs:10)
-- **Description**: Récupère tous les formulaires
+- **Description**: Liste le cache des formulaires (lecture SQL, pas de requête HTTP)
 - **Retour JSON**:
 
 ```json
@@ -165,77 +177,111 @@ Les routes backend utilisent principalement des méthodes POST pour les opérati
   "success": true,
   "data": [
     {
-      "formid": 1,
-      "enabled": true,
-      "form_name": "string",
-      "version": 1
+      "form_def_id": 1,
+      "branch": "main",
+      "file_path": ".forms/smaug-basique.yaml"
     }
   ]
 }
 ```
 
-#### `/mercure/api/forms/groups/<group_id>` (GET)
+#### `/mercure/api/forms/cache` (POST)
+
+- **Méthode**: [`forms_cache_post()`](mercure-lib/src/routes/back_end/forms_cache.rs)
+- **Authentification**: signature HMAC-SHA256 (voir `cache_hmac_secret` ci-dessous)
+- **Description**: Reconstruit entièrement le cache `FormDefs` + `FormDefHasGroup`
+  à partir d'un scan des branches du dépôt git (1 requête HTTP par branche, 1
+  requête HTTP par fichier YAML trouvé). Les formulaires disparus sont retirés
+  du cache, les groupes inconnus (absents de la table `Groups`) sont ignorés
+  avec un avertissement dans les logs.
+- **Signature**: en-tête `X-Mercure-Signature` = hexa(`HMAC-SHA256(cache_hmac_secret, corps_brut)`).
+  Le corps est libre (souvent vide) ; s'il est un objet JSON avec un champ
+  `timestamp` (secondes epoch), la requête est rejetée si son écart avec l'heure
+  du serveur dépasse 300 secondes (protection contre le rejeu).
+- **Exemple**:
+
+```bash
+body='{"timestamp": '$(date +%s)'}'
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$CACHE_HMAC_SECRET" -r | cut -d' ' -f1)
+curl -X POST -H "X-Mercure-Signature: $sig" --data-binary "$body" http://hote:port/mercure/api/forms/cache
+```
+
+- **Retour JSON**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Cache des formulaires mis à jour",
+    "cached_forms": 1,
+    "cached": [
+      {
+        "form_def_id": 1,
+        "branch": "main",
+        "file_path": ".forms/smaug-basique.yaml"
+      }
+    ]
+  }
+}
+```
+
+Configuration (Rocket.toml ou variables d'environnement) :
+
+```toml
+[release]
+cache_hmac_secret = "un-secret-partage-avec-le-webhook"
+```
+
+Le secret est vide par défaut : la route refuse de s'exécuter tant qu'aucun
+secret n'est configuré.
+
+#### `/mercure/api/groups/forms/<group_id>` (GET)
 
 - **Méthode**: [`get_all_forms_for_group()`](mercure-lib/src/routes/back_end/getform.rs:18)
-- **Description**: Récupère les formulaires associés à un groupe
+- **Description**: Récupère les formulaires mis en cache visibles par un groupe
+  (deux requêtes SQL : ceux associés au groupe, et ceux sans groupe — réservés
+  aux admins)
 - **Retour JSON**:
 
 ```json
 {
   "success": true,
   "data": {
-    "with_group": [...],
-    "without_group": [...]
-  }
-}
-```
-
-#### `/mercure/api/forms/<id>` (GET)
-
-- **Méthode**: [`get_form_from_id()`](mercure-lib/src/routes/back_end/getform.rs:32)
-- **Description**: Récupère un formulaire par son ID
-- **Retour JSON**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "pipeline_name": "string",
-    "launcher_name": "string",
-    "form_name": "string",
-    "enabled": true,
-    "version": 1,
-    "groups": [...],
-    "indir_type": "BclDir|AnalysisDir|OntDir",
-    "user_defined_vars": {
-      "variable_name": {
-        "FromValuesList": {
-          "allowed": ["value1", "value2"]
-        }
+    "with_group": [
+      {
+        "form_def_id": 1,
+        "branch": "main",
+        "file_path": ".forms/smaug-basique.yaml"
       }
-    }
+    ],
+    "without_group": []
   }
 }
 ```
 
-#### `/mercure/api/newform` (POST)
+#### `/mercure/api/forms/get?branch&form_path` (GET)
 
-- **Méthode**: [`newform_post()`](mercure-lib/src/routes/back_end/newform.rs:52)
-- **Authentification**: Admin requis
-- **Schéma JSON**: Même structure que le retour de `/mercure/api/forms/<id>`
-- **Description**: Création d'un nouveau formulaire
+- **Méthode**: [`get_form_from_id()`](mercure-lib/src/routes/back_end/getform.rs:33)
+- **Description**: Récupère la définition complète d'un formulaire
+  (`branch`, `file_path` requiérés), relue directement depuis le dépôt git
+  (requête HTTP)
+- **Retour JSON**:
 
-#### `/mercure/api/enable/<formid>` (GET)
-
-- **Méthode**: [`enable_form()`](mercure-lib/src/routes/back_end/newform.rs:32)
-- **Authentification**: Admin requis
-- **Description**: Active un formulaire
-
-#### `/mercure/api/disable/<formid>` (GET)
-
-- **Méthode**: [`disable_form()`](mercure-lib/src/routes/back_end/newform.rs:11)
-- **Authentification**: Admin requis
-- **Description**: Désactive un formulaire
+```json
+{
+  "success": true,
+  "data": {
+    "name": "string",
+    "description": "string",
+    "variables": [...],
+    "workdir": "string",
+    "exec_type": {"Shell": {"exec": "string"}} | {"Script": {"script_name": "string"}},
+    "branch": "string",
+    "file_path": "string",
+    "groups": ["string", ...]
+  }
+}
+```
 
 ### Gestion des runs
 

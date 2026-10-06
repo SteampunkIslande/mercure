@@ -95,6 +95,8 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             routes![
                 // Routes pour le backend: renvoie toujours du JSON
                 routes::backend::register_post,
+                // Route mettant à jour le cache des (branch, form_path), via HMAC
+                routes::backend::gitea_webhook,
                 routes::backend::login_post,
                 routes::backend::newgroup_get,
                 routes::backend::list_groups,
