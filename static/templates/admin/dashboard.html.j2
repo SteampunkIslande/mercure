@@ -1,6 +1,6 @@
 {% extends "base.html.j2" %}
 
-{% block title %}Admin Landing Page{% endblock %}
+{% block title %}Page d'administration{% endblock %}
 
 {% block extra_head %}
     <script src="/mercure/static/scripts/json_table.js"></script>
@@ -20,6 +20,14 @@
             <a href="/mercure/admin/groups/new">Nouveau groupe</a>
         </div>
     </div>
+    <div class="dropdown">
+        <button onclick="onDropDown(`forms_dropdown`)" class="dropbtn"><span
+                class="material-icons icon-align">build</span> Gestion avancée</button>
+        <div id="forms_dropdown" class="dropdown-content">
+            <a href="/mercure/admin/groups">Groupes</a>
+            <a href="/mercure/admin/forms">Formulaires</a>
+        </div>
+    </div>
     <div class="dropdown" style="float:right;">
         <button onclick="navigateTo(`/mercure/home`)" class="dropbtn"><span
                 class="material-icons icon-align">home</span></button>
@@ -36,6 +44,7 @@
     <div id="failure-runs-table"></div>
     <p id="failure-runs-overflow" style="display:none">Plus de 10 runs en échec, <a
             href="/mercure/show/runs?status=Failure">cliquez ici</a> pour les voir</p>
+
 {% endblock %}
 
 {% block extra_js %}

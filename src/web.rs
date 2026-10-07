@@ -87,7 +87,8 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::admin_dashboard_get,
                 routes::frontend::edit_users,
                 routes::frontend::edit_groups_for_user,
-                routes::frontend::new_group
+                routes::frontend::new_group,
+                routes::frontend::forms_settings_get,
             ],
         )
         .mount(
@@ -95,8 +96,10 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             routes![
                 // Routes pour le backend: renvoie toujours du JSON
                 routes::backend::register_post,
-                // Route mettant à jour le cache des (branch, form_path), via HMAC
-                routes::backend::gitea_webhook,
+                // Route mettant à jour le cache des formulaires à partir d'un webhook
+                routes::backend::gitea_webhook_update_form_cache,
+                // Route mettant à jour le cache des formulaires à partir d'un simple get authentifié
+                routes::backend::update_cache_get,
                 routes::backend::login_post,
                 routes::backend::newgroup_get,
                 routes::backend::list_groups,

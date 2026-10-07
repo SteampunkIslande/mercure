@@ -11,7 +11,7 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::models::Group;
-use crate::models::{FormDef, Run, RunStatus};
+use crate::models::{CachedForm, Run, RunStatus};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(
@@ -27,7 +27,7 @@ pub async fn edit_run_get(
             true
         } else {
             let form_groups: HashSet<i64> =
-                FormDef::get_group_ids(pool, &run.branch_name, &run.form_path)
+                CachedForm::get_group_ids(pool, &run.branch_name, &run.form_path)
                     .await?
                     .into_iter()
                     .collect();

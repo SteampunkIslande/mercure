@@ -1,14 +1,17 @@
 use hmac::{Hmac, Mac};
+use log::error;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
-use rocket::{State, post};
+use rocket::{State, get, post};
 use sha2::Sha256;
+use sqlx::SqlitePool;
 
+use crate::auth::Authenticated;
 use crate::config::MercureConfig;
+use crate::models::form;
 
 type HmacSha256 = Hmac<Sha256>;
 
-// 1. Create a Request Guard to cleanly extract the Gitea signature header
 pub struct GiteaSignature<'r>(&'r str);
 
 #[rocket::async_trait]
@@ -23,34 +26,73 @@ impl<'r> FromRequest<'r> for GiteaSignature<'r> {
     }
 }
 
-// 2. The route takes both the signature header and the raw body bytes
-#[post("/gitea-webhook", data = "<body>")]
-pub fn gitea_webhook(
+/// Helper to update cache and return correct HTTP status
+///
+/// # Arguments
+///
+/// - `pool` (`&State<SqlitePool>`) - sqlite database connection
+/// - `config` (`&State<MercureConfig>`) - configuration
+///
+/// # Returns
+///
+/// - `(Status, String)` - A tuple of HTTP Status with a custom message
+async fn update_cache(pool: &State<SqlitePool>, config: &State<MercureConfig>) -> (Status, String) {
+    match form::CachedForm::refresh_cache(pool, config).await {
+        Ok(v) => (
+            Status::Ok,
+            format!(
+                "Le cache a été mis à jour avec succès ({} formulaires)",
+                v.len()
+            ),
+        ),
+        Err(e) => {
+            error!("{e}");
+            (Status::InternalServerError, e.to_string())
+        }
+    }
+}
+
+#[get("/update/cache/forms")]
+pub async fn update_cache_get(
+    _auth: Authenticated,
+    pool: &State<SqlitePool>,
+    config: &State<MercureConfig>,
+) -> (Status, String) {
+    update_cache(pool, config).await
+}
+
+#[post("/update/cache/forms/gitea", data = "<body>")]
+pub async fn gitea_webhook_update_form_cache(
     signature: GiteaSignature<'_>,
     config: &State<MercureConfig>,
+    pool: &State<SqlitePool>,
     body: Vec<u8>,
-) -> Status {
+) -> (Status, String) {
     let webhook_secret: &str = config.webhook_secret.as_str();
 
     // Decode the incoming hex signature into raw bytes
     let Ok(sig_bytes) = hex::decode(signature.0) else {
-        println!("Invalid hex formatting in signature header.");
-        return Status::BadRequest;
+        return (
+            Status::BadRequest,
+            "Invalid hex formatting in signature header.".into(),
+        );
     };
 
     // Initialize the HMAC hasher with your secret
-    let mut mac = HmacSha256::new_from_slice(webhook_secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let Ok(mut mac) = HmacSha256::new_from_slice(webhook_secret.as_bytes()) else {
+        return (
+            Status::InternalServerError,
+            "Cannot create HMAC hasher from secret".into(),
+        );
+    };
 
     // Hash the raw request body
     mac.update(&body);
 
     // Verify the signature using constant-time equality
     if mac.verify_slice(&sig_bytes).is_ok() {
-        println!("Secure push registered! Verified webhook from Gitea.");
-        Status::Ok
+        update_cache(pool, config).await
     } else {
-        println!("Unauthorized webhook attempt: Signatures did not match.");
-        Status::Unauthorized
+        (Status::Unauthorized, "Nope, Unauthorized".into())
     }
 }

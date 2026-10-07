@@ -1,5 +1,5 @@
+use crate::models::CachedForm;
 use crate::models::Form;
-use crate::models::FormDef;
 use crate::models::Group;
 use crate::models::User;
 
@@ -296,7 +296,7 @@ impl Run {
                 None => Group::get_user_groups(pool, u.id).await?,
             };
 
-            let form_pairs = FormDef::visible_form_pairs(pool, viewer_groups).await?;
+            let form_pairs = CachedForm::visible_form_pairs(pool, viewer_groups).await?;
 
             if form_pairs.is_empty() {
                 // L'utilisateur n'a accès à aucun formulaire : liste vide

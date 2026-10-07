@@ -34,9 +34,9 @@
         {% for group in user_groups %}
 
         <button id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active {% endif %}"
-            onclick="openTab(event,{{ group.id }})">{{ group.name
-            }}</button>
+            onclick="openTab(event,{{ group.id }})">{{ group.name}}</button>
         {% endfor %}
+        <button id="tab-None" class="tablinks" onclick="openTab(event,`None`)">Formulaires sans groupe</button>
     </div>
 
     <div style="border: 1px solid #ccc; border-top: none; padding: 10px;">
@@ -56,6 +56,14 @@
         </tr>
     </table>
     {% endfor %}
+    {% if user.is_admin %}
+    <table id="forms-container-None" class="tabcontent" style="overflow-y:auto;height:400px;">
+        <tr>
+            <th class="content-column">Nom du formulaire</th>
+            <th class="numeric-column padding-x centered">Lancement d'un run</th>
+        </tr>
+    </table>
+    {% endif %}
 
 </div>
 <p id="no-user-group" style="display:none;">
@@ -110,8 +118,8 @@
 
     async function loadGroupForms() {
         if (userGroups.length > 0) {
-            for (let group of userGroups) {
-                try {
+            try {
+                for (let group of userGroups) {
                     const response = await fetch(`/mercure/api/groups/forms/${group.id}`);
                     const result = await response.json();
                     if (!isApiSuccess(result)) {
@@ -127,21 +135,50 @@
                     forms.with_group.forEach(form => {
                         const formBox = document.createElement('tr');
                         const submitUrl = `/mercure/runs/submit?branch=${encodeURIComponent(form.branch || '')}&form_path=${encodeURIComponent(form.file_path || '')}`;
-                        const branchLabel = form.branch ? ` <small>(${form.branch})</small>` : '';
                         // Les définitions mises en cache ne contiennent que (branch, file_path) :
                         // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
-                        const formLabel = form.name || form.file_path;
+                        const formLabel = form.name;
                         formBox.innerHTML = `
-                           <td class="content-column">${formLabel}${branchLabel}</td>
+                           <td class="content-column">${form.name}<br>${form.description}</td>
                            <td class="numeric-column">
                                <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
                            </td>
                         `;
                         container.appendChild(formBox);
                     });
-                } catch (error) {
-                    showMessage("error", `Error fetching forms ${error}`);
                 }
+                {% if user.is_admin %}
+                // None is a hack: rocket tries to parse an i64, and fails, thus passing None to the function
+                // Actually, any value would do ^^
+                const response = await fetch(`/mercure/api/groups/forms/None`);
+                const result = await response.json();
+                if (!isApiSuccess(result)) {
+                    throw new Error(getApiMessage(result) || "Erreur inconnue");
+                }
+                const forms = getApiData(result);
+                let table = document.getElementById(`forms-container-None`);
+                let container = table.querySelector('tbody');
+                if (!container) {
+                    console.log("No tbody found, appending to table directly");
+                    container = table;
+                }
+                forms.without_group.forEach(form => {
+                    const formBox = document.createElement('tr');
+                    const submitUrl = `/mercure/runs/submit?branch=${encodeURIComponent(form.branch || '')}&form_path=${encodeURIComponent(form.file_path || '')}`;
+                    // Les définitions mises en cache ne contiennent que (branch, file_path) :
+                    // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
+                    const formLabel = form.name;
+                    formBox.innerHTML = `
+                           <td class="content-column">${form.name}<br>${form.description}</td>
+                           <td class="numeric-column">
+                               <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
+                           </td>
+                        `;
+                    container.appendChild(formBox);
+                });
+                {% endif %}
+            } catch (error) {
+                showMessage("error", `Error fetching forms ${error}`);
             }
         }
         else {

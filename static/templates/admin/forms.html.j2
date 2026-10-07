@@ -1,0 +1,43 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Gestion des formulaires{% endblock %}
+
+{% block extra_head %}
+{#
+<script src="/mercure/static/scripts/json_table.js"></script>
+#}
+{% endblock %}
+
+{% block banner_text %}Gestion des formulaires{% endblock %}
+
+{% block content %}
+
+<ul>
+    <li>
+        <a href="javascript:void(0);" onclick="update_form_cache()">Mettre à jour le cache</a>
+    </li>
+</ul>
+
+<a href="/mercure/admin/dashboard" class="btn btn-primary">Retour au tableau de bord</a>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    async function update_form_cache() {
+        try {
+            const response = await fetch("/mercure/api/update/cache/forms");
+            if (response.status !== 200) {
+                let text = await response.text();
+                showMessage("error", `Erreur: ${text}`);
+            }
+            else {
+                showMessage("success", "Cache mis à jour avec succès !");
+            }
+        }
+        catch (error) {
+            showMessage('error', error);
+        }
+    }
+</script>
+{% endblock extra_js %}

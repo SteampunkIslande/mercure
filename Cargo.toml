@@ -5,6 +5,10 @@ edition = "2024"
 
 default-run = "mercure"
 
+[workspace]
+members = ["mercure-lib"]
+
+
 [dependencies]
 mercure-lib = { path = "./mercure-lib" }
 rocket = { version = "0.5", features = ["secrets", "json"] }
@@ -25,6 +29,7 @@ anyhow = "1.0.104"
 nix = { version = "0.31.3", features = ["signal"] }
 rocket-include-dir = "1.1.2"
 include_dir = "0.7.4"
+
 
 [dev-dependencies]
 rocket = { version = "0.5", features = ["secrets", "json"] }

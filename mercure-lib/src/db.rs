@@ -104,6 +104,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             form_def_id INTEGER PRIMARY KEY AUTOINCREMENT,
             branch TEXT NOT NULL,
             file_path TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
             UNIQUE (branch, file_path)
         )
         "#,
