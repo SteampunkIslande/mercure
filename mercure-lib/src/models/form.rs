@@ -808,18 +808,22 @@ mod form_def_cache_tests {
             ]
         );
 
-        let (with_group, without_group) = CachedForm::get_form_defs_for_group(&pool, bio)
+        let forms_with_group = CachedForm::get_form_defs_for_group(&pool, Some(bio))
             .await
             .expect("for group");
-        assert_eq!(with_group.len(), 1);
+        assert_eq!(forms_with_group.len(), 1);
         assert_eq!(
             (
-                with_group[0].branch.as_str(),
-                with_group[0].file_path.as_str()
+                forms_with_group[0].branch.as_str(),
+                forms_with_group[0].file_path.as_str()
             ),
             ("main", ".forms/f1.yaml")
         );
-        assert_eq!(without_group.len(), 2);
+
+        let forms_without_group = CachedForm::get_form_defs_for_group(&pool, None)
+            .await
+            .expect("for no group");
+        assert_eq!(forms_without_group.len(), 2);
 
         assert_eq!(
             CachedForm::get_group_ids(&pool, "main", ".forms/f1.yaml")
@@ -894,10 +898,13 @@ mod form_def_cache_tests {
                 .is_empty()
         );
 
-        let (with_group, without_group) = CachedForm::get_form_defs_for_group(&pool, 1)
+        let forms_with_group = CachedForm::get_form_defs_for_group(&pool, Some(1))
             .await
             .expect("for group");
-        assert!(with_group.is_empty());
-        assert_eq!(without_group.len(), 1);
+        let forms_without_group = CachedForm::get_form_defs_for_group(&pool, None)
+            .await
+            .expect("for no group");
+        assert!(forms_with_group.is_empty());
+        assert_eq!(forms_without_group.len(), 1);
     }
 }
