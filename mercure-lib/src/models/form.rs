@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use log::warn;
 use minijinja::Environment;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -173,7 +174,13 @@ impl Form {
                         // parse yaml
                         let mut form: Form = match yaml_serde::from_str(&content) {
                             Ok(f) => f,
-                            Err(_) => continue,
+                            Err(e) => {
+                                warn!(
+                                    "Impossible de sérialiser {} sur la branche {}: {}",
+                                    dir_item.path, branch_name, e
+                                );
+                                continue;
+                            }
                         };
 
                         form.branch = Some(branch_name.clone());
