@@ -251,6 +251,7 @@ impl Form {
 /// par `FormDef::refresh_cache`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CachedForm {
+    /// L'ID d'un formulaire. **Ne pas** l'utiliser pour identifier un formulaire en tant que tel.
     pub form_def_id: i64,
     pub branch: String,
     pub file_path: String,
@@ -301,6 +302,9 @@ impl CachedForm {
             .execute(&mut *tx)
             .await?;
         sqlx::query("DELETE FROM FormDefs")
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE from sqlite_sequence where name='FormDefs'")
             .execute(&mut *tx)
             .await?;
 
