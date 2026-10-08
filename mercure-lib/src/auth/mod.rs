@@ -1,5 +1,4 @@
 mod auth_guard;
-mod noquery_guard;
 
 use std::io::Cursor;
 
@@ -8,7 +7,6 @@ use super::routes::ApiResponse;
 use crate::models;
 
 pub use auth_guard::*;
-pub use noquery_guard::*;
 
 use rocket::http::Status;
 use rocket::request::Request;
