@@ -141,7 +141,7 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
     Ok((samples, cleaned))
 }
 
-pub fn format_french_date(date: &OffsetDateTime) -> String {
+pub fn format_french_date(date: &OffsetDateTime, with_time: bool) -> String {
     // Extraire juste la partie date si c'est un datetime
 
     let weekday = match date.weekday() {
@@ -168,7 +168,19 @@ pub fn format_french_date(date: &OffsetDateTime) -> String {
         Month::December => "déc.",
     };
 
-    format!("{} {} {} {}", weekday, date.day(), month_name, date.year())
+    if with_time {
+        format!(
+            "{} {} {} {} ({}h{})",
+            weekday,
+            date.day(),
+            month_name,
+            date.year(),
+            date.hour(),
+            date.minute()
+        )
+    } else {
+        format!("{} {} {} {}", weekday, date.day(), month_name, date.year())
+    }
 }
 
 /// Convertit le nom d'un fichier local en un nom servi par la route statique

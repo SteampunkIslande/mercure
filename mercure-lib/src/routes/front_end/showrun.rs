@@ -14,6 +14,7 @@ use crate::models::Attempt;
 use crate::models::Run;
 use crate::models::RunStatus;
 use crate::models::{CachedForm, Group};
+use crate::utils;
 
 #[get("/show/run/<run_id>?<attempt_number>")]
 pub async fn show_run_get(
@@ -68,6 +69,12 @@ pub async fn show_run_get(
             .await
             .unwrap_or_default();
 
+        let run_creation_date = if let Some(ref run_creation_date) = run.creation_date {
+            utils::format_french_date(run_creation_date, true)
+        } else {
+            "".to_string()
+        };
+
         // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let attempt = Attempt::get_hypothetic_attempt(&run)?;
@@ -77,6 +84,7 @@ pub async fn show_run_get(
                 context! {
                     run=> &run,
                     form=> &run.get_form().await?,
+                    run_creation_date,
                     attempt=> &attempt,
                     history=> history,
                     user=> auth.user,
@@ -94,6 +102,8 @@ pub async fn show_run_get(
                     attempt_number, run_id
                 ))?;
 
+            let attempt_date = utils::format_french_date(&attempt.attempt_date, true);
+
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {
                 RunStatus::Pending => Ok(Template::render(
@@ -101,6 +111,8 @@ pub async fn show_run_get(
                     context! {
                         run=> &run,
                         form=> &run.get_form().await?,
+                        run_creation_date,
+                        attempt_date,
                         attempt=> &attempt,
                         history=> &history,
                         user=> auth.user,
@@ -111,6 +123,8 @@ pub async fn show_run_get(
                     context! {
                         run=> &run,
                         form=> &run.get_form().await?,
+                        run_creation_date,
+                        attempt_date,
                         attempt=> &attempt,
                         history=> &history,
                         user=> auth.user,

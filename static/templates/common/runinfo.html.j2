@@ -14,13 +14,13 @@
             <span>{{ form.name }}</span>
         </div>
         <div>
-            <label><strong>Créé le:</strong></label>
-            <span>{{ run.creation_date }}</span>
+            <label><strong>Run créé le:</strong></label>
+            <span>{{ run_creation_date }}</span>
         </div>
-        {% if attempt.commit_hash %}
+        {% if run.status != "Idle" %}
         <div>
-            <label><strong>Commit:</strong></label>
-            <span><code>{{ attempt.commit_hash }}</code></span>
+            <label><strong>Tentative démarrée le:</strong></label>
+            <span>{{ attempt_date }}</span>
         </div>
         {% endif %}
         {% if attempt.comment %}

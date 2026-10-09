@@ -192,6 +192,7 @@ impl Run {
             &self
                 .creation_date
                 .unwrap_or(OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc())),
+            false,
         );
         Some(json!([
             // Colonne 1 - Nom du run
