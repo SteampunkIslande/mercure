@@ -5,6 +5,7 @@ use anyhow::Context;
 use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
+use time::UtcOffset;
 
 use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
@@ -69,8 +70,10 @@ pub async fn show_run_get(
             .await
             .unwrap_or_default();
 
+        let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
+
         let run_creation_date = if let Some(ref run_creation_date) = run.creation_date {
-            utils::format_french_date(run_creation_date, true)
+            utils::format_french_date(&run_creation_date.to_offset(local_offset), true)
         } else {
             "".to_string()
         };
@@ -102,7 +105,7 @@ pub async fn show_run_get(
                     attempt_number, run_id
                 ))?;
 
-            let attempt_date = utils::format_french_date(&attempt.attempt_date, true);
+            let attempt_date = utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
 
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {

@@ -17,7 +17,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
-use time::OffsetDateTime;
+use time::{OffsetDateTime, UtcOffset};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RunDefinitionError {
@@ -188,12 +188,12 @@ impl Run {
     ///
     /// La sortie doit correspondre colonne par colonne à `Run::runs_table_header`.
     fn to_json(&self, user_name: &str) -> Option<Value> {
-        let creation_date_str = format_french_date(
-            &self
-                .creation_date
-                .unwrap_or(OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc())),
-            false,
-        );
+        let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
+        let creation_date = self
+            .creation_date
+            .unwrap_or(OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc()))
+            .to_offset(local_offset);
+        let creation_date_str = format_french_date(&creation_date, false);
         Some(json!([
             // Colonne 1 - Nom du run
             json!({
