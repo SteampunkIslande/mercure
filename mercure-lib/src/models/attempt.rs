@@ -43,7 +43,7 @@ impl Attempt {
     ) -> Result<(), ModelError> {
         let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
-        let attempt_date = OffsetDateTime::now_utc().to_string();
+        let attempt_date = OffsetDateTime::now_utc();
         let user_defined_vars = serde_json::to_string(&run.user_defined_vars)?;
 
         sqlx::query(

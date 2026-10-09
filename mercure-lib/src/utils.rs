@@ -1,10 +1,12 @@
-use std::collections::HashMap;
-
-use lazy_regex::{Lazy, Regex, lazy_regex};
-
 use anyhow::Result;
-use chrono::{Datelike, NaiveDate};
 use diacritics::remove_diacritics;
+
+use time::format_description::StaticFormatDescription;
+use time::macros::format_description;
+use time::{Month, OffsetDateTime, Weekday};
+
+pub static NICE_DATETIME_FORMAT: StaticFormatDescription =
+    format_description!("[weekday repr:short] [day padding:none] [month repr:short] [year]");
 
 /// Fonction utilitaire pour nettoyer une chaîne de caractères
 fn clean_string(input: &str) -> String {
@@ -139,57 +141,34 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
     Ok((samples, cleaned))
 }
 
-pub fn format_french_date(date_str: &str) -> String {
+pub fn format_french_date(date: &OffsetDateTime) -> String {
     // Extraire juste la partie date si c'est un datetime
-    let date_part = date_str.split('T').next().unwrap_or(date_str);
 
-    if let Ok(date) = NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
-        let weekday = match date.weekday() {
-            chrono::Weekday::Mon => "lun.",
-            chrono::Weekday::Tue => "mar.",
-            chrono::Weekday::Wed => "mer.",
-            chrono::Weekday::Thu => "jeu.",
-            chrono::Weekday::Fri => "ven.",
-            chrono::Weekday::Sat => "sam.",
-            chrono::Weekday::Sun => "dim.",
-        };
-        let month_name = match date.month() {
-            1 => "janv.",
-            2 => "fév.",
-            3 => "mars",
-            4 => "avr.",
-            5 => "mai",
-            6 => "juin",
-            7 => "juill.",
-            8 => "août",
-            9 => "sept.",
-            10 => "oct.",
-            11 => "nov.",
-            12 => "déc.",
-            _ => "creepy",
-        };
+    let weekday = match date.weekday() {
+        Weekday::Monday => "lun.",
+        Weekday::Tuesday => "mar.",
+        Weekday::Wednesday => "mer.",
+        Weekday::Thursday => "jeu.",
+        Weekday::Friday => "ven.",
+        Weekday::Saturday => "sam.",
+        Weekday::Sunday => "dim.",
+    };
+    let month_name = match date.month() {
+        Month::January => "janv.",
+        Month::February => "fév.",
+        Month::March => "mars",
+        Month::April => "avr.",
+        Month::May => "mai",
+        Month::June => "juin",
+        Month::July => "juill.",
+        Month::August => "août",
+        Month::September => "sept.",
+        Month::October => "oct.",
+        Month::November => "nov.",
+        Month::December => "déc.",
+    };
 
-        format!("{} {} {} {}", weekday, date.day(), month_name, date.year())
-    } else {
-        // Fallback si le parsing échoue
-        date_str.to_string()
-    }
-}
-
-static VAR_REGEX: Lazy<Regex> = lazy_regex!(r"(?m)^##\s*(\S+)\s+(.+)$");
-
-pub fn parse_launcher(launcher_content: &str) -> HashMap<String, String> {
-    // In the launcher content, look for lines starting with ## VAR_NAME description
-    let mut vars: HashMap<String, String> = HashMap::new();
-
-    for cap in VAR_REGEX.captures_iter(launcher_content) {
-        if let (Some(var), Some(desc)) = (cap.get(1), cap.get(2)) {
-            let var_name = var.as_str().to_string();
-            vars.insert(var_name, desc.as_str().to_string());
-        }
-    }
-
-    vars
+    format!("{} {} {} {}", weekday, date.day(), month_name, date.year())
 }
 
 /// Convertit le nom d'un fichier local en un nom servi par la route statique
@@ -206,25 +185,4 @@ pub fn filename_to_static_served_name(
     path.strip_prefix(base_path)
         .ok()
         .map(|rel_path| format!("{}/{}", prefix, rel_path.to_string_lossy()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_launcher() {
-        let launcher_content = r#"
-## VAR1 Description of var1
-## VAR2 Description of var2
-Some other content
-## VAR3 Description of var3
-        "#;
-
-        let vars = parse_launcher(launcher_content);
-        assert_eq!(vars.get("VAR1"), Some(&"Description of var1".to_string()));
-        assert_eq!(vars.get("VAR2"), Some(&"Description of var2".to_string()));
-        assert_eq!(vars.get("VAR3"), Some(&"Description of var3".to_string()));
-        assert_eq!(vars.len(), 3);
-    }
 }

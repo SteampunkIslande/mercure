@@ -97,7 +97,7 @@ impl FromStr for RunStatus {
 /// Created by users.
 /// On any user's home page, there is a list of runs submitted by the user
 /// There is also a button that the user can press to get to route '/newrun/groupname'
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct Run {
     /// Auto-incremented Run ID (database defined).
     pub run_id: Option<i64>,
@@ -109,7 +109,7 @@ pub struct Run {
     pub run_name: String,
 
     /// Date of creation of this run in the database. Not modifiable with new attempts.
-    pub creation_date: String,
+    pub creation_date: Option<OffsetDateTime>,
 
     /// Current status of the run. Reflects the status of the latest attempt.
     pub status: RunStatus,
@@ -131,7 +131,7 @@ impl Run {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
     pub async fn new_run(mut run_submission: Run, pool: &SqlitePool) -> Result<i64, ModelError> {
         // Date de création (peu importe ce que l'utilisateur avait soumis)
-        run_submission.creation_date = OffsetDateTime::now_utc().to_string();
+        run_submission.creation_date = Some(OffsetDateTime::now_utc());
 
         // Insérer dans la table Runs
         let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)?;
@@ -188,6 +188,11 @@ impl Run {
     ///
     /// La sortie doit correspondre colonne par colonne à `Run::runs_table_header`.
     fn to_json(&self, user_name: &str) -> Option<Value> {
+        let creation_date_str = format_french_date(
+            &self
+                .creation_date
+                .unwrap_or(OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc())),
+        );
         Some(json!([
             // Colonne 1 - Nom du run
             json!({
@@ -202,7 +207,7 @@ impl Run {
             }),
             // Colonne 3 - Date du run
             json!({
-                "content": format_french_date(&self.creation_date),
+                "content": creation_date_str,
                 "td_class": "content-column"
             }),
             // Colonne 4 - Statut
@@ -525,8 +530,8 @@ impl Run {
         .fetch_one(pool)
         .await?;
 
-        let run_name: String = row.try_get("run_name")?;
-        let creation_date: String = row.try_get("creation_date")?;
+        let run_name = row.try_get("run_name")?;
+        let creation_date = row.try_get("creation_date")?;
 
         let user_id: i64 = row.try_get("user_id")?;
         // Récupérer l'utilisateur, juste pour s'assurer que le user_id est valide

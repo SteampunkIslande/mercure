@@ -14,14 +14,6 @@
             <span>{{ form.name }}</span>
         </div>
         <div>
-            <label><strong>Branche:</strong></label>
-            <span>{{ run.branch_name }}</span>
-        </div>
-        <div>
-            <label><strong>Fichier:</strong></label>
-            <span>{{ run.form_path }}</span>
-        </div>
-        <div>
             <label><strong>Créé le:</strong></label>
             <span>{{ run.creation_date }}</span>
         </div>
@@ -58,7 +50,8 @@
     {% for var in form.variables %}
     <div class="form-variable">
         <label><strong>{{ var.title }}:</strong></label>
-        <span>{% if attempt.user_defined_vars[var.name] %}{{ attempt.user_defined_vars[var.name] }}{% else %}—{% endif %}</span>
+        <span>{% if attempt.user_defined_vars[var.name] %}{{ attempt.user_defined_vars[var.name] }}{% else %}—{% endif
+            %}</span>
         {% if var.description %}
         <small class="var-description">{{ var.description }}</small>
         {% endif %}

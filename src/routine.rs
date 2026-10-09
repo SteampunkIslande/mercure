@@ -10,7 +10,6 @@ use sqlx::SqlitePool;
 
 use thiserror::Error;
 
-use chrono::ParseError;
 use mercure_lib::models::AnalysisStateMachineError;
 use regex::Error as RegexError;
 use sqlx::Error;
@@ -29,8 +28,6 @@ enum RoutineError {
     Sqlx(#[from] Error),
     #[error(transparent)]
     AnalysisStateMachine(#[from] AnalysisStateMachineError),
-    #[error(transparent)]
-    DateParse(#[from] ParseError),
     #[error(transparent)]
     Model(#[from] ModelError),
     #[error(transparent)]

@@ -1,5 +1,4 @@
 use anyhow::{Result, bail};
-use chrono::Local;
 use env_logger::Builder;
 use mercure::config::get_mercure_config;
 use std::io::Write;
@@ -9,6 +8,7 @@ mod routine;
 mod web;
 use clap::{Parser, Subcommand};
 use mercure::db;
+use time;
 
 use crate::admin::Admin;
 use crate::web::Web;
@@ -17,7 +17,7 @@ use crate::web::Web;
 fn init_logger() {
     Builder::new()
         .format(|buf, record| {
-            let now = Local::now().format("%Y-%m-%d %H:%M:%S");
+            let now = time::OffsetDateTime::now_local().unwrap_or(time::OffsetDateTime::now_utc());
             writeln!(buf, "[{} {}] {}", record.level(), now, record.args())
         })
         .filter_level(log::LevelFilter::Info)

@@ -134,7 +134,7 @@
                     }
                     forms.with_group.forEach(form => {
                         const formBox = document.createElement('tr');
-                        const submitUrl = `/mercure/runs/submit?branch=${encodeURIComponent(form.branch || '')}&form_path=${encodeURIComponent(form.file_path || '')}`;
+                        const submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(form.branch)}/${encodeURIComponent(form.file_path)}`;
                         // Les définitions mises en cache ne contiennent que (branch, file_path) :
                         // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
                         const formLabel = form.name;
@@ -164,7 +164,7 @@
                 }
                 forms.without_group.forEach(form => {
                     const formBox = document.createElement('tr');
-                    const submitUrl = `/mercure/runs/submit?branch=${encodeURIComponent(form.branch || '')}&form_path=${encodeURIComponent(form.file_path || '')}`;
+                    const submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(form.branch)}/${encodeURIComponent(form.file_path)}`;
                     // Les définitions mises en cache ne contiennent que (branch, file_path) :
                     // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
                     const formLabel = form.name;

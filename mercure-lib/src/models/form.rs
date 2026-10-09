@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use log::warn;
 use minijinja::Environment;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 
@@ -218,7 +218,7 @@ impl Form {
                 let mut form: Form = yaml_serde::from_str(&content)?;
                 form.branch = Some(branch.to_string());
                 form.file_path = Some(form_path.to_string());
-                form.check_validity(&json!({})).await?;
+                form.check_validity().await?;
                 Ok(form)
             }
             GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
@@ -228,11 +228,14 @@ impl Form {
         }
     }
 
-    pub async fn check_validity(
-        &self,
-        context: &impl Serialize,
-    ) -> Result<(), FormDefinitionError> {
-        self.try_render_template(context)?;
+    pub async fn check_validity(&self) -> Result<(), FormDefinitionError> {
+        self.try_render_template(
+            &self
+                .variables
+                .iter()
+                .map(|v| (v.name.as_str(), "")) // For each user-provided variable, replace with empty string to get
+                .collect::<HashMap<&str, &str>>(),
+        )?;
         Ok(())
     }
 

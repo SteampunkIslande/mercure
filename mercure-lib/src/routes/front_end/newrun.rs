@@ -6,11 +6,11 @@ use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
 
-#[get("/runs/submit?<branch>&<form_path>")]
+#[get("/runs/submit/branch/<branch>/<form_path>")]
 pub async fn new_run_get(
     auth: Authenticated,
-    form_path: &str,
     branch: &str,
+    form_path: &str,
     _pool: &State<SqlitePool>,
 ) -> Result<Template, FrontendError> {
     let form = Form::get_form(branch, form_path).await?;
