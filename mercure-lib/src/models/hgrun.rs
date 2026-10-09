@@ -5,6 +5,7 @@ use crate::models::User;
 
 use crate::models::ModelError;
 use crate::utils::format_french_date;
+use anyhow::Context;
 use rocket::form::FromFormField;
 use rocket::form::ValueField;
 use serde::{Deserialize, Serialize};
@@ -18,12 +19,20 @@ use std::fmt::Display;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum RunDefinitionError {
     #[error("Le run est dans un statut invalide")]
     InvalidRunStatusError,
+    #[error("Le run ne peut pas être édité, seul un run 'A valider' peut l'être")]
+    UneditableRun,
     #[error("RunID manquant!")]
     MissingRunID,
+    #[error(transparent)]
+    SqlxError(#[from] sqlx::Error),
+    #[error(transparent)]
+    SerdeJsonError(#[from] serde_json::Error),
+    #[error(transparent)]
+    AnyHowError(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
@@ -71,7 +80,7 @@ impl Display for RunStatus {
 }
 
 impl FromStr for RunStatus {
-    type Err = ModelError;
+    type Err = RunDefinitionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -154,14 +163,12 @@ impl Run {
         run_id: i64,
         user_defined_vars: HashMap<String, String>,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), RunDefinitionError> {
         let user_defined_vars = serde_json::to_string(&user_defined_vars)?;
 
         let run: Run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
-            return Err(ModelError::FormError(
-                "Impossible d'éditer un run validé, en cours d'analyse, ou terminé".to_string(),
-            ));
+            return Err(RunDefinitionError::UneditableRun);
         }
 
         sqlx::query(
@@ -505,7 +512,10 @@ impl Run {
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
-    pub async fn get_run_from_id(run_id: i64, pool: &SqlitePool) -> Result<Self, ModelError> {
+    pub async fn get_run_from_id(
+        run_id: i64,
+        pool: &SqlitePool,
+    ) -> Result<Self, RunDefinitionError> {
         let row = sqlx::query(
             r#"
             SELECT * FROM Runs WHERE run_id = ?
@@ -529,7 +539,7 @@ impl Run {
         .bind(user_id)
         .fetch_optional(pool)
         .await?
-        .ok_or(ModelError::FormError("Utilisateur non trouvé".to_string()))?;
+        .context("Utilisateur non trouvé!")?;
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars: HashMap<String, String> =

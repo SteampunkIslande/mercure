@@ -1,5 +1,5 @@
 use crate::{
-    models::{Attempt, Run, RunStatus},
+    models::{Attempt, Run, RunDefinitionError, RunStatus},
     pipeline_exec::{GitCheckError, versionning},
 };
 
@@ -13,6 +13,8 @@ pub enum AnalysisStateMachineError {
     InvalidTransition { from: String, to: String },
     #[error(transparent)]
     ModelError(#[from] ModelError),
+    #[error(transparent)]
+    RunDefinitionError(#[from] RunDefinitionError),
     #[error("{0}")]
     InvalidOperation(String),
     #[error(transparent)]

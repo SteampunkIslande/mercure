@@ -14,12 +14,10 @@ pub use groups::*;
 pub use hgrun::*;
 pub use user::*;
 
-use crate::{models, pipeline_exec::versionning};
+use crate::pipeline_exec::versionning;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ModelError {
-    #[error("Form error: {0}")]
-    FormError(String),
     #[error("Form serde error from/to json: {0}")]
     SerdeJsonError(#[from] serde_json::Error),
     #[error("Form serde error from/to yaml: {0}")]
@@ -33,9 +31,11 @@ pub enum ModelError {
     #[error(transparent)]
     IOError(#[from] std::io::Error),
     #[error(transparent)]
-    AttemptError(#[from] models::AttemptError),
+    AttemptError(#[from] attempt::AttemptError),
     #[error(transparent)]
     BcryptError(#[from] bcrypt::BcryptError),
+    #[error(transparent)]
+    FormError(#[from] form::FormDefinitionError),
 }
 
 impl From<Infallible> for ModelError {

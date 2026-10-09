@@ -4,6 +4,7 @@ use anyhow::Context;
 use log::warn;
 use minijinja::Environment;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 
@@ -21,6 +22,8 @@ pub enum FormDefinitionError {
     IOError(#[from] std::io::Error),
     #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
     DuplicateVarError(String),
+    #[error("Erreur de formulaire: {0}")]
+    InvalidData(String),
     #[error(transparent)]
     MinijinjaError(#[from] minijinja::Error),
     #[error(transparent)]
@@ -215,6 +218,7 @@ impl Form {
                 let mut form: Form = yaml_serde::from_str(&content)?;
                 form.branch = Some(branch.to_string());
                 form.file_path = Some(form_path.to_string());
+                form.check_validity(&json!({})).await?;
                 Ok(form)
             }
             GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(

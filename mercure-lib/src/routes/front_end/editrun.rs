@@ -6,6 +6,7 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
+use crate::models::ModelError;
 use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
 
@@ -19,7 +20,9 @@ pub async fn edit_run_get(
     pool: &State<SqlitePool>,
     run_id: i64,
 ) -> Result<Template, FrontendError> {
-    let run: Run = Run::get_run_from_id(run_id, pool).await?;
+    let run: Run = Run::get_run_from_id(run_id, pool)
+        .await
+        .map_err(ModelError::from)?;
     let form = run.get_form().await?;
     let variables: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
     let can_see_run = {
