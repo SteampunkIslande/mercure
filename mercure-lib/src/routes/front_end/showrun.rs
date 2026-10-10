@@ -12,9 +12,9 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::models::Attempt;
+use crate::models::Group;
 use crate::models::Run;
 use crate::models::RunStatus;
-use crate::models::{CachedForm, Group};
 use crate::utils;
 
 #[get("/show/run/<run_id>?<attempt_number>")]
@@ -35,14 +35,7 @@ pub async fn show_run_get(
             if auth.user.is_admin {
                 true
             } else {
-                let form_groups: HashSet<i64> =
-                    CachedForm::get_group_ids(pool, &run.branch_name, &run.form_path)
-                        .await
-                        .ok()
-                        .map(|v| v.into_iter().collect())
-                        .unwrap_or_default();
-
-                let auth_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
+                let current_user_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                     .await
                     .context(format!(
                         "Impossible d'obtenir les groupes de {} (vous)",
@@ -51,14 +44,14 @@ pub async fn show_run_get(
                     .iter()
                     .map(|grp| grp.id)
                     .collect();
-                let form_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
+                let run_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
                 .await
                 .context(format!(
                     "Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)",
                     run.get_user(pool).await?.username
                 ))?.iter().map(|grp| grp.id).collect();
                 // If there is a common group between the groups the form was declared for, the user that declared the run, and the authenticated user's groups, then you can see/edit the run
-                intersection::hash_set::intersection([form_groups, auth_groups, form_user_groups])
+                intersection::hash_set::intersection([current_user_groups, run_user_groups])
                     .is_empty()
                     .not()
             }
@@ -105,7 +98,8 @@ pub async fn show_run_get(
                     attempt_number, run_id
                 ))?;
 
-            let attempt_date = utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
+            let attempt_date =
+                utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
 
             // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
             match attempt.status {
