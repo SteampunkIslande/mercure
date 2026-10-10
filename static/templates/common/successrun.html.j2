@@ -11,10 +11,10 @@
 <div style="margin-top: 30px; text-align: left;">
     <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
     {% if run.status in ("Idle", "Pending", "Running") %}
-    <a id="analysis-current" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative actuelle</a>
+    <a id="analysis-current" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
+        actuelle</a>
     {% else %}
-    <a id="analysis-reproduce" class="btn btn-secondary" onclick="restartRun('reproduce')">Reproduire à l'identique</a>
-    <a id="analysis-retry-latest" class="btn btn-primary" onclick="restartRun('latest')">Relancer avec le pipeline corrigé</a>
+    <a id="analysis-retry" class="btn btn-primary" onclick="restartRun()">Relancer</a>
     {% endif %}
 </div>
 

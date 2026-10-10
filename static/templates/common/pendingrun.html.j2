@@ -5,9 +5,9 @@
 {% block banner_text %}Run en attente<br>{{ run.run_name }}{% endblock %}
 
 {% block content %}
-    {% include "common/runinfo.html.j2" %}
+{% include "common/runinfo.html.j2" %}
 
-    <div style="margin-top: 30px; text-align: left;">
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-    </div>
+<div style="margin-top: 30px; text-align: left;">
+    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+</div>
 {% endblock %}

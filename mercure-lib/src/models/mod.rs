@@ -36,6 +36,8 @@ pub enum ModelError {
     BcryptError(#[from] bcrypt::BcryptError),
     #[error(transparent)]
     FormError(#[from] form::FormDefinitionError),
+    #[error(transparent)]
+    AnyHowError(#[from] anyhow::Error),
 }
 
 impl From<Infallible> for ModelError {

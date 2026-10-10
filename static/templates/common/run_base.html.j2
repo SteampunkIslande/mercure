@@ -1,6 +1,5 @@
 {% extends "base.html.j2" %}
 
-{% block body_attrs %} onload="init()"{% block run_body_attrs %}{% endblock %}{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -32,31 +31,16 @@
         }
     }
 
-    async function restartRun(mode) {
+    async function restartRun() {
         if (!runId) {
             showMessage("error", "ID du run introuvable.");
             return;
         }
-        const params = new URLSearchParams({ mode });
-        if (mode === "reproduce") {
-            if (!attemptCommit) {
-                showMessage("error", "Impossible de reproduire : aucun commit n'est associé à cette tentative.");
-                return;
-            }
-            params.set("commit_hash", attemptCommit);
-            if (!confirm("Reproduire cette tentative à l'identique (mêmes variables, même commit " + attemptCommit + ") ?")) {
-                return;
-            }
-        } else if (mode === "latest") {
-            if (!confirm("Relancer ce run avec la version actuelle du pipeline sur la branche « {{ run.branch_name }} » ? Les variables restent identiques.")) {
-                return;
-            }
-        } else {
-            showMessage("error", "Mode de relance inconnu.");
+        if (!confirm("Relancer ce run avec la version actuelle du pipeline ? Les variables restent identiques.")) {
             return;
         }
         try {
-            const response = await fetch(`/mercure/api/retry/${runId}?${params.toString()}`);
+            const response = await fetch(`/mercure/api/retry/${runId}`);
             const data = await response.json();
             if (isApiSuccess(data)) {
                 window.location.href = `/mercure/show/run/${runId}`;
@@ -68,10 +52,7 @@
         }
     }
 
-    {% block run_extra_js %}{% endblock %}
 
-    async function init() {
-        {% block run_on_ready %}{% endblock %}
-    }
 </script>
-{% endblock %}
+{% endblock extra_js %}
+{% block run_extra_js %}{% endblock %}

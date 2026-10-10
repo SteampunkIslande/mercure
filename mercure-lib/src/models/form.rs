@@ -140,7 +140,9 @@ pub struct Form {
 
 impl Form {
     pub async fn get_all_form_defs(config: &MercureConfig) -> Result<Vec<Form>, ModelError> {
-        let all_branches = versionning::get_all_branches().await?;
+        let all_branches = versionning::get_all_branches()
+            .await
+            .context("Impossible de lister les branches")?;
         let MercureConfig { pipelines, .. } = config;
 
         let mut all_forms: Vec<Form> = Vec::new();

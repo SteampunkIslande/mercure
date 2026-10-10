@@ -3,147 +3,151 @@
 {% block title %}Run en cours d'analyse - {{ run.run_name }}{% endblock %}
 
 {% block extra_head %}
-    <style>
-        .progress {
-            background: hsl(0, 0%, 50%);
-            border-radius: 4px;
-            overflow: hidden;
-            height: 24px;
+<style>
+    .progress {
+        background: hsl(0, 0%, 50%);
+        border-radius: 4px;
+        overflow: hidden;
+        height: 24px;
+    }
+
+    .progress-bar {
+        background: #3fc401;
+        height: 100%;
+        color: #ffffff;
+        text-align: left;
+        white-space: nowrap;
+        line-height: 24px;
+        padding-left: 6px;
+        font-weight: bold;
+    }
+
+    @keyframes progress-bar-stripes {
+        from {
+            background-position: 0 0;
         }
 
-        .progress-bar {
-            background: #3fc401;
-            height: 100%;
-            color: #ffffff;
-            text-align: left;
-            white-space: nowrap;
-            line-height: 24px;
-            padding-left: 6px;
-            font-weight: bold;
+        to {
+            background-position: 40px 0;
         }
-
-        @keyframes progress-bar-stripes {
-            from {
-                background-position: 0 0;
-            }
-
-            to {
-                background-position: 40px 0;
-            }
-        }
-    </style>
+    }
+</style>
 {% endblock %}
 
 {% block banner_text %}Run en cours d'analyse<br><span> {{
-                    run.run_name
-                    }}</span>{% endblock %}
+    run.run_name
+    }}</span>
+{% endblock banner_text %}
 
 {% block content %}
-    <div class="field">
-        <strong>Formulaire:</strong> {{ form.name }}
-    </div>
 
-    <div class="field">
-        <strong>Étape:</strong> <span id="current-step"><em>Non renseignée</em></span>
-    </div>
+<div class="field">
+    <strong>Formulaire:</strong> {{ form.name }}
+</div>
+
+<div class="field">
+    <strong>Étape:</strong> <span id="current-step"><em>Non renseignée</em></span>
+</div>
 
 
-    <div class="field">
-        <strong>Progression:</strong>
-        <div id="progress-container">
-            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                <div id="progress-bar" class="progress-bar" style="width:0%">0%</div>
-            </div>
+<div class="field">
+    <strong>Progression:</strong>
+    <div id="progress-container">
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="progress-bar" class="progress-bar" style="width:0%">0%</div>
         </div>
     </div>
+</div>
 
-    <div class="field">
-        <span><strong>Nombre de jobs SLURM en attente pour ce pipeline:</strong>
-            <div id="pending-jobs-count"></div>
-        </span>
-    </div>
-    <div class="field">
-        <span><strong>Nombre de jobs SLURM en cours d'exécution pour ce
-                pipeline:</strong>
-            <div id="running-jobs-count"></div>
-        </span>
-    </div>
+<div class="field">
+    <span><strong>Nombre de jobs SLURM en attente pour ce pipeline:</strong>
+        <div id="pending-jobs-count"></div>
+    </span>
+</div>
+<div class="field">
+    <span><strong>Nombre de jobs SLURM en cours d'exécution pour ce
+            pipeline:</strong>
+        <div id="running-jobs-count"></div>
+    </span>
+</div>
 
-    {% include "common/slurm_show.html.j2" %}
-    {% include "common/runinfo.html.j2" %}
+{% include "common/slurm_show.html.j2" %}
+{% include "common/runinfo.html.j2" %}
 
-    <div style="margin-top: 30px; text-align: left;">
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
-    </div>
-{% endblock %}
+<div style="margin-top: 30px; text-align: left;">
+    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+</div>
+{% endblock content %}
 
 {% block run_body_attrs %} onbeforeunload="stopPolling()"{% endblock %}
 
 {% block run_extra_js %}
-        let intervalId = null;
+<script>
+    let intervalId = null;
 
-        function stopPolling() {
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
+    function stopPolling() {
+        if (intervalId) {
+            clearInterval(intervalId);
+        }
+    }
+
+    function setProgress(percent) {
+        const p = Math.max(0, Math.min(100, Number(percent) || 0));
+        const bar = document.getElementById('progress-bar');
+        bar.style.width = p + '%';
+        bar.textContent = p + '%';
+        bar.parentElement.setAttribute('aria-valuenow', String(p));
+    }
+
+    async function updateJobInfo(info) {
+        const stepEl = document.getElementById('current-step');
+        if (info && info.current_step_string) stepEl.textContent = info.current_step_string;
+        else stepEl.innerHTML = '<em>Non renseignée</em>';
+
+        if (info && info.current_progress !== null) { setProgress(info.current_progress); }
+        if (info && info.current_progress === null) { setProgress(0); }
+
+        const pendingCountEl = document.getElementById("pending-jobs-count")
+        if (info && info.pending_jobs_count) pendingCountEl.textContent = info.pending_jobs_count;
+        else pendingCountEl.textContent = "Inconnu (pas de job SLURM associé)"
+
+        const runningCountEl = document.getElementById("running-jobs-count")
+        if (info && info.running_jobs_count) runningCountEl.textContent = info.running_jobs_count;
+        else runningCountEl.textContent = "Inconnu (pas de job SLURM associé)"
+        if (info && info.slurm_job_name) {
+            slurm_job_name = info.slurm_job_name;
+            await refreshData(slurm_job_name);
+        }
+        else {
+            document.getElementById("controls-bar").style.display = "none";
+            document.getElementById("slurm-table-container").style.display = "none";
+            document.getElementById("error-container").innerHTML = "<p>Informations SLURM indisponibles pour le moment. Cela signifie généralement qu'aucun job SLURM n'est actuellement associé à cette exécution.</p > ";
         }
 
-        function setProgress(percent) {
-            const p = Math.max(0, Math.min(100, Number(percent) || 0));
-            const bar = document.getElementById('progress-bar');
-            bar.style.width = p + '%';
-            bar.textContent = p + '%';
-            bar.parentElement.setAttribute('aria-valuenow', String(p));
-        }
+    }
 
-        async function updateJobInfo(info) {
-            const stepEl = document.getElementById('current-step');
-            if (info && info.current_step_string) stepEl.textContent = info.current_step_string;
-            else stepEl.innerHTML = '<em>Non renseignée</em>';
+    async function pollJobInfo() {
+        const url = `/mercure/api/watch/${runId}/${attemptNumber}`;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
 
-            if (info && info.current_progress !== null) { setProgress(info.current_progress); }
-            if (info && info.current_progress === null) { setProgress(0); }
-
-            const pendingCountEl = document.getElementById("pending-jobs-count")
-            if (info && info.pending_jobs_count) pendingCountEl.textContent = info.pending_jobs_count;
-            else pendingCountEl.textContent = "Inconnu (pas de job SLURM associé)"
-
-            const runningCountEl = document.getElementById("running-jobs-count")
-            if (info && info.running_jobs_count) runningCountEl.textContent = info.running_jobs_count;
-            else runningCountEl.textContent = "Inconnu (pas de job SLURM associé)"
-            if (info && info.slurm_job_name) {
-                slurm_job_name = info.slurm_job_name;
-                await refreshData(slurm_job_name);
-            }
-            else {
-                document.getElementById("controls-bar").style.display = "none";
-                document.getElementById("slurm-table-container").style.display = "none";
-                document.getElementById("error-container").innerHTML = "<p>Informations SLURM indisponibles pour le moment. Cela signifie généralement qu'aucun job SLURM n'est actuellement associé à cette exécution.</p>";
-            }
-
-        }
-
-        async function pollJobInfo() {
-            const url = `/mercure/api/watch/${runId}/${attemptNumber}`;
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-
-                if (isApiSuccess(data) && getApiData(data)) {
-                    await updateJobInfo(getApiData(data));
-                } else {
-                    await updateJobInfo(null);
-                }
-            }
-            catch (e) {
-                console.warn('Erreur lors de la récupération des infos job', e);
+            if (isApiSuccess(data) && getApiData(data)) {
+                await updateJobInfo(getApiData(data));
+            } else {
                 await updateJobInfo(null);
             }
         }
+        catch (e) {
+            console.warn('Erreur lors de la récupération des infos job', e);
+            await updateJobInfo(null);
+        }
+    }
 
-{% endblock %}
+    {% endblock %}
 
-{% block run_on_ready %}
-        intervalId = setInterval(pollJobInfo, 30000);
-        await pollJobInfo();
+    {% block run_on_ready %}
+    intervalId = setInterval(pollJobInfo, 30000);
+    await pollJobInfo();
+</script>
 {% endblock %}
