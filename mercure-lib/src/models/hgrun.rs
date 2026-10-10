@@ -287,29 +287,22 @@ impl Run {
     /// Renvoie le JSON prêt pour le front : `{title, header, table, pagination}`.
     async fn fetch_runs_table(
         pool: &SqlitePool,
-        user: Option<&User>,
         groups: Option<Vec<Group>>,
         page_size: Option<i64>,
         page: Option<i64>,
         title: &str,
         filters: RunFilters<'_>,
     ) -> Result<Value, ModelError> {
-        let limit = page_size.unwrap_or(DEFAULT_RUNS_PAGE_SIZE).max(1);
+        let limit = page_size.unwrap_or(5).max(1);
         let current_page = page.unwrap_or(1).max(1);
         let offset = (current_page - 1) * limit;
 
         let mut where_parts: Vec<String> = Vec::new();
         let mut where_binds: Vec<String> = Vec::new();
 
-        // 1. Visibilité par groupes
-        if let Some(u) = user {
-            let viewer_groups = match groups {
-                Some(groups) => groups,
-                // Repli : relire les groupes de l'utilisateur depuis la base
-                None => Group::get_user_groups(pool, u.id).await?,
-            };
-
-            let form_pairs = CachedForm::visible_form_pairs(pool, viewer_groups).await?;
+        // 1. Visibilité par groupes (si les groupes sont importants, c'est-à-dire si l'utilisateur n'est pas admin)
+        if let Some(groups) = groups {
+            let form_pairs = CachedForm::visible_form_pairs(pool, groups).await?;
 
             if form_pairs.is_empty() {
                 // L'utilisateur n'a accès à aucun formulaire : liste vide
@@ -426,13 +419,12 @@ impl Run {
     /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
     pub async fn list_runs(
         pool: &SqlitePool,
-        user: Option<&User>,
         page_size: Option<i64>,
         page: Option<i64>,
         status: Option<RunStatus>,
         groups: Option<Vec<Group>>,
     ) -> Result<Value, ModelError> {
-        let title = if user.is_none() {
+        let title = if groups.is_none() {
             "Liste des runs (tous les groupes)"
         } else {
             "Liste des runs de vos groupes"
@@ -442,7 +434,6 @@ impl Run {
 
         Self::fetch_runs_table(
             pool,
-            user,
             groups,
             page_size,
             page,
@@ -485,7 +476,6 @@ impl Run {
     #[allow(clippy::too_many_arguments)]
     pub async fn search_runs(
         pool: &SqlitePool,
-        user: Option<&User>,
         page_size: Option<i64>,
         page: Option<i64>,
         status: Option<&str>,
@@ -494,7 +484,7 @@ impl Run {
         run_name_search: Option<&str>,
         groups: Option<Vec<Group>>,
     ) -> Result<Value, ModelError> {
-        let title = if user.is_none() {
+        let title = if groups.is_none() {
             "Résultats de la recherche (tous les groupes)"
         } else {
             "Résultats de la recherche de vos groupes"
@@ -502,7 +492,6 @@ impl Run {
 
         Self::fetch_runs_table(
             pool,
-            user,
             groups,
             page_size,
             page,
@@ -672,9 +661,6 @@ impl Run {
         Ok(())
     }
 }
-
-/// Nombre de runs par page si `page_size` n'est pas fourni.
-const DEFAULT_RUNS_PAGE_SIZE: i64 = 5;
 
 /// Critères de filtrage partagés par `Run::list_runs` et `Run::search_runs`.
 struct RunFilters<'a> {

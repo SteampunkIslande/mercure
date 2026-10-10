@@ -8,20 +8,16 @@ use sqlx::SqlitePool;
 
 /// Résout ce que l'utilisateur courant est autorisé à voir :
 ///
-/// - un admin voit tous les runs (`user = None` côté modèle) ;
+/// - un admin voit tous les runs (`groups` = None) ;
 /// - un utilisateur standard ne voit que les runs des formulaires associés à au
 ///   moins un de ses groupes (voir `Run::fetch_runs_table`).
-///
-/// Le couple renvoyé est à passer tel quel au modèle : (`user`, `groups`).
-async fn resolve_viewer<'a>(
-    pool: &SqlitePool,
-    user: &'a User,
-) -> Result<(Option<&'a User>, Option<Vec<Group>>), ModelError> {
+/// Renvoie soit None
+async fn resolve_viewer(pool: &SqlitePool, user: &User) -> Result<Option<Vec<Group>>, ModelError> {
     if user.is_admin {
-        Ok((None, None))
+        Ok(None)
     } else {
         let groups = Group::get_user_groups(pool, user.id).await?;
-        Ok((Some(user), Some(groups)))
+        Ok(Some(groups))
     }
 }
 
@@ -33,8 +29,8 @@ pub async fn list_runs_get(
     page_size: Option<i64>,
     status: Option<RunStatus>,
 ) -> Json<ApiResponse<Value>> {
-    let (user, groups) = match resolve_viewer(pool, &authenticated.user).await {
-        Ok(viewer) => viewer,
+    let groups = match resolve_viewer(pool, &authenticated.user).await {
+        Ok(groups) => groups,
         Err(_) => {
             return Json(ApiResponse::error(
                 "Erreur lors de la récupération de vos groupes.".to_string(),
@@ -42,7 +38,7 @@ pub async fn list_runs_get(
         }
     };
 
-    match Run::list_runs(pool, user, page_size, page, status, groups).await {
+    match Run::list_runs(pool, page_size, page, status, groups).await {
         Ok(payload) => Json(ApiResponse::success(payload)),
         Err(_) => Json(ApiResponse::error(
             "Erreur lors de la récupération des runs.".to_string(),
@@ -61,8 +57,8 @@ pub async fn search_run_get(
     date_to: Option<String>,
     run_name_search: Option<String>,
 ) -> Json<ApiResponse<Value>> {
-    let (user, groups) = match resolve_viewer(pool, &authenticated.user).await {
-        Ok(viewer) => viewer,
+    let groups = match resolve_viewer(pool, &authenticated.user).await {
+        Ok(groups) => groups,
         Err(_) => {
             return Json(ApiResponse::error(
                 "Erreur lors de la récupération de vos groupes.".to_string(),
@@ -72,7 +68,6 @@ pub async fn search_run_get(
 
     match Run::search_runs(
         pool,
-        user,
         page_size,
         page,
         status.as_deref(),
