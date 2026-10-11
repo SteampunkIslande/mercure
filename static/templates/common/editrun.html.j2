@@ -168,6 +168,10 @@
                         variables[key] = getApiData(json);
                     }
                 }
+                // Unless it has been defined at some point, let's define it as empty string
+                if (!variables[key]) {
+                    variables[key] = "";
+                }
             } else {
                 // For text, date, and select elements, .value works perfectly
                 variables[key] = el.value;

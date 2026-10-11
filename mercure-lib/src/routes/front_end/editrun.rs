@@ -20,11 +20,26 @@ pub async fn edit_run_get(
     pool: &State<SqlitePool>,
     run_id: i64,
 ) -> Result<Template, FrontendError> {
-    let run: Run = Run::get_run_from_id(run_id, pool)
+    let mut run: Run = Run::get_run_from_id(run_id, pool)
         .await
         .map_err(ModelError::from)?;
     let form = run.get_form().await?;
-    let variables: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
+    let variables_html: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
+
+    let variable_names: HashSet<&str> = form.variables.iter().map(|v| v.name.as_str()).collect();
+
+    // Permet de retirer si nécessaire des variables qui ne sont plus utiles dans la version actuelle du formulaire (si une variable a été supprimée entre deux modification des paramètres d'un run)
+    run.user_defined_vars = run
+        .user_defined_vars
+        .into_iter()
+        .filter_map(|(k, v)| {
+            if variable_names.contains(k.as_str()) {
+                Some((k, v))
+            } else {
+                None
+            }
+        })
+        .collect();
     let can_see_run = {
         if auth.user.is_admin {
             true
@@ -58,7 +73,7 @@ pub async fn edit_run_get(
                     run=> &run,
                     user=> &auth.user,
                     form=> &form,
-                    user_defined_vars=> &variables,
+                    user_defined_vars=> &variables_html,
                 },
             )),
             status => {

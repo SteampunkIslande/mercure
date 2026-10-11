@@ -133,13 +133,25 @@ impl Run {
         // Date de création (peu importe ce que l'utilisateur avait soumis)
         run_submission.creation_date = Some(OffsetDateTime::now_utc());
 
+        let user_defined_vars_str = serde_json::to_string(&run_submission.user_defined_vars)?;
+
         // Insérer dans la table Runs
         let form = run_submission.get_form().await?;
         // S'assurer que le formulaire est bien rempli
-        form.check_validity(Some(&run_submission.user_defined_vars))
-            .await?;
-
-        let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)?;
+        form.check_validity(Some(
+            &run_submission
+                .user_defined_vars
+                .into_iter()
+                .chain(
+                    [
+                        ("outdir".to_string(), "".to_string()), // Additional fields, left empty for now (testing) that will be added at execution time
+                        ("attempt_id".to_string(), "".to_string()),
+                    ]
+                    .into_iter(),
+                )
+                .collect::<HashMap<String, String>>(),
+        ))
+        .await?;
 
         let run_id = sqlx::query(
             r#"
@@ -154,7 +166,7 @@ impl Run {
         .bind(RunStatus::Idle.to_string())
         .bind(0)
         .bind(&run_submission.branch_name)
-        .bind(&user_defined_vars)
+        .bind(&user_defined_vars_str)
         .bind(&run_submission.form_path)
         .fetch_one(pool)
         .await?
@@ -169,7 +181,7 @@ impl Run {
         user_defined_vars: HashMap<String, String>,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        let user_defined_vars = serde_json::to_string(&user_defined_vars)?;
+        let user_defined_vars_str = serde_json::to_string(&user_defined_vars)?;
 
         let run: Run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
@@ -178,14 +190,26 @@ impl Run {
 
         let form = run.get_form().await?;
         // S'assurer que le formulaire est bien rempli
-        form.check_validity(Some(&user_defined_vars)).await?;
+        form.check_validity(Some(
+            &user_defined_vars
+                .into_iter()
+                .chain(
+                    [
+                        ("outdir".to_string(), "".to_string()),
+                        ("attempt_id".to_string(), "".to_string()),
+                    ]
+                    .into_iter(),
+                )
+                .collect::<HashMap<String, String>>(),
+        ))
+        .await?;
 
         sqlx::query(
             r#"
             UPDATE Runs SET user_defined_vars = ? WHERE run_id = ?
             "#,
         )
-        .bind(&user_defined_vars)
+        .bind(&user_defined_vars_str)
         .bind(run_id)
         .execute(pool)
         .await?;

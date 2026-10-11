@@ -23,7 +23,7 @@ pub enum FormDefinitionError {
     IOError(#[from] std::io::Error),
     #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
     DuplicateVarError(String),
-    #[error("Les variables suivantes sont présentes dans le template, mais leur valeur n'est pas requise par le formulaire:{}",.0)]
+    #[error("Les variables suivantes sont requises:{}",.0)]
     MissingVar(String),
     #[error("Erreur de formulaire: {0}")]
     InvalidData(String),
@@ -225,7 +225,7 @@ impl Form {
                 form.branch = Some(branch.to_string());
                 form.file_path = Some(form_path.to_string());
                 // Check validity of this form by making sure there are no syntax error in the template definition
-                form.check_validity::<Value>(None).await?;
+                form.check_validity(None).await?;
                 Ok(form)
             }
             GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
@@ -255,10 +255,10 @@ impl Form {
     ///
     /// - There is a syntax error in the template definition
     /// - One or more variables are missing
-    pub async fn check_validity<T>(&self, variables: Option<&T>) -> Result<(), FormDefinitionError>
-    where
-        T: Serialize,
-    {
+    pub async fn check_validity(
+        &self,
+        variables: Option<&HashMap<String, String>>,
+    ) -> Result<(), FormDefinitionError> {
         match variables {
             None => {
                 self.try_render_template(
@@ -266,6 +266,7 @@ impl Form {
                         .variables
                         .iter()
                         .map(|v| (v.name.as_str(), "")) // For each user-provided variable, replace with empty string to get
+                        .chain([("outdir", ""), ("attempt_id", "")])
                         .collect::<HashMap<&str, &str>>(),
                 )?;
             }
