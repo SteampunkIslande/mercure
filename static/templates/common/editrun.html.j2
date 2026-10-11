@@ -10,9 +10,7 @@
 <br><span class="banner-text">{{ form.name }}{% if form.branch %} (sur la branche {{ form.branch }}){% endif %}</span>
 {%endblock %}
 
-{% block body_attrs %}
-onload="init()"
-{% endblock %}
+{% block body_attrs %}onload="init()"{% endblock %}
 
 {% block content %}
 <h2>{% if run %}Edition du run {{ run.run_name }}{% else %}Déclarer un nouveau run{% endif %}</h2>
@@ -64,9 +62,6 @@ onload="init()"
     {% else %}
     const currentRun = null;
     {% endif %}
-
-    // Run initialization as soon as the DOM is ready
-    document.addEventListener('DOMContentLoaded', init);
 
     async function init() {
         const dynamicSelects = document.querySelectorAll('select[data-source]');

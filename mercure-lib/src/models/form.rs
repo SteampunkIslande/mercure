@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use log::warn;
 use minijinja::Environment;
+use minijinja::{UndefinedBehavior, Value};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
@@ -22,6 +23,8 @@ pub enum FormDefinitionError {
     IOError(#[from] std::io::Error),
     #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
     DuplicateVarError(String),
+    #[error("Les variables suivantes sont présentes dans le template, mais leur valeur n'est pas requise par le formulaire:{}",.0)]
+    MissingVar(String),
     #[error("Erreur de formulaire: {0}")]
     InvalidData(String),
     #[error(transparent)]
@@ -90,6 +93,7 @@ impl Variable {
                 format!(
                     r#"<select id="{name}" name="{name}">
                     {options}
+                    <option value="" disabled selected value>---Choisissez une valeur---</option>
                     </select>"#
                 )
             }
@@ -220,7 +224,8 @@ impl Form {
                 let mut form: Form = yaml_serde::from_str(&content)?;
                 form.branch = Some(branch.to_string());
                 form.file_path = Some(form_path.to_string());
-                form.check_validity().await?;
+                // Check validity of this form by making sure there are no syntax error in the template definition
+                form.check_validity::<Value>(None).await?;
                 Ok(form)
             }
             GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
@@ -230,15 +235,81 @@ impl Form {
         }
     }
 
-    pub async fn check_validity(&self) -> Result<(), FormDefinitionError> {
-        self.try_render_template(
-            &self
-                .variables
-                .iter()
-                .map(|v| (v.name.as_str(), "")) // For each user-provided variable, replace with empty string to get
-                .collect::<HashMap<&str, &str>>(),
-        )?;
+    /// Makes sure this form is valid under given circumstances
+    ///
+    /// # Arguments
+    ///
+    /// - `&self` (`undefined`) - This form
+    /// - `variables` (`Option<&T>`) - Any serializable object, optional
+    ///
+    /// If `variables` is None, then check the template for syntax errors. In fact, if variables is None, we try to render the template with self.variables, which comes, itself, from deserializing the
+    /// form definition.
+    ///
+    /// If `variables` is Some, then we make sure we received every required variable for this form (plus the template syntax).
+    ///
+    /// # Returns
+    ///
+    /// - `Result<(), FormDefinitionError> where T: Serialize,` - Returns an error if anything goes wrong while rendering the template. Otherwise, returns nothing
+    ///
+    /// # Errors
+    ///
+    /// - There is a syntax error in the template definition
+    /// - One or more variables are missing
+    pub async fn check_validity<T>(&self, variables: Option<&T>) -> Result<(), FormDefinitionError>
+    where
+        T: Serialize,
+    {
+        match variables {
+            None => {
+                self.try_render_template(
+                    &self
+                        .variables
+                        .iter()
+                        .map(|v| (v.name.as_str(), "")) // For each user-provided variable, replace with empty string to get
+                        .collect::<HashMap<&str, &str>>(),
+                )?;
+            }
+            Some(vars) => self.try_render_template(vars)?,
+        }
+
         Ok(())
+    }
+
+    fn list_missing_vars<T>(template: &str, context: &T) -> Result<Vec<String>, minijinja::Error>
+    where
+        T: Serialize,
+    {
+        // Create an isolated environment to parse the template string
+        let env = Environment::new();
+        let tmpl = env.template_from_str(template)?;
+
+        // Get undeclared variables witin template
+        let undeclared_vars = tmpl.undeclared_variables(false);
+
+        // Serialize the context into a MiniJinja Value
+        let context_value = Value::from_serialize(context);
+
+        let mut missing = Vec::new();
+
+        for var in undeclared_vars {
+            // Attempt to get the attribute from the context.
+            // If the context is an object/map, get_attr fetches the value.
+            // It returns Ok(UNDEFINED) if the key is missing, or Err if the context
+            // type doesn't support attribute lookup.
+            match context_value.get_attr(&var) {
+                Ok(val) if !val.is_undefined() => {
+                    // The variable is present in the context
+                }
+                _ => {
+                    // The variable is missing or context is not an object
+                    missing.push(var);
+                }
+            }
+        }
+
+        // Sort to ensure deterministic output
+        missing.sort();
+        Ok(missing)
     }
 
     pub fn try_render_template(&self, context: &impl Serialize) -> Result<(), FormDefinitionError> {
@@ -248,9 +319,22 @@ impl Form {
             }
             FormExecType::Shell { exec } => exec.to_string(),
         };
-        let env = Environment::new();
-        env.render_str(&template, context)
-            .context("Erreur jinja (template incorrect)")?;
+        let mut env = Environment::new();
+        env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
+
+        match env.render_str(&template, context) {
+            Ok(_) => {}
+            Err(e) => match e.kind() {
+                minijinja::ErrorKind::UndefinedError => {
+                    return Err(FormDefinitionError::MissingVar(
+                        Self::list_missing_vars(&template, context)?
+                            .join(", ")
+                            .to_string(),
+                    ));
+                }
+                _ => return Err(e.into()),
+            },
+        }
         Ok(())
     }
 }
@@ -695,6 +779,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
             <select id="v1" name="v1">
                     <option value="A">A</option>
 <option value="B">B</option>
+                    <option value="" disabled selected value>---Choisissez une valeur---</option>
                     </select>
         </div>"#,
         );

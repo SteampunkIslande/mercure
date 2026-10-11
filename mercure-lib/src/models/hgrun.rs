@@ -97,7 +97,7 @@ impl FromStr for RunStatus {
 /// Created by users.
 /// On any user's home page, there is a list of runs submitted by the user
 /// There is also a button that the user can press to get to route '/newrun/groupname'
-#[derive(Debug, Serialize, Default, Deserialize, Clone)]
+#[derive(Debug, Serialize, Default, Deserialize, Clone, PartialEq)]
 pub struct Run {
     /// Auto-incremented Run ID (database defined).
     pub run_id: Option<i64>,
@@ -134,6 +134,11 @@ impl Run {
         run_submission.creation_date = Some(OffsetDateTime::now_utc());
 
         // Insérer dans la table Runs
+        let form = run_submission.get_form().await?;
+        // S'assurer que le formulaire est bien rempli
+        form.check_validity(Some(&run_submission.user_defined_vars))
+            .await?;
+
         let user_defined_vars = serde_json::to_string(&run_submission.user_defined_vars)?;
 
         let run_id = sqlx::query(
@@ -163,13 +168,17 @@ impl Run {
         run_id: i64,
         user_defined_vars: HashMap<String, String>,
         pool: &SqlitePool,
-    ) -> Result<(), RunDefinitionError> {
+    ) -> Result<(), ModelError> {
         let user_defined_vars = serde_json::to_string(&user_defined_vars)?;
 
         let run: Run = Self::get_run_from_id(run_id, pool).await?;
         if !matches!(run.status, RunStatus::Idle) {
-            return Err(RunDefinitionError::UneditableRun);
+            return Err(RunDefinitionError::UneditableRun.into());
         }
+
+        let form = run.get_form().await?;
+        // S'assurer que le formulaire est bien rempli
+        form.check_validity(Some(&user_defined_vars)).await?;
 
         sqlx::query(
             r#"
