@@ -12,7 +12,7 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::models::Group;
-use crate::models::{CachedForm, Run, RunStatus};
+use crate::models::{Run, RunStatus};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(
@@ -29,17 +29,12 @@ pub async fn edit_run_get(
         if auth.user.is_admin {
             true
         } else {
-            let form_groups: HashSet<i64> =
-                CachedForm::get_group_ids(pool, &run.branch_name, &run.form_path)
-                    .await?
-                    .into_iter()
-                    .collect();
-            let auth_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
+            let current_user_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                 .await?
                 .iter()
                 .map(|grp| grp.id)
                 .collect();
-            let form_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
+            let run_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
                 .await
                 .context(format!(
                     "Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)",
@@ -49,7 +44,7 @@ pub async fn edit_run_get(
                 .map(|grp| grp.id)
                 .collect();
             // If there is a common group between the groups the form was declared for, the user that declared the run, and the authenticated user's groups, then you can see/edit the run
-            intersection::hash_set::intersection([form_groups, auth_groups, form_user_groups])
+            intersection::hash_set::intersection([current_user_groups, run_user_groups])
                 .is_empty()
                 .not()
         }
