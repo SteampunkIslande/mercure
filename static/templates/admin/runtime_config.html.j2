@@ -52,7 +52,6 @@
                 <td class="config-action">
                     <a href="javascript:void(0);" class="btn btn-primary btn-sm save-config"
                         data-key="{{ entry.key }}">Sauvegarder</a>
-                    <span class="save-status" style="display:none; margin-left: 8px;"></span>
                 </td>
             </tr>
             {% endfor %}
@@ -74,14 +73,10 @@
                 const row = document.querySelector(`tr[data-key="${key}"]`);
                 const select = row.querySelector('.config-select');
                 const input = row.querySelector('.config-input');
-                const statusSpan = row.querySelector('.save-status');
 
                 const value = select ? select.value : input.value;
 
                 this.disabled = true;
-                statusSpan.textContent = 'Sauvegarde...';
-                statusSpan.style.display = 'inline';
-                statusSpan.style.color = '#666';
 
                 try {
                     const response = await fetch('/mercure/api/config/set', {
@@ -95,8 +90,7 @@
                     const json = await response.json();
 
                     if (isApiSuccess(json)) {
-                        statusSpan.textContent = '✓ Sauvegardé';
-                        statusSpan.style.color = 'green';
+                        showMessage("success", "Configuration sauvegardée");
 
                         // Mettre à jour la valeur affichée si nécessaire
                         if (select) {
@@ -105,17 +99,12 @@
                             input.value = value;
                         }
                     } else {
-                        statusSpan.textContent = '✗ Erreur: ' + (getApiMessage(json) || 'Inconnue');
-                        statusSpan.style.color = 'red';
+                        showMessage("error", getApiMessage(json) || "Inconnue");
                     }
                 } catch (error) {
-                    statusSpan.textContent = '✗ Erreur: ' + error;
-                    statusSpan.style.color = 'red';
+                    showMessage("error", error);
                 } finally {
                     this.disabled = false;
-                    setTimeout(() => {
-                        statusSpan.style.display = 'none';
-                    }, 3000);
                 }
             });
         });
