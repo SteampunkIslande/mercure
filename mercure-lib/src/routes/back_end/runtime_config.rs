@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     auth::Authenticated,
-    models::{AppState, AppStateConfigKey, appstate::ValueType},
+    models::{AppState, AppStateConfigKey, appstate::ValueInput},
     routes::ApiResponse,
 };
 
@@ -17,7 +17,7 @@ pub struct ConfigSetRequest {
 pub struct ConfigEntry {
     pub key: AppStateConfigKey,
     pub value: String,
-    pub value_type: ValueType,
+    pub value_input: ValueInput,
     pub description: &'static str,
 }
 
@@ -36,7 +36,7 @@ pub async fn runtime_config_get(
                 .map(|key| ConfigEntry {
                     key: *key,
                     value: conf.get(key).cloned().unwrap_or_default(),
-                    value_type: key.value_type(),
+                    value_input: key.value_input(),
                     description: key.description(),
                 })
                 .collect();
@@ -61,7 +61,7 @@ pub async fn runtime_config_set(
         Ok(_) => Json(ApiResponse::success(ConfigEntry {
             key,
             value: value.clone(),
-            value_type: key.value_type(),
+            value_input: key.value_input(),
             description: key.description(),
         })),
         Err(e) => Json(ApiResponse::error(e.to_string())),

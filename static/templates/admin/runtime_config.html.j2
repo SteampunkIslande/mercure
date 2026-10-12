@@ -21,7 +21,6 @@
             <tr>
                 <th>Variable</th>
                 <th>Description</th>
-                <th>Type</th>
                 <th>Valeur</th>
                 <th>Action</th>
             </tr>
@@ -31,24 +30,7 @@
             <tr data-key="{{ entry.key }}">
                 <td class="config-key">{{ entry.key }}</td>
                 <td class="config-description">{{ entry.description }}</td>
-                <td class="config-type">
-                    {% if entry.value_type == "combo" %}
-                    <span class="badge badge-info">Liste prédéfinie</span>
-                    {% else %}
-                    <span class="badge badge-secondary">Texte libre</span>
-                    {% endif %}
-                </td>
-                <td class="config-value">
-                    {% if entry.value_type == "combo" %}
-                    <select class="config-select" data-key="{{ entry.key }}">
-                        {% for opt in entry.combo_values %}
-                        <option value="{{ opt }}" {% if opt==entry.value %}selected{% endif %}>{{ opt }}</option>
-                        {% endfor %}
-                    </select>
-                    {% else %}
-                    <input type="text" class="config-input" data-key="{{ entry.key }}" value="{{ entry.value }}">
-                    {% endif %}
-                </td>
+                <td class="config-value">{{ entry.input_html | safe }}</td>
                 <td class="config-action">
                     <a href="javascript:void(0);" class="btn btn-primary btn-sm save-config"
                         data-key="{{ entry.key }}">Sauvegarder</a>
@@ -71,10 +53,9 @@
             button.addEventListener('click', async function () {
                 const key = this.dataset.key;
                 const row = document.querySelector(`tr[data-key="${key}"]`);
-                const select = row.querySelector('.config-select');
-                const input = row.querySelector('.config-input');
+                const input = row.querySelector('[name="' + key + '"]');
 
-                const value = select ? select.value : input.value;
+                const value = input ? input.value : '';
 
                 this.disabled = true;
 
@@ -91,13 +72,6 @@
 
                     if (isApiSuccess(json)) {
                         showMessage("success", "Configuration sauvegardée");
-
-                        // Mettre à jour la valeur affichée si nécessaire
-                        if (select) {
-                            // La valeur est déjà à jour dans le select
-                        } else {
-                            input.value = value;
-                        }
                     } else {
                         showMessage("error", getApiMessage(json) || "Inconnue");
                     }

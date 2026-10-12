@@ -13,8 +13,7 @@ use crate::{
 struct ConfigEntryForTemplate {
     key: String,
     value: String,
-    value_type: String,  // "combo" or "text"
-    combo_values: Vec<String>,
+    input_html: String,
     description: String,
 }
 
@@ -31,12 +30,11 @@ pub async fn runtime_config_page_get(
         .iter()
         .map(|key| {
             let value = config.get(key).cloned().unwrap_or_default();
-            let vt = key.value_type();
+            let vi = key.value_input();
             ConfigEntryForTemplate {
                 key: key.as_str().to_string(),
-                value,
-                value_type: if vt.is_combo() { "combo" } else { "text" }.to_string(),
-                combo_values: vt.combo_values().to_vec(),
+                value: value.clone(),
+                input_html: vi.render_html(key.as_str(), &value),
                 description: key.description().to_string(),
             }
         })

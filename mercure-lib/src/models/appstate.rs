@@ -5,73 +5,142 @@ use sqlx::{Row, SqlitePool};
 
 use crate::models::ModelError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AppStateConfigKey {
-    AppstateLocked,
-    ActiveRoutine,
+/// Macro to define AppState configuration keys with minimal boilerplate.
+/// Usage:
+/// ```ignore
+/// define_appstate_config! {
+///     AppstateLocked {
+///         db_key: "appstate_locked",
+///         description: "Lock AppState to prevent reset on next startup",
+///         input: ValueInput::combo(&["true", "false"]),
+///     },
+///     ActiveRoutine {
+///         db_key: "active_routine",
+///         description: "Allow pending runs to transition to Running automatically",
+///         input: ValueInput::combo(&["true", "false"]),
+///     },
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_appstate_config {
+    (
+        $(
+            $variant:ident {
+                db_key: $db_key:expr,
+                description: $description:expr,
+                input: $input:expr,
+            }
+        ),* $(,)?
+    ) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        pub enum AppStateConfigKey {
+            $($variant,)*
+        }
+
+        impl AppStateConfigKey {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(AppStateConfigKey::$variant => $db_key,)*
+                }
+            }
+
+            pub fn from_str(s: &str) -> Option<Self> {
+                match s {
+                    $($db_key => Some(AppStateConfigKey::$variant),)*
+                    _ => None,
+                }
+            }
+
+            pub fn all() -> &'static [AppStateConfigKey] {
+                &[$(AppStateConfigKey::$variant,)*]
+            }
+
+            pub fn value_input(&self) -> ValueInput {
+                match self {
+                    $(AppStateConfigKey::$variant => $input,)*
+                }
+            }
+
+            pub fn description(&self) -> &'static str {
+                match self {
+                    $(AppStateConfigKey::$variant => $description,)*
+                }
+            }
+        }
+    };
 }
 
-impl AppStateConfigKey {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            AppStateConfigKey::AppstateLocked => "appstate_locked",
-            AppStateConfigKey::ActiveRoutine => "active_routine",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "appstate_locked" => Some(AppStateConfigKey::AppstateLocked),
-            "active_routine" => Some(AppStateConfigKey::ActiveRoutine),
-            _ => None,
-        }
-    }
-
-    pub fn all() -> &'static [AppStateConfigKey] {
-        &[
-            AppStateConfigKey::AppstateLocked,
-            AppStateConfigKey::ActiveRoutine,
-        ]
-    }
-
-    pub fn value_type(&self) -> ValueType {
-        match self {
-            AppStateConfigKey::AppstateLocked => {
-                ValueType::Combo(vec!["true".to_string(), "false".to_string()])
-            }
-            AppStateConfigKey::ActiveRoutine => {
-                ValueType::Combo(vec!["true".to_string(), "false".to_string()])
-            }
-        }
-    }
-
-    pub fn description(&self) -> &'static str {
-        match self {
-            AppStateConfigKey::AppstateLocked => "Lock AppState to prevent reset on next startup",
-            AppStateConfigKey::ActiveRoutine => {
-                "Allow pending runs to transition to Running automatically"
-            }
-        }
-    }
+// Define the configuration using the macro
+define_appstate_config! {
+    AppstateLocked {
+        db_key: "appstate_locked",
+        description: "Lock AppState to prevent reset on next startup",
+        input: ValueInput::combo(&["true", "false"]),
+    },
+    ActiveRoutine {
+        db_key: "active_routine",
+        description: "Allow pending runs to transition to Running automatically",
+        input: ValueInput::combo(&["true", "false"]),
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "values")]
-pub enum ValueType {
+pub enum ValueInput {
     TextInput,
     Combo(Vec<String>),
 }
 
-impl ValueType {
-    pub fn is_combo(&self) -> bool {
-        matches!(self, ValueType::Combo(_))
+impl ValueInput {
+    pub fn text() -> Self {
+        ValueInput::TextInput
     }
 
-    pub fn combo_values(&self) -> &[String] {
+    pub fn combo(values: &[&str]) -> Self {
+        ValueInput::Combo(values.iter().map(|s| s.to_string()).collect())
+    }
+
+    pub fn validate(&self, value: &str) -> Result<(), ModelError> {
         match self {
-            ValueType::Combo(v) => v,
-            ValueType::TextInput => &[],
+            ValueInput::Combo(allowed) => {
+                if !allowed.iter().any(|v| v.eq_ignore_ascii_case(value)) {
+                    return Err(ModelError::InvalidInput(format!(
+                        "Invalid value '{}'. Allowed values: {:?}",
+                        value, allowed
+                    )));
+                }
+                Ok(())
+            }
+            ValueInput::TextInput => Ok(()),
+        }
+    }
+
+    pub fn render_html(&self, name: &str, current_value: &str) -> String {
+        match self {
+            ValueInput::Combo(allowed) => {
+                let mut html = format!(r#"<select class="config-select" name="{}">"#, name);
+                for opt in allowed {
+                    let selected = if opt.eq_ignore_ascii_case(current_value) {
+                        " selected"
+                    } else {
+                        ""
+                    };
+                    html.push_str(&format!(
+                        r#"<option value="{}"{selected}>{}</option>"#,
+                        opt, opt
+                    ));
+                }
+                html.push_str("</select>");
+                html
+            }
+            ValueInput::TextInput => {
+                format!(
+                    r#"<input type="text" class="config-input" name="{}" value="{}">"#,
+                    name,
+                    html_escape::encode_text(current_value)
+                )
+            }
         }
     }
 }
@@ -123,7 +192,7 @@ impl AppState {
         value: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        Self::validate_value(key, value)?;
+        key.value_input().validate(value)?;
         sqlx::query(
             r#"
         INSERT OR REPLACE INTO AppState (key, value) VALUES (?, ?)
@@ -134,23 +203,6 @@ impl AppState {
         .execute(pool)
         .await?;
         Ok(())
-    }
-
-    fn validate_value(key: AppStateConfigKey, value: &str) -> Result<(), ModelError> {
-        match key.value_type() {
-            ValueType::Combo(allowed) => {
-                if !allowed.iter().any(|v| v.eq_ignore_ascii_case(value)) {
-                    return Err(ModelError::InvalidInput(format!(
-                        "Invalid value '{}' for key '{}'. Allowed values: {:?}",
-                        value,
-                        key.as_str(),
-                        allowed
-                    )));
-                }
-                Ok(())
-            }
-            ValueType::TextInput => Ok(()),
-        }
     }
 
     pub async fn lock_appstate(pool: &SqlitePool) -> Result<(), ModelError> {
