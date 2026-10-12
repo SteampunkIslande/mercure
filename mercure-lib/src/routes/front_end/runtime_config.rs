@@ -1,6 +1,6 @@
 use rocket::{State, get};
-use sqlx::SqlitePool;
 use serde::Serialize;
+use sqlx::SqlitePool;
 
 use crate::{
     auth::Authenticated,
