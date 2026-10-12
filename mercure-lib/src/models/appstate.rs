@@ -99,7 +99,7 @@ impl AppState {
         )
     }
 
-    pub async fn get_all(pool: &SqlitePool) -> Result<HashMap<String, String>, ModelError> {
+    async fn get_all(pool: &SqlitePool) -> Result<HashMap<String, String>, ModelError> {
         Ok(sqlx::query(r#"SELECT key,value FROM AppState"#)
             .fetch_all(pool)
             .await?
