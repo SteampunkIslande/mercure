@@ -127,6 +127,18 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    // A general-purpose table to share state accross the app (such as disabling new run executions)
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS AppState (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }
 

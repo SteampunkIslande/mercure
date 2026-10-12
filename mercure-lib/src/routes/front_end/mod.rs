@@ -8,6 +8,7 @@ mod home;
 mod newgroup;
 mod newrun;
 mod redirect;
+mod runtime_config;
 mod showrun;
 
 pub use admin::*;
@@ -21,6 +22,7 @@ pub use newgroup::*;
 pub use newrun::*;
 pub use redirect::*;
 use rocket::{Response, http::Status, response::Responder};
+pub use runtime_config::*;
 pub use showrun::*;
 
 use crate::templates::{Template, context};

@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use env_logger::Builder;
 use mercure::config::get_mercure_config;
+use mercure::models::appstate;
 use std::io::Write;
 
 mod admin;
@@ -64,6 +65,9 @@ async fn main() -> Result<()> {
             );
         }
     };
+
+    // Initialize the global AppState (a sqlite table that stores runtime configuration variables)
+    appstate::AppState::on_startup(&pool).await?;
 
     match cli.command {
         Commands::Admin(admin) => admin.run(pool).await?,

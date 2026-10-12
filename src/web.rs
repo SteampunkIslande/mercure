@@ -88,6 +88,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::edit_groups_for_user,
                 routes::frontend::new_group,
                 routes::frontend::forms_settings_get,
+                routes::frontend::runtime_config_page_get,
             ],
         )
         .mount(
@@ -128,6 +129,9 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::redirect_get,
                 // Route pour relancer un run (une fois terminé)
                 routes::backend::retry_run_get,
+                // Routes de configuration d'exécution
+                routes::backend::runtime_config_get,
+                routes::backend::runtime_config_set,
             ],
         )
         .manage(pool)

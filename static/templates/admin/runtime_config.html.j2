@@ -1,0 +1,124 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Configuration d'exécution{% endblock %}
+
+{% block extra_head %}
+<script src="/mercure/static/scripts/json_table.js"></script>
+{% endblock %}
+
+{% block banner_text %}Configuration d'exécution{% endblock %}
+
+{% block content %}
+<div class="config-container">
+    <h1>Variables de configuration d'exécution</h1>
+    <p class="config-description">
+        Ces variables contrôlent le comportement de l'application au runtime.
+        Les modifications prennent effet immédiatement.
+    </p>
+
+    <table class="config-table">
+        <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th>Valeur</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr data-key="{{ entry.key }}">
+                <td class="config-key">{{ entry.key }}</td>
+                <td class="config-description">{{ entry.description }}</td>
+                <td class="config-type">
+                    {% if entry.value_type == "combo" %}
+                    <span class="badge badge-info">Liste prédéfinie</span>
+                    {% else %}
+                    <span class="badge badge-secondary">Texte libre</span>
+                    {% endif %}
+                </td>
+                <td class="config-value">
+                    {% if entry.value_type == "combo" %}
+                    <select class="config-select" data-key="{{ entry.key }}">
+                        {% for opt in entry.combo_values %}
+                        <option value="{{ opt }}" {% if opt==entry.value %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <input type="text" class="config-input" data-key="{{ entry.key }}" value="{{ entry.value }}">
+                    {% endif %}
+                </td>
+                <td class="config-action">
+                    <a href="javascript:void(0);" class="btn btn-primary btn-sm save-config"
+                        data-key="{{ entry.key }}">Sauvegarder</a>
+                    <span class="save-status" style="display:none; margin-left: 8px;"></span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="/mercure/admin/dashboard" class="btn btn-secondary" style="margin-top: 20px;">
+        <span class="material-icons icon-align">arrow_back</span> Retour au tableau de bord
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.save-config').forEach(button => {
+            button.addEventListener('click', async function () {
+                const key = this.dataset.key;
+                const row = document.querySelector(`tr[data-key="${key}"]`);
+                const select = row.querySelector('.config-select');
+                const input = row.querySelector('.config-input');
+                const statusSpan = row.querySelector('.save-status');
+
+                const value = select ? select.value : input.value;
+
+                this.disabled = true;
+                statusSpan.textContent = 'Sauvegarde...';
+                statusSpan.style.display = 'inline';
+                statusSpan.style.color = '#666';
+
+                try {
+                    const response = await fetch('/mercure/api/config/set', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ key, value }),
+                    });
+
+                    const json = await response.json();
+
+                    if (isApiSuccess(json)) {
+                        statusSpan.textContent = '✓ Sauvegardé';
+                        statusSpan.style.color = 'green';
+
+                        // Mettre à jour la valeur affichée si nécessaire
+                        if (select) {
+                            // La valeur est déjà à jour dans le select
+                        } else {
+                            input.value = value;
+                        }
+                    } else {
+                        statusSpan.textContent = '✗ Erreur: ' + (getApiMessage(json) || 'Inconnue');
+                        statusSpan.style.color = 'red';
+                    }
+                } catch (error) {
+                    statusSpan.textContent = '✗ Erreur: ' + error;
+                    statusSpan.style.color = 'red';
+                } finally {
+                    this.disabled = false;
+                    setTimeout(() => {
+                        statusSpan.style.display = 'none';
+                    }, 3000);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

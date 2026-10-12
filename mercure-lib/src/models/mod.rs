@@ -1,4 +1,5 @@
 pub mod analysis;
+pub mod appstate;
 pub mod attempt;
 pub mod form;
 pub mod groups;
@@ -8,6 +9,7 @@ pub mod user;
 use std::convert::Infallible;
 
 pub use analysis::*;
+pub use appstate::*;
 pub use attempt::*;
 pub use form::*;
 pub use groups::*;
@@ -38,6 +40,8 @@ pub enum ModelError {
     FormError(#[from] form::FormDefinitionError),
     #[error(transparent)]
     AnyHowError(#[from] anyhow::Error),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl From<Infallible> for ModelError {
