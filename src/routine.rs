@@ -166,7 +166,7 @@ async fn run_script(attempt: &Attempt, mut shutdown_rx: broadcast::Receiver<()>)
                     println!("Le processus s'est bien lancé. Penser à écrire dans la base de données...");
                 }
                 Ok(status) => {
-                    println!("Le processus s'est terminé avec une erreur... Code d'erreur: {} Il faudrait écrire ça dans la base de données aussi...",status.code().and_then(|c|Some(c.to_string())).unwrap_or("?".to_string()));
+                    println!("Le processus s'est terminé avec une erreur... Code d'erreur: {} Il faudrait écrire ça dans la base de données aussi...",status.code().map(|c| c.to_string()).unwrap_or("?".to_string()));
                 }
                 Err(e) => {
                     eprintln!("Erreur lors de l'attente de la fin de l'analyse... {}",  e);

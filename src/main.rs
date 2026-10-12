@@ -9,7 +9,6 @@ mod routine;
 mod web;
 use clap::{Parser, Subcommand};
 use mercure::db;
-use time;
 
 use crate::admin::Admin;
 use crate::web::Web;
