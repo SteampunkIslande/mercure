@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     auth::Authenticated,
-    models::{AppState, AppStateConfigKey},
+    models::{AppState, AppStateConfigKey, appstate::ValueType},
     routes::ApiResponse,
 };
 
@@ -17,7 +17,7 @@ pub struct ConfigSetRequest {
 pub struct ConfigEntry {
     pub key: AppStateConfigKey,
     pub value: String,
-    pub value_type: crate::models::ValueType,
+    pub value_type: ValueType,
     pub description: &'static str,
 }
 
