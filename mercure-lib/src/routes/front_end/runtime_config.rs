@@ -23,13 +23,13 @@ pub async fn runtime_config_page_get(
     auth: Authenticated,
 ) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        return Err(FrontendError::LogicalError("Admins only!".to_string()));
+        return Err(FrontendError::AdminsOnly);
     }
-    let config = AppState::get_all_typed(pool).await?;
+    let config = AppState::get_all(pool).await?;
     let entries: Vec<ConfigEntryForTemplate> = AppStateConfigKey::all()
         .iter()
         .map(|key| {
-            let value = config.get(key).cloned().unwrap_or_default();
+            let value = config.get(key.as_str()).cloned().unwrap_or_default();
             let vi = key.value_input();
             ConfigEntryForTemplate {
                 key: key.as_str().to_string(),
