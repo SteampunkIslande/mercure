@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rocket::serde::{Deserialize, Serialize};
+use rocket::serde::Serialize;
 use serde::ser::SerializeSeq;
 
 use crate::models::ModelError;
@@ -43,18 +43,6 @@ impl Serialize for ValueInput {
             }
             ValueInput::Date => serializer.serialize_str("date"),
         }
-    }
-}
-
-// Dummy Deserialize implementation (not actually used - ValueInput is only serialized for API responses)
-impl<'de> Deserialize<'de> for ValueInput {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // This should never be called in practice since ValueInput is only sent from server to client
-        // Return a default Date variant
-        Ok(ValueInput::Date)
     }
 }
 

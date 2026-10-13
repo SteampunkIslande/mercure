@@ -107,8 +107,7 @@ macro_rules! define_app_configs {
         )*
 
         // Generate the overarching registry for the Admin UI loop
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[serde(rename_all = "snake_case")]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum AppStateConfigKey {
             $($name ),*
         }
@@ -130,6 +129,50 @@ macro_rules! define_app_configs {
 
             pub fn value_input(&self) -> ValueInput {
                 match self { $( Self::$name => <$name as ConfigItem>::value_input(), )* }
+            }
+
+            /// Parses a raw string through the item's strongly-typed `FromStr`
+            /// implementation, rejecting invalid values and returning the
+            /// canonical string form that should be persisted.
+            pub fn parse_value(&self, raw: &str) -> Result<String, ModelError> {
+                match self {
+                    $( Self::$name => Ok(<$name as std::str::FromStr>::from_str(raw)?.to_string()), )*
+                }
+            }
+        }
+
+        impl std::fmt::Display for AppStateConfigKey {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl std::str::FromStr for AppStateConfigKey {
+            type Err = ModelError;
+
+            fn from_str(raw: &str) -> Result<Self, Self::Err> {
+                Self::all()
+                    .iter()
+                    .copied()
+                    .find(|key| key.as_str() == raw)
+                    .ok_or_else(|| {
+                        ModelError::InvalidInput(format!("Clé de config inconnue '{raw}'"))
+                    })
+            }
+        }
+
+        // A key is identified on the wire (HTML form, JSON) by its database key,
+        // so a single canonical string round-trips through the whole stack.
+        impl Serialize for AppStateConfigKey {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
+            }
+        }
+
+        impl<'de> Deserialize<'de> for AppStateConfigKey {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let raw = String::deserialize(deserializer)?;
+                raw.parse().map_err(serde::de::Error::custom)
             }
         }
     };

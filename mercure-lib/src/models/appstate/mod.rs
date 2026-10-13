@@ -2,17 +2,15 @@
 //!
 //! Public API:
 //! - `AppState` - Main entry point for getting/setting config values
+//! - `AppStateConfigKey` - Registry enum for all config keys
 //! - `ConfigItem` - Trait for strongly-typed config values
 //! - `ValueInput` - Enum for HTML input rendering (Combo, Date)
-//! - `AppStateConfigKey` - Registry enum for all config keys
 //! - `SigintBehavior`, `ActiveRoutine`, `AppShutdownDate` - Concrete config types
 
-pub mod appstate_defs;
 mod appstate_impl;
-pub mod appstate_macros;
-pub mod appstate_types;
+mod appstate_macros;
+mod appstate_types;
 
-// Re-export the core types from the macro module
-pub use appstate_defs::*;
 pub use appstate_impl::AppState;
 pub use appstate_macros::{ConfigItem, ValueInput};
+pub use appstate_types::{ActiveRoutine, AppShutdownDate, AppStateConfigKey, SigintBehavior};

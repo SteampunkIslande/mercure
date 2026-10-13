@@ -29,21 +29,20 @@ pub async fn runtime_config_get(
     if !auth.user.is_admin {
         return Json(ApiResponse::error("Admins only!"));
     }
-    match AppState::get_all(pool).await {
-        Ok(conf) => {
-            let entries: Vec<ConfigEntry> = AppStateConfigKey::all()
-                .iter()
-                .map(|key| ConfigEntry {
-                    key: *key,
-                    value: conf.get(key.as_str()).cloned().unwrap_or_default(),
-                    value_input: key.value_input(),
-                    description: key.description(),
-                })
-                .collect();
-            Json(ApiResponse::success(entries))
+
+    let mut entries = Vec::with_capacity(AppStateConfigKey::all().len());
+    for key in AppStateConfigKey::all() {
+        match AppState::get_str(*key, pool).await {
+            Ok(value) => entries.push(ConfigEntry {
+                key: *key,
+                value,
+                value_input: key.value_input(),
+                description: key.description(),
+            }),
+            Err(e) => return Json(ApiResponse::error(e.to_string())),
         }
-        Err(e) => Json(ApiResponse::error(e.to_string())),
     }
+    Json(ApiResponse::success(entries))
 }
 
 #[post("/config/set", data = "<request>")]

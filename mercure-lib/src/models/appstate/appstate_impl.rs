@@ -1,9 +1,6 @@
 use crate::models::ModelError;
-use crate::models::appstate::{
-    ActiveRoutine, AppShutdownDate, AppStateConfigKey, ConfigItem, SigintBehavior,
-};
-use sqlx::{Row, SqlitePool};
-use std::collections::HashMap;
+use crate::models::appstate::{AppStateConfigKey, ConfigItem};
+use sqlx::SqlitePool;
 
 pub struct AppState;
 
@@ -19,61 +16,54 @@ impl AppState {
         Ok(())
     }
 
-    /// Safely gets the strongly typed value
+    /// Reads and parses the strongly typed value for `T`, falling back to its
+    /// declared default when the key is missing or holds an invalid value.
     pub async fn get<T: ConfigItem>(pool: &SqlitePool) -> Result<T, ModelError> {
-        let val: Option<String> = sqlx::query_scalar("SELECT value FROM AppState WHERE key = ?")
+        let raw: Option<String> = sqlx::query_scalar("SELECT value FROM AppState WHERE key = ?")
             .bind(T::DB_KEY)
             .fetch_optional(pool)
             .await?;
 
-        match val {
-            Some(s) => Ok(s.parse::<T>().unwrap_or_else(|_| T::default_value())),
-            None => Ok(T::default_value()),
-        }
+        Ok(raw
+            .and_then(|s| s.parse::<T>().ok())
+            .unwrap_or_else(T::default_value))
     }
 
-    /// Fetches everything as strings for the Admin UI renderer
-    pub async fn get_all(pool: &SqlitePool) -> Result<HashMap<String, String>, ModelError> {
-        Ok(sqlx::query("SELECT key, value FROM AppState")
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .filter_map(|row| Some((row.try_get("key").ok()?, row.try_get("value").ok()?)))
-            .collect())
+    /// Reads the raw string value for a key, falling back to its declared
+    /// default. Intended for the admin UI, which renders untyped form inputs.
+    pub async fn get_str(key: AppStateConfigKey, pool: &SqlitePool) -> Result<String, ModelError> {
+        let raw: Option<String> = sqlx::query_scalar("SELECT value FROM AppState WHERE key = ?")
+            .bind(key.as_str())
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(raw.unwrap_or_else(|| key.default_value_str().to_string()))
     }
 
-    /// The new perfectly-typed setter.
+    /// Persists a strongly typed value.
     /// Usage: `AppState::set(SigintBehavior::StopJobs, &pool).await?`
     /// Usage: `AppState::set(AppShutdownDate("2024-05-12".into()), &pool).await?`
     pub async fn set<T: ConfigItem>(value: T, pool: &SqlitePool) -> Result<(), ModelError> {
-        sqlx::query("INSERT OR REPLACE INTO AppState (key, value) VALUES (?, ?)")
-            .bind(T::DB_KEY)
-            .bind(value.to_string()) // Handled gracefully by the Display implementation
-            .execute(pool)
-            .await?;
-        Ok(())
+        Self::write(T::DB_KEY, &value.to_string(), pool).await
     }
 
-    /// Sets a config value by key, parsing the string to the appropriate type.
-    /// Used by the Admin API which receives untyped strings.
+    /// Persists a value received as an untyped string (e.g. from the admin API),
+    /// validating and canonicalizing it through the strongly typed item first.
     pub async fn set_by_key(
         key: AppStateConfigKey,
         value: &str,
         pool: &SqlitePool,
     ) -> Result<(), ModelError> {
-        match key {
-            AppStateConfigKey::SigintBehavior => {
-                let parsed: SigintBehavior = value.parse()?;
-                Self::set(parsed, pool).await
-            }
-            AppStateConfigKey::ActiveRoutine => {
-                let parsed: ActiveRoutine = value.parse()?;
-                Self::set(parsed, pool).await
-            }
-            AppStateConfigKey::AppShutdownDate => {
-                let parsed: AppShutdownDate = value.parse()?;
-                Self::set(parsed, pool).await
-            }
-        }
+        let canonical = key.parse_value(value)?;
+        Self::write(key.as_str(), &canonical, pool).await
+    }
+
+    async fn write(key: &str, value: &str, pool: &SqlitePool) -> Result<(), ModelError> {
+        sqlx::query("INSERT OR REPLACE INTO AppState (key, value) VALUES (?, ?)")
+            .bind(key)
+            .bind(value)
+            .execute(pool)
+            .await?;
+        Ok(())
     }
 }

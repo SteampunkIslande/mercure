@@ -11,10 +11,9 @@ use crate::{
 
 #[derive(Serialize)]
 struct ConfigEntryForTemplate {
-    key: String,
-    value: String,
+    key: AppStateConfigKey,
     input_html: String,
-    description: String,
+    description: &'static str,
 }
 
 #[get("/runtime_config")]
@@ -25,20 +24,17 @@ pub async fn runtime_config_page_get(
     if !auth.user.is_admin {
         return Err(FrontendError::AdminsOnly);
     }
-    let config = AppState::get_all(pool).await?;
-    let entries: Vec<ConfigEntryForTemplate> = AppStateConfigKey::all()
-        .iter()
-        .map(|key| {
-            let value = config.get(key.as_str()).cloned().unwrap_or_default();
-            let vi = key.value_input();
-            ConfigEntryForTemplate {
-                key: key.as_str().to_string(),
-                value: value.clone(),
-                input_html: vi.render_html(key.as_str(), &value),
-                description: key.description().to_string(),
-            }
-        })
-        .collect();
+
+    let mut entries = Vec::with_capacity(AppStateConfigKey::all().len());
+    for key in AppStateConfigKey::all() {
+        let value = AppState::get_str(*key, pool).await?;
+        entries.push(ConfigEntryForTemplate {
+            key: *key,
+            input_html: key.value_input().render_html(key.as_str(), &value),
+            description: key.description(),
+        });
+    }
+
     Ok(Template::render(
         "admin/runtime_config",
         context! {
