@@ -1,11 +1,11 @@
-//! Public type system for AppState configuration.
+//! Macro machinery for the AppState configuration registry.
 //!
-//! This module exposes the strongly-typed configuration items, the registry enum,
-//! and the validation/rendering utilities. Macro internals are private to this module.
-
-use crate::models::ModelError;
-use crate::models::appstate::appstate_macros::{ConfigItem, ValueInput};
-use rocket::serde::{Deserialize, Serialize};
+//! Defines `define_app_configs!` (and its `config_item_generator!` helper),
+//! which generate the strongly-typed config items and the `AppStateConfigKey`
+//! registry. The macro is *invoked* from `mod.rs`, next to the public API.
+//!
+//! Every type is referenced through an absolute path inside the expansion so
+//! the macro can be invoked from any module without extra imports.
 
 /// Helper macro to generate specific types (Enums or Date wrappers)
 macro_rules! config_item_generator {
@@ -18,7 +18,7 @@ macro_rules! config_item_generator {
             variants: [ $($variant:ident),* $(,)? ]$(,)?
         }
     ) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(rename_all = "PascalCase")]
         $vis enum $name { $($variant),* }
 
@@ -30,11 +30,11 @@ macro_rules! config_item_generator {
         }
 
         impl std::str::FromStr for $name {
-            type Err = ModelError;
+            type Err = crate::models::ModelError;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     $( stringify!($variant) => Ok(Self::$variant), )*
-                    _ => Err(ModelError::InvalidInput(format!(
+                    _ => Err(crate::models::ModelError::InvalidInput(format!(
                         "Invalid {} '{}'. Allowed: {}",
                         stringify!($name), s, [$(stringify!($variant)),*].join(", ")
                     ))),
@@ -42,14 +42,14 @@ macro_rules! config_item_generator {
             }
         }
 
-        impl ConfigItem for $name {
+        impl crate::models::appstate::ConfigItem for $name {
             const DB_KEY: &'static str = $db_key;
             const DESCRIPTION: &'static str = $desc;
             const DEFAULT_STR: &'static str = stringify!($default);
 
             fn default_value() -> Self { Self::$default }
-            fn value_input() -> ValueInput {
-                ValueInput::Combo(&[ $( stringify!($variant) ),* ])
+            fn value_input() -> crate::models::appstate::ValueInput {
+                crate::models::appstate::ValueInput::Combo(&[ $( stringify!($variant) ),* ])
             }
         }
     };
@@ -63,7 +63,7 @@ macro_rules! config_item_generator {
         }
     ) => {
         /// A strongly typed newtype wrapper for a Date string (YYYY-MM-DD).
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         $vis struct $name(pub String);
 
         impl std::fmt::Display for $name {
@@ -73,19 +73,21 @@ macro_rules! config_item_generator {
         }
 
         impl std::str::FromStr for $name {
-            type Err = ModelError;
+            type Err = crate::models::ModelError;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 Ok(Self(s.to_string()))
             }
         }
 
-        impl ConfigItem for $name {
+        impl crate::models::appstate::ConfigItem for $name {
             const DB_KEY: &'static str = $db_key;
             const DESCRIPTION: &'static str = $desc;
             const DEFAULT_STR: &'static str = $default;
 
             fn default_value() -> Self { Self($default.to_string()) }
-            fn value_input() -> ValueInput { ValueInput::Date }
+            fn value_input() -> crate::models::appstate::ValueInput {
+                crate::models::appstate::ValueInput::Date
+            }
         }
     };
 }
@@ -116,25 +118,25 @@ macro_rules! define_app_configs {
             pub fn all() -> &'static [Self] { &[ $( Self::$name ),* ] }
 
             pub const fn as_str(&self) -> &'static str {
-                match self { $( Self::$name => <$name as ConfigItem>::DB_KEY, )* }
+                match self { $( Self::$name => <$name as crate::models::appstate::ConfigItem>::DB_KEY, )* }
             }
 
             pub const fn description(&self) -> &'static str {
-                match self { $( Self::$name => <$name as ConfigItem>::DESCRIPTION, )* }
+                match self { $( Self::$name => <$name as crate::models::appstate::ConfigItem>::DESCRIPTION, )* }
             }
 
             pub const fn default_value_str(&self) -> &'static str {
-                match self { $( Self::$name => <$name as ConfigItem>::DEFAULT_STR, )* }
+                match self { $( Self::$name => <$name as crate::models::appstate::ConfigItem>::DEFAULT_STR, )* }
             }
 
-            pub fn value_input(&self) -> ValueInput {
-                match self { $( Self::$name => <$name as ConfigItem>::value_input(), )* }
+            pub fn value_input(&self) -> crate::models::appstate::ValueInput {
+                match self { $( Self::$name => <$name as crate::models::appstate::ConfigItem>::value_input(), )* }
             }
 
             /// Parses a raw string through the item's strongly-typed `FromStr`
             /// implementation, rejecting invalid values and returning the
             /// canonical string form that should be persisted.
-            pub fn parse_value(&self, raw: &str) -> Result<String, ModelError> {
+            pub fn parse_value(&self, raw: &str) -> Result<String, crate::models::ModelError> {
                 match self {
                     $( Self::$name => Ok(<$name as std::str::FromStr>::from_str(raw)?.to_string()), )*
                 }
@@ -148,7 +150,7 @@ macro_rules! define_app_configs {
         }
 
         impl std::str::FromStr for AppStateConfigKey {
-            type Err = ModelError;
+            type Err = crate::models::ModelError;
 
             fn from_str(raw: &str) -> Result<Self, Self::Err> {
                 Self::all()
@@ -156,50 +158,24 @@ macro_rules! define_app_configs {
                     .copied()
                     .find(|key| key.as_str() == raw)
                     .ok_or_else(|| {
-                        ModelError::InvalidInput(format!("Clé de config inconnue '{raw}'"))
+                        crate::models::ModelError::InvalidInput(format!("Unknown config key '{raw}'"))
                     })
             }
         }
 
         // A key is identified on the wire (HTML form, JSON) by its database key,
         // so a single canonical string round-trips through the whole stack.
-        impl Serialize for AppStateConfigKey {
+        impl serde::Serialize for AppStateConfigKey {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 serializer.serialize_str(self.as_str())
             }
         }
 
-        impl<'de> Deserialize<'de> for AppStateConfigKey {
+        impl<'de> serde::Deserialize<'de> for AppStateConfigKey {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let raw = String::deserialize(deserializer)?;
+                let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
                 raw.parse().map_err(serde::de::Error::custom)
             }
         }
     };
 }
-
-define_app_configs! {
-    pub enum SigintBehavior {
-        db_key: "on_sigint",
-        description: "Actions à mener lorsque cette application reçoit SIGINT",
-        default: StopJobs,
-        variants: [StopJobs, WaitForJobCompletion],
-    },
-
-    pub enum ActiveRoutine {
-        db_key: "active_routine",
-        description: "Permet l'exécution immédiate de tous les runs...",
-        default: RoutineOn,
-        variants: [RoutineOff, RoutineOn],
-    },
-
-    // The new Date branch in action!
-    pub date AppShutdownDate {
-        db_key: "app_shutdown_date",
-        description: "Date prévisionnelle d'arrêt de service de l'application",
-        default: "2025-12-31",
-    }
-}
-
-// The types are already public from the macro expansion (pub enum/struct)
-// No need for pub use self::...
