@@ -75,14 +75,19 @@ macro_rules! define_appstate_config {
 define_appstate_config! {
     AppstateLocked {
         db_key: "appstate_locked",
-        description: "Lock AppState to prevent reset on next startup",
+        description: "Verrouiller l'appstate pour éviter que l'état ne soit réinitialisé au prochain redémarrage (n'empêche pas les modifications).",
         input: ValueInput::combo(&["true", "false"]),
     },
     ActiveRoutine {
         db_key: "active_routine",
-        description: "Allow pending runs to transition to Running automatically",
+        description: "Permet l'exécution immédiate de tous les runs en attente. Passer cette valeur à false permet de suspendre les exécutions, par exemple pour drainer les jobs en cours avant un arrêt de l'application.",
         input: ValueInput::combo(&["true", "false"]),
     },
+    SigintBehavior{
+        db_key: "on_sigint",
+        description: "Actions à mener lorsque cette application reçoit SIGINT",
+        input: ValueInput::combo(&["StopJobs","WaitForJobCompletion"]),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,3 +1,4 @@
+use crate::models::Form;
 use crate::models::{ModelError, Run, RunStatus};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -78,6 +79,15 @@ impl Attempt {
             status: RunStatus::Idle,
             comment: String::new(),
         })
+    }
+
+    pub async fn get_run(&self, pool: &SqlitePool) -> Result<Run, ModelError> {
+        Ok(Run::get_run_from_id(self.run_id, pool).await?)
+    }
+
+    pub async fn get_form(&self, pool: &SqlitePool) -> Result<Form, ModelError> {
+        // Form::get_form()
+        todo!()
     }
 
     /// Récupère un HgAttempt à partir de son attempt_number et run_id

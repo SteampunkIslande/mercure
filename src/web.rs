@@ -204,7 +204,7 @@ impl Web {
         });
 
         // Démarrage de la routine (exécution des jobs)
-        let routine = run_routine_loop(pool, routine_shutdown_rx);
+        let routine = run_routine_loop(&pool, routine_shutdown_rx);
 
         // Démarrage de l'application web
         let webapp = rocket_app.launch();

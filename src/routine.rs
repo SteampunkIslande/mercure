@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use mercure::models::ModelError;
+use mercure::models::{ModelError, appstate};
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
 use std::process::ExitStatus;
@@ -36,16 +36,12 @@ enum RoutineError {
     TokioJoin(#[from] TokioJoinError),
     #[error(transparent)]
     InvalidRegex(#[from] RegexError),
-    #[error("Le dossier d'entrée {0} est introuvable")]
-    IndirNotFound(String),
-    #[error("Aucun dossier d'entrée spécifié")]
-    NoIndir,
-    #[error("Impossible de déterminer si le run est terminé: {0}")]
-    CheckRunCompletedError(String),
+    #[error(transparent)]
+    AnyhowError(#[from] anyhow::Error),
 }
 
 pub async fn run_routine_loop(
-    pool: SqlitePool,
+    pool: &SqlitePool,
     mut routine_shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
     // Canal pour prévenir les processus enfants démarrés par la routine
@@ -63,12 +59,18 @@ pub async fn run_routine_loop(
             }
 
             _ = interval.tick() => {
-                if let Some(attempt) = find_run_to_launch(&pool).await {
+                if let Some(attempt) = find_run_to_launch(pool).await {
                     let child_rx = child_shutdown_tx.subscribe();
 
-                    // Lancement de la tâche dans le JoinSet
+                    // 1. Clone the pool handle. This is cheap (Arc clone under the hood).
+                    let pool_clone = pool.clone();
+
+                    // 2. Move the cloned handle into the spawned task
                     join_set.spawn(async move {
-                        run_script(&attempt, child_rx).await;
+                        match run_script(&attempt, &pool_clone, child_rx).await {
+                            Ok(()) => { info!("Run terminé"); }
+                            Err(e) => { error!("{}", e.to_string()); }
+                        }
                     });
                 }
             }
@@ -145,15 +147,22 @@ async fn send_sigint_then_kill(
     }
 }
 
-async fn run_script(attempt: &Attempt, mut shutdown_rx: broadcast::Receiver<()>) {
+async fn run_script(
+    attempt: &Attempt,
+    pool: &SqlitePool,
+    mut shutdown_rx: broadcast::Receiver<()>,
+) -> Result<(), RoutineError> {
+    // let script_file
     let mut child = match Command::new("bash").spawn() {
         Ok(c) => c,
         Err(e) => {
-            error!(
+            return Err(anyhow::format_err!(
                 "Erreur de lancement pour la tentative {} du run {}. Erreur: `{}`",
-                attempt.attempt_number, attempt.run_id, e
-            );
-            return;
+                attempt.attempt_number,
+                attempt.run_id,
+                e
+            )
+            .into());
         }
     };
 
@@ -172,6 +181,7 @@ async fn run_script(attempt: &Attempt, mut shutdown_rx: broadcast::Receiver<()>)
                     eprintln!("Erreur lors de l'attente de la fin de l'analyse... {}",  e);
                 }
             }
+            Ok(())
         }
 
         _ = shutdown_rx.recv() => {
@@ -188,6 +198,7 @@ async fn run_script(attempt: &Attempt, mut shutdown_rx: broadcast::Receiver<()>)
                     eprintln!("Double oops: {}",e);
                 }
             }
+            Ok(())
         }
     }
 }

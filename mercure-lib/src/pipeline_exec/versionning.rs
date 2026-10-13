@@ -1,4 +1,7 @@
-use crate::config::{GitWebConfig, MercureConfig, get_mercure_config};
+use crate::{
+    config::{GitWebConfig, MercureConfig, get_mercure_config},
+    models::FormIdentification,
+};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
@@ -133,15 +136,34 @@ pub async fn get_file_giteav1(
     base_url: &str,
     owner: &str,
     repo: &str,
-    branch_name: &str,
-    path: &str,
+    form_identification: &FormIdentification,
 ) -> Result<String, GitCheckError> {
     let client = Client::new();
     // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
-    let url = format!(
-        "{}/{}/{}/raw/branch/{}/{}",
-        base_url, owner, repo, branch_name, path
-    );
+    let url = match form_identification {
+        FormIdentification::GitBranchAndPath {
+            branch,
+            file_path: path,
+        } => {
+            format!(
+                "{}/{}/{}/raw/branch/{}/{}",
+                base_url, owner, repo, branch, path
+            )
+        }
+        FormIdentification::GitCommit {
+            hash,
+            file_path: path,
+        } => {
+            format!(
+                "{}/{}/{}/raw/commit/{}/{}",
+                base_url, owner, repo, hash, path
+            )
+        }
+        FormIdentification::None => {
+            return Err(anyhow::format_err!("Fuck").into());
+        }
+    };
+
     Ok(client.get(&url).send().await?.text().await?)
 }
 

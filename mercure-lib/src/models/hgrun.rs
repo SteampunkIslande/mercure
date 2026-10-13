@@ -1,5 +1,6 @@
 use crate::models::CachedForm;
 use crate::models::Form;
+use crate::models::FormIdentification;
 use crate::models::Group;
 use crate::models::User;
 
@@ -599,7 +600,11 @@ impl Run {
     }
 
     pub async fn get_form(&self) -> Result<Form, ModelError> {
-        Form::get_form(&self.branch_name, &self.form_path).await
+        Form::get_form(FormIdentification::GitBranchAndPath {
+            branch: self.branch_name.clone(),
+            file_path: self.form_path.clone(),
+        })
+        .await
     }
 
     pub async fn get_user(&self, pool: &SqlitePool) -> Result<User, ModelError> {

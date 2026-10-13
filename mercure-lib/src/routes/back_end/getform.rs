@@ -3,7 +3,7 @@ use serde_json::json;
 use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
-use crate::models::{CachedForm, Form};
+use crate::models::{CachedForm, Form, FormIdentification};
 use crate::routes::ApiResponse;
 
 /// Lists every cached FormDef straight from the database (no HTTP request to the git
@@ -48,9 +48,9 @@ pub async fn get_all_forms_for_group(
 
 /// Gets the full, exact form definition of a (branch, form_path) pair, directly
 /// from the git repository (HTTP request).
-#[get("/forms/get?<branch>&<form_path>")]
-pub async fn get_form_from_id(branch: &str, form_path: &str) -> Json<ApiResponse<Form>> {
-    match Form::get_form(branch, form_path).await {
+#[get("/forms/get?<branch>&<file_path>")]
+pub async fn get_form_from_id(branch: String, file_path: String) -> Json<ApiResponse<Form>> {
+    match Form::get_form(FormIdentification::GitBranchAndPath { branch, file_path }).await {
         Ok(formdef) => Json(ApiResponse::success(formdef)),
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
     }

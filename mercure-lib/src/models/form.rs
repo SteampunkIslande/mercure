@@ -31,6 +31,8 @@ pub enum FormDefinitionError {
     MinijinjaError(#[from] minijinja::Error),
     #[error(transparent)]
     AnyHowError(#[from] anyhow::Error),
+    #[error("Nom de variable réservé: {}",.0)]
+    ReservedVarName(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -130,6 +132,20 @@ impl Default for FormExecType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub enum FormIdentification {
+    GitBranchAndPath {
+        branch: String,
+        file_path: String,
+    },
+    GitCommit {
+        hash: String,
+        file_path: String,
+    },
+    #[default]
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Form {
     pub name: String,
     pub description: String,
@@ -137,8 +153,7 @@ pub struct Form {
     #[serde(flatten)]
     pub exec_type: FormExecType,
     pub workdir: String,
-    pub branch: Option<String>,
-    pub file_path: Option<String>,
+    pub form_identification: FormIdentification,
     pub groups: Option<Vec<String>>,
 }
 
@@ -158,21 +173,24 @@ impl Form {
                 repo,
             } => {
                 // For each branch
-                for branch_name in all_branches.iter() {
+                for branch_name in all_branches.into_iter() {
                     // 1. List yaml files on this branch
                     let items =
-                        versionning::list_yaml_forms_giteav1(base_url, owner, repo, branch_name)
+                        versionning::list_yaml_forms_giteav1(base_url, owner, repo, &branch_name)
                             .await
                             .unwrap_or_default();
                     // For each form in given branch
                     for dir_item in items {
+                        let form_identification = FormIdentification::GitBranchAndPath {
+                            branch: branch_name.clone(),
+                            file_path: dir_item.path.clone(),
+                        };
                         // fetch file
                         let content = match versionning::get_file_giteav1(
                             base_url,
                             owner,
                             repo,
-                            branch_name,
-                            &dir_item.path,
+                            &form_identification,
                         )
                         .await
                         {
@@ -192,8 +210,7 @@ impl Form {
                             }
                         };
 
-                        form.branch = Some(branch_name.clone());
-                        form.file_path = Some(dir_item.path);
+                        form.form_identification = form_identification;
                         all_forms.push(form);
                     }
                 }
@@ -210,7 +227,7 @@ impl Form {
         Ok(all_forms)
     }
 
-    pub async fn get_form(branch: &str, form_path: &str) -> Result<Form, ModelError> {
+    pub async fn get_form(form_identification: FormIdentification) -> Result<Form, ModelError> {
         let MercureConfig { pipelines, .. } = crate::config::get_mercure_config();
 
         match &pipelines {
@@ -220,10 +237,10 @@ impl Form {
                 repo,
             } => {
                 let content =
-                    versionning::get_file_giteav1(base_url, owner, repo, branch, form_path).await?;
+                    versionning::get_file_giteav1(base_url, owner, repo, &form_identification)
+                        .await?;
                 let mut form: Form = yaml_serde::from_str(&content)?;
-                form.branch = Some(branch.to_string());
-                form.file_path = Some(form_path.to_string());
+                form.form_identification = form_identification;
                 // Check validity of this form by making sure there are no syntax error in the template definition
                 form.check_validity(None).await?;
                 Ok(form)
@@ -261,6 +278,13 @@ impl Form {
     ) -> Result<(), FormDefinitionError> {
         match variables {
             None => {
+                if let Some(v) = self
+                    .variables
+                    .iter()
+                    .find(|v| (&["outdir", "attempt_id"]).contains(&v.name.as_str()))
+                {
+                    return Err(FormDefinitionError::ReservedVarName(v.name.to_string()));
+                }
                 self.try_render_template(
                     &self
                         .variables
@@ -354,8 +378,7 @@ impl Form {
 pub struct CachedForm {
     /// L'ID d'un formulaire. **Ne pas** l'utiliser pour identifier un formulaire en tant que tel.
     pub form_def_id: i64,
-    pub branch: String,
-    pub file_path: String,
+    pub form_identification: FormIdentification,
     pub name: String,
     pub description: String,
 }
@@ -412,11 +435,10 @@ impl CachedForm {
         let mut cached = Vec::new();
         for form in all_forms {
             let Form {
-                branch: Some(branch),
                 name,
                 description,
-                file_path: Some(file_path),
                 groups,
+                form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
                 ..
             } = form
             else {
@@ -458,8 +480,7 @@ impl CachedForm {
 
             cached.push(CachedForm {
                 form_def_id,
-                branch,
-                file_path,
+                form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
                 description,
                 name,
             });
@@ -640,10 +661,11 @@ ORDER BY fd.branch, fd.file_path"#,
 
 /// Builds a `FormDef` from a row selecting `form_def_id`, `branch` and `file_path`
 fn form_def_from_row(row: &sqlx::sqlite::SqliteRow) -> Option<CachedForm> {
+    let branch = row.try_get("branch").ok()?;
+    let file_path = row.try_get("file_path").ok()?;
     Some(CachedForm {
         form_def_id: row.try_get("form_def_id").ok()?,
-        branch: row.try_get("branch").ok()?,
-        file_path: row.try_get("file_path").ok()?,
+        form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
         description: row.try_get("description").ok()?,
         name: row.try_get("name").ok()?,
     })
@@ -712,8 +734,7 @@ mod test {
                                 variable_type: VariableType::ExistingFile,
                             }
                         ],
-                        branch:None,
-                        file_path: None,
+                        form_identification: FormIdentification::None,
 
                         workdir: "outdir".to_string(),
                         groups: Some(vec!["Admin".to_string(),"Génétique".to_string()]),
@@ -832,7 +853,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 mod form_def_cache_tests {
     use sqlx::SqlitePool;
 
-    use crate::models::{CachedForm, Form, Group};
+    use crate::models::{CachedForm, Form, FormIdentification, Group};
 
     async fn test_pool() -> SqlitePool {
         // Le cache en mémoire vit par connexion : une seule connexion dans le pool
@@ -845,15 +866,17 @@ mod form_def_cache_tests {
         pool
     }
 
-    fn form(name: &str, branch: &str, path: &str, groups: &[&str]) -> Form {
+    fn form(name: &str, branch: &str, file_path: &str, groups: &[&str]) -> Form {
         Form {
             name: name.to_string(),
             description: String::new(),
             variables: vec![],
             exec_type: Default::default(),
             workdir: String::new(),
-            branch: Some(branch.to_string()),
-            file_path: Some(path.to_string()),
+            form_identification: FormIdentification::GitBranchAndPath {
+                branch: branch.to_string(),
+                file_path: file_path.to_string(),
+            },
             groups: Some(groups.iter().map(|s| s.to_string()).collect()),
         }
     }
@@ -892,22 +915,28 @@ mod form_def_cache_tests {
             vec![
                 CachedForm {
                     form_def_id: all[0].form_def_id,
-                    branch: "dev".into(),
-                    file_path: ".forms/f2.yaml".into(),
+                    form_identification: FormIdentification::GitBranchAndPath {
+                        branch: "dev".into(),
+                        file_path: ".forms/f2.yaml".into()
+                    },
                     description: "".to_string(),
                     name: "F2".to_string()
                 },
                 CachedForm {
                     form_def_id: all[1].form_def_id,
-                    branch: "main".into(),
-                    file_path: ".forms/f1.yaml".into(),
+                    form_identification: FormIdentification::GitBranchAndPath {
+                        branch: "main".into(),
+                        file_path: ".forms/f1.yaml".into()
+                    },
                     description: "".to_string(),
                     name: "F1".to_string()
                 },
                 CachedForm {
                     form_def_id: all[2].form_def_id,
-                    branch: "main".into(),
-                    file_path: ".forms/f3.yaml".into(),
+                    form_identification: FormIdentification::GitBranchAndPath {
+                        branch: "main".into(),
+                        file_path: ".forms/f3.yaml".into()
+                    },
                     description: "".to_string(),
                     name: "F3".to_string()
                 },
@@ -919,11 +948,11 @@ mod form_def_cache_tests {
             .expect("for group");
         assert_eq!(forms_with_group.len(), 1);
         assert_eq!(
-            (
-                forms_with_group[0].branch.as_str(),
-                forms_with_group[0].file_path.as_str()
-            ),
-            ("main", ".forms/f1.yaml")
+            forms_with_group[0].form_identification,
+            FormIdentification::GitBranchAndPath {
+                branch: "main".to_string(),
+                file_path: ".forms/f1.yaml".to_string()
+            }
         );
 
         let forms_without_group = CachedForm::get_form_defs_for_group(&pool, None)
@@ -993,8 +1022,13 @@ mod form_def_cache_tests {
 
         let all = CachedForm::get_all(&pool).await.expect("get_all");
         assert_eq!(all.len(), 1);
-        assert_eq!(all[0].branch, "main");
-        assert_eq!(all[0].file_path, ".forms/f1.yaml");
+        assert_eq!(
+            all[0].form_identification,
+            FormIdentification::GitBranchAndPath {
+                branch: "main".to_string(),
+                file_path: ".forms/f1.yaml".to_string()
+            }
+        );
 
         // L'ancienne association (F1 -> Bio) ne doit plus exister
         assert!(
