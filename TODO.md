@@ -4,17 +4,6 @@
 
 - [x] Déplacer back_end/redirect.rs dans frontend (et renommer la route correspondante de post en get)
 
-## Scripts
-
-- [ ] Le dossier scripts ne devrait contenir que des scripts tels qu'ils sont en production. Pour les mettre à jour: copier depuis l'installation (fonctionnelle) présente sur le serveur de production.
-
-## Utilitaires
-
-Nettoyage de `utils.rs`.
-
-- [ ] Créer un fichier dédié pour les samplesheets Illumina.
-- [ ] déplacer la fonction parse_launcher de `utils.rs` vers `launchers_check.rs`.
-
 # Remaniement de code
 
 ## Langue
@@ -24,4 +13,4 @@ Nettoyage de `utils.rs`.
 ## Rafraîchissements
 
 - [ ] Revoir la route `/home` (front_end/home.rs)
-- [ ] Remanier le modèle HgRun pour toujours utiliser les champs indir et outdir (même pour les dossiers BCL).
+- [ ] Revoir `front_end/mod.rs`, la gestion des erreurs n'est pas élégante...

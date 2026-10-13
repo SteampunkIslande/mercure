@@ -34,7 +34,9 @@ pub enum FrontendError {
     #[error("Erreur logique: {0}")]
     LogicalError(String),
     #[error(transparent)]
-    GenericError(#[from] anyhow::Error),
+    AnyhowError(#[from] anyhow::Error),
+    #[error("Accès réservé aux admins")]
+    AdminsOnly,
 }
 
 impl<'r> Responder<'r, 'static> for FrontendError {
@@ -42,7 +44,25 @@ impl<'r> Responder<'r, 'static> for FrontendError {
         let (title, detail) = match &self {
             FrontendError::ModelError(e) => ("Erreur de modèle".to_string(), e.to_string()),
             FrontendError::LogicalError(e) => ("Erreur logique".to_string(), e.to_string()),
-            FrontendError::GenericError(e) => ("Erreur générique".to_string(), e.to_string()),
+            FrontendError::AnyhowError(e) => (
+                if let Some(e) = e.chain().next() {
+                    format!("Erreur: {}", e)
+                } else {
+                    "Erreur inconnue".to_string()
+                },
+                e.chain()
+                    .fold(Vec::new(), |mut acc, cause| {
+                        acc.push(format!(
+                            "Causée par: <b>{}<b/>, elle-même causée par:",
+                            cause
+                        ));
+                        acc
+                    })
+                    .join("<br/>"),
+            ),
+            FrontendError::AdminsOnly => {
+                return Template::render("error/admin_only", context! {}).respond_to(req);
+            }
         };
 
         Template::render(
