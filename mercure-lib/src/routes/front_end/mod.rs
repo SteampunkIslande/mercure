@@ -44,22 +44,30 @@ impl<'r> Responder<'r, 'static> for FrontendError {
         let (title, detail) = match &self {
             FrontendError::ModelError(e) => ("Erreur de modèle".to_string(), e.to_string()),
             FrontendError::LogicalError(e) => ("Erreur logique".to_string(), e.to_string()),
-            FrontendError::AnyhowError(e) => (
-                if let Some(e) = e.chain().next() {
-                    format!("Erreur: {}", e)
+            FrontendError::AnyhowError(e) => {
+                // 1. The outermost error (first in the chain) becomes the title.
+                // anyhow::Error's Display implementation already gives us this.
+                let title = format!("Erreur : {}", e);
+
+                // 2. We skip the first error and collect the underlying causes.
+                let causes_html = e
+                    .chain()
+                    .skip(1)
+                    .map(|cause| format!("<li>{}</li>", cause))
+                    .collect::<Vec<_>>();
+
+                // 3. Format the body with a simple, clean HTML list style.
+                let body = if causes_html.is_empty() {
+                    String::new() // Or perhaps "<p>Aucun détail supplémentaire.</p>".to_string()
                 } else {
-                    "Erreur inconnue".to_string()
-                },
-                e.chain()
-                    .fold(Vec::new(), |mut acc, cause| {
-                        acc.push(format!(
-                            "Causée par: <b>{}<b/>, elle-même causée par:",
-                            cause
-                        ));
-                        acc
-                    })
-                    .join("<br/>"),
-            ),
+                    format!(
+                        "<p><strong>Causée par :</strong></p><ul>{}</ul>",
+                        causes_html.join("")
+                    )
+                };
+
+                (title, body)
+            }
             FrontendError::AdminsOnly => {
                 return Template::render("error/admin_only", context! {}).respond_to(req);
             }

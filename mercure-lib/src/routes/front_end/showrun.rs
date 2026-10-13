@@ -79,7 +79,7 @@ pub async fn show_run_get(
                 "common/idlerun",
                 context! {
                     run=> &run,
-                    form=> &run.get_form().await?,
+                    form=> &run.get_form().await.context("Impossible d'obtenir le formulaire associé...")?,
                     run_creation_date,
                     attempt=> &attempt,
                     history=> history,
