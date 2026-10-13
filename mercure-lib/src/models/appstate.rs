@@ -1,93 +1,201 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use rocket::serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 
 use crate::models::ModelError;
 
-/// Macro to define AppState configuration keys with minimal boilerplate.
+/// Trait for config types to provide metadata and HTML rendering.
+pub trait ConfigType:
+    Sized + FromStr<Err = ModelError> + Default + Clone + Send + Sync + 'static
+{
+    const DB_KEY: &'static str;
+    const DESCRIPTION: &'static str;
+    const DEFAULT: &'static str;
+
+    fn value_input() -> ValueInput;
+    fn render_html(name: &str, current_value: &str) -> String {
+        Self::value_input().render_html(name, current_value)
+    }
+}
+
+/// Trait for config values that can be parsed from strings.
+pub trait ConfigValue: std::fmt::Display + Send + Sync {}
+impl<T> ConfigValue for T where
+    T: std::fmt::Display + Send + Sync + FromStr<Err = ModelError> + Default + Clone + 'static
+{
+}
+
+/// Define an enum config type.
 /// Usage:
-/// ```ignore
+/// ```
+/// enum_config! {
+///     SigintBehavior {
+///         db_key: "on_sigint",
+///         description: "Actions when receiving SIGINT",
+///         variants: [StopJobs, WaitForJobCompletion],
+///         default: StopJobs,
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! enum_config {
+    (
+        $(
+            $type_name:ident {
+                db_key: $db_key:expr,
+                description: $description:expr,
+                variants: [$($variant:ident),* $(,)?],
+                default: $default:ident,
+            }
+        ),* $(,)?
+    ) => {
+        $(
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+            #[serde(rename_all = "PascalCase")]
+            pub enum $type_name {
+                $($variant,)*
+            }
+
+            impl $type_name {
+                pub const fn all() -> &'static [$type_name] {
+                    &[$($type_name::$variant,)*]
+                }
+
+                pub fn as_str(&self) -> &'static str {
+                    match self {
+                        $($type_name::$variant => stringify!($variant),)*
+                    }
+                }
+            }
+
+            impl FromStr for $type_name {
+                type Err = ModelError;
+
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    match s {
+                        $(stringify!($variant) => Ok($type_name::$variant),)*
+                        _ => Err(ModelError::InvalidInput(format!(
+                            "Invalid {} '{}'. Allowed: {}",
+                            stringify!($type_name),
+                            s,
+                            [$($type_name::$variant.as_str()),*].join(", ")
+                        ))),
+                    }
+                }
+            }
+
+            impl Default for $type_name {
+                fn default() -> Self {
+                    $type_name::$default
+                }
+            }
+
+            impl std::fmt::Display for $type_name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.as_str())
+                }
+            }
+
+            impl crate::models::appstate::ConfigType for $type_name {
+                const DB_KEY: &'static str = $db_key;
+                const DESCRIPTION: &'static str = $description;
+                const DEFAULT: &'static str = stringify!($default);
+
+                fn value_input() -> ValueInput {
+                    ValueInput::combo(&[$(stringify!($variant)),*])
+                }
+            }
+        )*
+    };
+}
+
+/// Macro to define AppState configuration keys from config types.
+/// Usage:
+/// ```
 /// define_appstate_config! {
-///     AppstateLocked {
-///         db_key: "appstate_locked",
-///         description: "Lock AppState to prevent reset on next startup",
-///         input: ValueInput::combo(&["true", "false"]),
-///     },
-///     ActiveRoutine {
-///         db_key: "active_routine",
-///         description: "Allow pending runs to transition to Running automatically",
-///         input: ValueInput::combo(&["true", "false"]),
-///     },
+///     SigintBehavior,
+///     ActiveRoutine,
 /// }
 /// ```
 #[macro_export]
 macro_rules! define_appstate_config {
-    (
-        $(
-            $variant:ident {
-                db_key: $db_key:expr,
-                description: $description:expr,
-                input: $input:expr,
-            }
-        ),* $(,)?
-    ) => {
+    ($($type_name:ident),+ $(,)?) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
         #[serde(rename_all = "snake_case")]
         pub enum AppStateConfigKey {
-            $($variant,)*
+            $($type_name,)*
         }
 
         impl AppStateConfigKey {
             pub fn as_str(&self) -> &'static str {
                 match self {
-                    $(AppStateConfigKey::$variant => $db_key,)*
+                    $(AppStateConfigKey::$type_name => <$type_name as crate::models::appstate::ConfigType>::DB_KEY,)*
                 }
             }
 
             pub fn from_str(s: &str) -> Option<Self> {
                 match s {
-                    $($db_key => Some(AppStateConfigKey::$variant),)*
+                    $(<$type_name as crate::models::appstate::ConfigType>::DB_KEY => Some(AppStateConfigKey::$type_name),)*
                     _ => None,
                 }
             }
 
             pub fn all() -> &'static [AppStateConfigKey] {
-                &[$(AppStateConfigKey::$variant,)*]
+                &[$(AppStateConfigKey::$type_name,)*]
             }
 
             pub fn value_input(&self) -> ValueInput {
                 match self {
-                    $(AppStateConfigKey::$variant => $input,)*
+                    $(AppStateConfigKey::$type_name => <$type_name as crate::models::appstate::ConfigType>::value_input(),)*
                 }
             }
 
             pub fn description(&self) -> &'static str {
                 match self {
-                    $(AppStateConfigKey::$variant => $description,)*
+                    $(AppStateConfigKey::$type_name => <$type_name as crate::models::appstate::ConfigType>::DESCRIPTION,)*
+                }
+            }
+
+            pub fn default_value(&self) -> &'static str {
+                match self {
+                    $(AppStateConfigKey::$type_name => <$type_name as crate::models::appstate::ConfigType>::DEFAULT,)*
+                }
+            }
+
+            pub fn parse_value(&self, s: &str) -> Result<Box<dyn crate::models::appstate::ConfigValue>, ModelError> {
+                match self {
+                    $(AppStateConfigKey::$type_name => Ok(Box::new(s.parse::<$type_name>()?)),)*
                 }
             }
         }
     };
 }
 
-// Define the configuration using the macro
-define_appstate_config! {
-    AppstateLocked {
-        db_key: "appstate_locked",
-        description: "Verrouiller l'appstate pour éviter que l'état ne soit réinitialisé au prochain redémarrage (n'empêche pas les modifications).",
-        input: ValueInput::combo(&["true", "false"]),
-    },
+// Define config types
+enum_config! {
+    SigintBehavior {
+        db_key: "on_sigint",
+        description: "Actions à mener lorsque cette application reçoit SIGINT",
+        variants: [StopJobs, WaitForJobCompletion],
+        default: StopJobs,
+    }
+}
+
+enum_config! {
     ActiveRoutine {
         db_key: "active_routine",
         description: "Permet l'exécution immédiate de tous les runs en attente. Passer cette valeur à false permet de suspendre les exécutions, par exemple pour drainer les jobs en cours avant un arrêt de l'application.",
-        input: ValueInput::combo(&["true", "false"]),
-    },
-    SigintBehavior{
-        db_key: "on_sigint",
-        description: "Actions à mener lorsque cette application reçoit SIGINT",
-        input: ValueInput::combo(&["StopJobs","WaitForJobCompletion"]),
+        variants: [RoutineOff, RoutineOn],
+        default: RoutineOn,
     }
+}
+
+// Register config types in AppStateConfigKey
+define_appstate_config! {
+    SigintBehavior,
+    ActiveRoutine,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,8 +219,9 @@ impl ValueInput {
             ValueInput::Combo(allowed) => {
                 if !allowed.iter().any(|v| v.eq_ignore_ascii_case(value)) {
                     return Err(ModelError::InvalidInput(format!(
-                        "Invalid value '{}'. Allowed values: {:?}",
-                        value, allowed
+                        "Invalid value '{}'. Allowed values: {}",
+                        value,
+                        allowed.join(", ")
                     )));
                 }
                 Ok(())
@@ -154,11 +263,14 @@ pub struct AppState {}
 
 impl AppState {
     pub async fn on_startup(pool: &SqlitePool) -> Result<(), ModelError> {
-        if Self::appstate_is_locked(pool).await? {
-            Ok(())
-        } else {
-            Ok(Self::set(AppStateConfigKey::ActiveRoutine, "true", pool).await?)
+        let existing = Self::get_all(pool).await?;
+        for key in AppStateConfigKey::all() {
+            let db_key = key.as_str();
+            if !existing.contains_key(db_key) {
+                Self::set(*key, key.default_value(), pool).await?;
+            }
         }
+        Ok(())
     }
 
     pub async fn get(
@@ -210,25 +322,20 @@ impl AppState {
         Ok(())
     }
 
-    pub async fn lock_appstate(pool: &SqlitePool) -> Result<(), ModelError> {
-        Ok(Self::set(AppStateConfigKey::AppstateLocked, "true", pool).await?)
-    }
-
-    pub async fn unlock_appstate(pool: &SqlitePool) -> Result<(), ModelError> {
-        Ok(Self::set(AppStateConfigKey::AppstateLocked, "false", pool).await?)
-    }
-
-    pub async fn appstate_is_locked(pool: &SqlitePool) -> Result<bool, ModelError> {
-        Ok(Self::get(AppStateConfigKey::AppstateLocked, pool)
-            .await?
-            .map(|s| s.eq_ignore_ascii_case("true"))
-            .unwrap_or(false))
-    }
-
     pub async fn active_routine(pool: &SqlitePool) -> Result<bool, ModelError> {
         Ok(Self::get(AppStateConfigKey::ActiveRoutine, pool)
             .await?
-            .map(|s| s.eq_ignore_ascii_case("true"))
+            .map(|s| s.parse::<ActiveRoutine>())
+            .transpose()?
+            .map(|ar| matches!(ar, ActiveRoutine::RoutineOn))
             .unwrap_or(true))
+    }
+
+    pub async fn sigint_behavior(pool: &SqlitePool) -> Result<SigintBehavior, ModelError> {
+        Ok(Self::get(AppStateConfigKey::SigintBehavior, pool)
+            .await?
+            .map(|s| s.parse())
+            .transpose()?
+            .unwrap_or_default())
     }
 }
