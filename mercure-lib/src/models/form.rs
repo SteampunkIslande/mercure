@@ -131,7 +131,7 @@ impl Default for FormExecType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum FormIdentification {
     GitBranchAndPath {
         branch: String,
@@ -153,6 +153,7 @@ pub struct Form {
     #[serde(flatten)]
     pub exec_type: FormExecType,
     pub workdir: String,
+    #[serde(skip)]
     pub form_identification: FormIdentification,
     pub groups: Option<Vec<String>>,
 }
@@ -182,9 +183,10 @@ impl Form {
                     // For each form in given branch
                     for dir_item in items {
                         let form_identification = FormIdentification::GitBranchAndPath {
-                            branch: branch_name.clone(),
-                            file_path: dir_item.path.clone(),
+                            branch: branch_name.to_string(), // Clone is mandatory
+                            file_path: dir_item.path,        // MOVED: No clone needed!
                         };
+
                         // fetch file
                         let content = match versionning::get_file_giteav1(
                             base_url,
@@ -202,14 +204,23 @@ impl Form {
                         let mut form: Form = match yaml_serde::from_str(&content) {
                             Ok(f) => f,
                             Err(e) => {
+                                // Read the path back out of the enum you just created
+                                let path_for_warn = match &form_identification {
+                                    FormIdentification::GitBranchAndPath { file_path, .. } => {
+                                        file_path
+                                    }
+                                    _ => "unknown_path", // Or handle exhaustively depending on your enum
+                                };
+
                                 warn!(
                                     "Impossible de sérialiser {} sur la branche {}: {}",
-                                    dir_item.path, branch_name, e
+                                    path_for_warn, branch_name, e
                                 );
                                 continue;
                             }
                         };
 
+                        // At this point, form identification was set to None, which is the (invalid) default for the FormIdentification type.
                         form.form_identification = form_identification;
                         all_forms.push(form);
                     }
@@ -378,6 +389,7 @@ impl Form {
 pub struct CachedForm {
     /// L'ID d'un formulaire. **Ne pas** l'utiliser pour identifier un formulaire en tant que tel.
     pub form_def_id: i64,
+    #[serde(skip)]
     pub form_identification: FormIdentification,
     pub name: String,
     pub description: String,

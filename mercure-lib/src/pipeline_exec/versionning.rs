@@ -160,7 +160,7 @@ pub async fn get_file_giteav1(
             )
         }
         FormIdentification::None => {
-            return Err(anyhow::format_err!("Fuck").into());
+            return Err(anyhow::format_err!("Identification du formulaire invalide").into());
         }
     };
 
