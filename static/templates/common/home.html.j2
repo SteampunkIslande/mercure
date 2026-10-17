@@ -36,7 +36,9 @@
         <button id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active {% endif %}"
             onclick="openTab(event,{{ group.id }})">{{ group.name}}</button>
         {% endfor %}
+        {% if user.is_admin %}
         <button id="tab-None" class="tablinks" onclick="openTab(event,`None`)">Formulaires sans groupe</button>
+        {% endif %}
     </div>
 
     <div style="border: 1px solid #ccc; border-top: none; padding: 10px;">
@@ -115,79 +117,82 @@
     }
 
     const userGroups = {{ user_groups | tojson }};
+    async function fetchAndRenderForms(groupId, listKey) {
+        try {
+            const response = await fetch(`/mercure/api/groups/forms/${groupId}`);
+            const result = await response.json();
 
-    async function loadGroupForms() {
-        if (userGroups.length > 0) {
-            try {
-                for (let group of userGroups) {
-                    const response = await fetch(`/mercure/api/groups/forms/${group.id}`);
-                    const result = await response.json();
-                    if (!isApiSuccess(result)) {
-                        throw new Error(getApiMessage(result) || "Erreur inconnue");
-                    }
-                    const forms = getApiData(result);
-                    let table = document.getElementById(`forms-container-${group.id}`);
-                    let container = table.querySelector('tbody');
-                    if (!container) {
-                        console.log("No tbody found, appending to table directly");
-                        container = table;
-                    }
-                    forms.with_group.forEach(form => {
-                        const formBox = document.createElement('tr');
-                        const submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(form.branch)}/${encodeURIComponent(form.file_path)}`;
-                        // Les définitions mises en cache ne contiennent que (branch, file_path) :
-                        // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
-                        const formLabel = form.name;
-                        formBox.innerHTML = `
-                           <td class="content-column">${form.name}<br>${form.description}</td>
-                           <td class="numeric-column">
-                               <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
-                           </td>
-                        `;
-                        container.appendChild(formBox);
-                    });
-                }
-                {% if user.is_admin %}
-                // None is a hack: rocket tries to parse an i64, and fails, thus passing None to the function
-                // Actually, any value would do ^^
-                const response = await fetch(`/mercure/api/groups/forms/None`);
-                const result = await response.json();
-                if (!isApiSuccess(result)) {
-                    throw new Error(getApiMessage(result) || "Erreur inconnue");
-                }
-                const forms = getApiData(result);
-                let table = document.getElementById(`forms-container-None`);
-                let container = table.querySelector('tbody');
-                if (!container) {
-                    console.log("No tbody found, appending to table directly");
-                    container = table;
-                }
-                forms.without_group.forEach(form => {
-                    const formBox = document.createElement('tr');
-                    const submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(form.branch)}/${encodeURIComponent(form.file_path)}`;
-                    // Les définitions mises en cache ne contiennent que (branch, file_path) :
-                    // le YAML complet n'est récupéré qu'à l'ouverture du formulaire.
-                    const formLabel = form.name;
-                    formBox.innerHTML = `
-                           <td class="content-column">${form.name}<br>${form.description}</td>
-                           <td class="numeric-column">
-                               <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
-                           </td>
-                        `;
-                    container.appendChild(formBox);
-                });
-                {% endif %}
-            } catch (error) {
-                showMessage("error", `Error fetching forms ${error}`);
+            if (!isApiSuccess(result)) {
+                throw new Error(getApiMessage(result) || "Erreur inconnue");
             }
-        }
-        else {
-            console.log("User has no groups!");
-            document.getElementById("no-user-group").style.display = "block";
+
+            const formsData = getApiData(result);
+            const forms = formsData[listKey] || [];
+
+            let table = document.getElementById(`forms-container-${groupId}`);
+            if (!table) return;
+
+            let container = table.querySelector('tbody') || table;
+
+            forms.forEach(form => {
+                const formBox = document.createElement('tr');
+                let submitUrl = "#";
+
+                // The switch/case handles different variants smoothly.
+                switch (form.form_id) {
+                    case "GitBranchAndPath": {
+                        // FIX: Because of #[serde(flatten)], branch and file_path are on the root 'form' object, 
+                        // not inside 'form.form_id' (which is just the string tag "GitBranchAndPath").
+                        const { branch, file_path } = form;
+                        submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(branch)}/${encodeURIComponent(file_path)}`;
+                        break;
+                    }
+                    case "GitCommit": {
+                        const { hash, file_path } = form;
+                        submitUrl = `/mercure/runs/submit/commit/${encodeURIComponent(hash)}/${encodeURIComponent(file_path)}`;
+                        break;
+                    }
+                    default:
+                        console.warn(`Unknown form_id type: ${form.form_id}`);
+                        break;
+                }
+
+                formBox.innerHTML = `
+               <td class="content-column">${form.name}<br>${form.description}</td>
+               <td class="numeric-column">
+                   <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
+               </td>
+            `;
+                container.appendChild(formBox);
+            });
+        } catch (error) {
+            showMessage("error", `Error fetching forms for group ${groupId}: ${error.message}`);
         }
     }
 
+    async function loadGroupForms() {
+        const fetchTasks = [];
 
+        if (userGroups && userGroups.length > 0) {
+            // Queue all group fetches to run concurrently
+            userGroups.forEach(group => {
+                fetchTasks.push(fetchAndRenderForms(group.id, "with_group"));
+            });
+        } else {
+            console.log("User has no groups!");
+            const noGroupElement = document.getElementById("no-user-group");
+            if (noGroupElement) noGroupElement.style.display = "block";
+        }
+
+        {% if user.is_admin %}
+        // I moved this outside the (userGroups.length > 0) check.
+        // Previously, if an admin had 0 groups, the "None" forms wouldn't load!
+        fetchTasks.push(fetchAndRenderForms("None", "without_group"));
+        {% endif %}
+
+        // Await all network requests simultaneously
+        await Promise.all(fetchTasks);
+    }
     async function lastRuns() {
         try {
             const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);

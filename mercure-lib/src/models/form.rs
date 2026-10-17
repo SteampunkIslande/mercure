@@ -131,7 +131,8 @@ impl Default for FormExecType {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "form_id")]
 pub enum FormIdentification {
     GitBranchAndPath {
         branch: String,
@@ -153,7 +154,8 @@ pub struct Form {
     #[serde(flatten)]
     pub exec_type: FormExecType,
     pub workdir: String,
-    #[serde(skip)]
+    #[serde(flatten)]
+    #[serde(skip_deserializing)]
     pub form_identification: FormIdentification,
     pub groups: Option<Vec<String>>,
 }
@@ -389,7 +391,8 @@ impl Form {
 pub struct CachedForm {
     /// L'ID d'un formulaire. **Ne pas** l'utiliser pour identifier un formulaire en tant que tel.
     pub form_def_id: i64,
-    #[serde(skip)]
+    #[serde(flatten)]
+    #[serde(skip_deserializing)]
     pub form_identification: FormIdentification,
     pub name: String,
     pub description: String,
