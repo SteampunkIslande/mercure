@@ -89,7 +89,8 @@
             for (const [key, value] of Object.entries(currentRun.user_defined_vars)) {
                 const input = document.getElementById(key);
                 // Skip the dynamic selects since we just handled them asynchronously
-                if (input && !input.hasAttribute('data-source')) {
+                // and skip file inputs: setting .value on a file input throws DOMException
+                if (input && !input.hasAttribute('data-source') && input.type !== 'file') {
                     input.value = value;
                 }
             }
