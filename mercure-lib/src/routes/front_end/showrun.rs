@@ -74,12 +74,15 @@ pub async fn show_run_get(
         // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let attempt = Attempt::get_hypothetic_attempt(&run)?;
+            let form = &run.get_form().await.context(
+                "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible",
+            )?;
 
             Ok(Template::render(
                 "common/idlerun",
                 context! {
                     run=> &run,
-                    form=> &run.get_form().await.context("Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible")?,
+                    form=> &form,
                     run_creation_date,
                     attempt=> &attempt,
                     history=> history,
