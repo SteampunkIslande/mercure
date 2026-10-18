@@ -21,22 +21,15 @@ pub use home::*;
 pub use newgroup::*;
 pub use newrun::*;
 pub use redirect::*;
-use rocket::{
-    Response,
-    http::{Status, uri::error::PathError},
-    response::Responder,
-};
+use rocket::{Response, http::Status, response::Responder};
 pub use runtime_config::*;
 pub use showrun::*;
 
-use crate::{
-    routes::frontend::FrontendError::InvalidPath,
-    templates::{Template, context},
-};
+use crate::templates::{Template, context};
 
 #[derive(Debug, wherror::Error)]
 pub enum FrontendError {
-    #[error("{location}: {source}")]
+    #[error("Erreur de modèle dans le fichier {location}: {source}")]
     ModelError {
         #[from]
         source: crate::models::ModelError,
@@ -44,7 +37,7 @@ pub enum FrontendError {
     },
     #[error("Erreur logique: {0}")]
     LogicalError(String),
-    #[error("{location}: {source}")]
+    #[error("Erreur générique dans le fichier {location}: {source}")]
     AnyhowError {
         #[from]
         source: anyhow::Error,
@@ -52,25 +45,8 @@ pub enum FrontendError {
     },
     #[error("Accès réservé aux admins")]
     AdminsOnly,
-    #[error("Chemin invalide")]
-    InvalidPath(String),
-}
-
-/// Convert a rocket::...::PathError into a FrontendError because PathError doesn't implement as_dyn_error
-impl From<PathError> for FrontendError {
-    fn from(value: PathError) -> Self {
-        match value {
-            PathError::BadChar(c) => {
-                InvalidPath(format!("caractère invalide dans le chemin:{}", c))
-            }
-            PathError::BadStart(c) => {
-                InvalidPath(format!("premier caractère invalide dans le chemin:{}", c))
-            }
-            PathError::BadEnd(c) => {
-                InvalidPath(format!("dernier caractère invalide dans le chemin:{}", c))
-            }
-        }
-    }
+    #[error(debug)]
+    InvalidPath(#[from(no_source)] rocket::http::uri::error::PathError),
 }
 
 impl<'r> Responder<'r, 'static> for FrontendError {
@@ -89,7 +65,6 @@ impl<'r> Responder<'r, 'static> for FrontendError {
                 // 2. We skip the first error and collect the underlying causes.
                 let causes_html = source
                     .chain()
-                    .skip(1)
                     .map(|cause| format!("<li>{}</li>", cause))
                     .collect::<Vec<_>>();
 
@@ -108,10 +83,7 @@ impl<'r> Responder<'r, 'static> for FrontendError {
             FrontendError::AdminsOnly => {
                 return Template::render("error/admin_only", context! {}).respond_to(req);
             }
-            FrontendError::InvalidPath(s) => (
-                "Chemin invalide".to_string(),
-                format!("Erreur de chemin: {s}"),
-            ),
+            FrontendError::InvalidPath(_) => (self.to_string(), format!("Erreur de chemin")),
         };
 
         Template::render(

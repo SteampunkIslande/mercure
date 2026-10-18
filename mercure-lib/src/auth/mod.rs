@@ -36,7 +36,7 @@ pub enum AuthError {
     },
     #[error("No password given")]
     NoPassword,
-    #[error("{location}: {source}")]
+    #[error("Erreur dans le fichier {location}: {source}")]
     ModelError {
         #[from]
         source: models::ModelError,
