@@ -14,3 +14,5 @@
 
 - [ ] Revoir la route `/home` (front_end/home.rs)
 - [ ] Revoir `front_end/mod.rs`, la gestion des erreurs n'est pas élégante...
+- [ ] Problème: gestion des erreurs (toujours pas ça, notamment dans les ApiResponse, le texte laisse à désirer.)
+- [ ] Problème: les variables définies par l'utilisateur semblent ne pas rester à une valeur en mode édition de run. Etrange.
