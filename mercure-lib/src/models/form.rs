@@ -16,7 +16,7 @@ use crate::{
     pipeline_exec::{GitCheckError, versionning},
 };
 
-#[derive(thiserror::Error, Debug)]
+#[derive(wherror::Error, Debug)]
 pub enum FormDefinitionError {
     #[error(transparent)]
     SerdeError(#[from] yaml_serde::Error),

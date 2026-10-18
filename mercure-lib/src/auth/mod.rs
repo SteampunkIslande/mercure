@@ -12,7 +12,7 @@ use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, wherror::Error)]
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,

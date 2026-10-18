@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use time::{OffsetDateTime, UtcOffset};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, wherror::Error)]
 pub enum RunDefinitionError {
     #[error("Le run est dans un statut invalide")]
     InvalidRunStatusError,

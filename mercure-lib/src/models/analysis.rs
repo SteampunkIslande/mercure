@@ -5,7 +5,7 @@ use crate::{
 
 use super::ModelError;
 use sqlx::SqlitePool;
-use thiserror::Error;
+use wherror::Error;
 
 #[derive(Error, Debug)]
 pub enum AnalysisStateMachineError {

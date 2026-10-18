@@ -18,7 +18,7 @@ pub use user::*;
 
 use crate::pipeline_exec::versionning;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, wherror::Error)]
 pub enum ModelError {
     #[error("Form serde error from/to json: {0}")]
     SerdeJsonError(#[from] serde_json::Error),

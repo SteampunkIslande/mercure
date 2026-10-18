@@ -34,7 +34,7 @@ use crate::{
     templates::{Template, context},
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, wherror::Error)]
 pub enum FrontendError {
     #[error(transparent)]
     ModelError(#[from] crate::models::ModelError),

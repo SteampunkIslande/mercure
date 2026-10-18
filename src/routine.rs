@@ -8,7 +8,7 @@ use tokio::task::{JoinError as TokioJoinError, JoinSet};
 
 use sqlx::SqlitePool;
 
-use thiserror::Error;
+use wherror::Error;
 
 use mercure_lib::models::AnalysisStateMachineError;
 use regex::Error as RegexError;

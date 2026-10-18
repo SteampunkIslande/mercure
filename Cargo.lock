@@ -1647,9 +1647,9 @@ dependencies = [
  "rocket",
  "rocket-include-dir",
  "sqlx",
- "thiserror 1.0.69",
  "time",
  "tokio",
+ "wherror",
 ]
 
 [[package]]
@@ -1673,10 +1673,10 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
- "thiserror 1.0.69",
  "time",
  "tokio",
  "walkdir",
+ "wherror",
  "yaml_serde",
 ]
 
@@ -3697,6 +3697,26 @@ name = "webpki-roots"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
+
+[[package]]
+name = "wherror"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9464ed694aa5abd4b6422fa111132e73f483dec7a96bd51bb88bb58dfba01f78"
+dependencies = [
+ "wherror-impl",
+]
+
+[[package]]
+name = "wherror-impl"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6930f5b954732bbc0f23bf1a769dd2f49f050b0f17e77068fca435690ae598f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+]
 
 [[package]]
 name = "whoami"

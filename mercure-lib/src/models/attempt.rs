@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(wherror::Error, Debug)]
 pub enum AttemptError {
     #[error("Aucun run n'est attaché à cette tentative")]
     NoRunAttached,

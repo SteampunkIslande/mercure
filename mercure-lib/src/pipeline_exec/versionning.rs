@@ -7,7 +7,7 @@ use crate::{
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
-use thiserror::Error;
+use wherror::Error;
 
 #[derive(Error, Debug)]
 pub enum GitCheckError {
