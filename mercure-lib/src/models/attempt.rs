@@ -1,10 +1,12 @@
-use crate::models::Form;
+use crate::config::{GitWebConfig, get_mercure_config};
+use crate::models::{Form, FormIdentification};
 use crate::models::{ModelError, Run, RunStatus};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
@@ -27,7 +29,7 @@ pub struct Attempt {
 
     pub user_defined_vars: HashMap<String, String>,
 
-    pub commit_hash: String,
+    pub form_identification: FormIdentification,
 
     /// One of the only two editable fields
     pub status: RunStatus,
@@ -44,13 +46,17 @@ impl Attempt {
     ) -> Result<(), ModelError> {
         let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
+        let FormIdentification::GitBranchAndPath { file_path, .. } = run.form_identification else {
+            return Err(anyhow::format_err!("Une nouvelle tentative ne peut être créée qu'à partir d'un formulaire défini par une branche et un chemin.").into());
+        };
+
         let attempt_date = OffsetDateTime::now_utc();
         let user_defined_vars = serde_json::to_string(&run.user_defined_vars)?;
 
         sqlx::query(
             r#"
-            INSERT INTO Attempts (run_id, attempt_number, attempt_date, user_defined_vars, commit_hash, status, comment)
-            VALUES (?, ?, ?, ?, ?, ?, '')
+            INSERT INTO Attempts (run_id, attempt_number, attempt_date, user_defined_vars, commit_hash, form_path, status, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, '')
             "#,
         )
         .bind(run.run_id)
@@ -58,6 +64,7 @@ impl Attempt {
         .bind(&attempt_date)
         .bind(&user_defined_vars)
         .bind(&current_commit_hash)
+        .bind(&file_path.display().to_string())
         .bind(run.status.to_string())
         .execute(pool)
         .await?;
@@ -75,7 +82,7 @@ impl Attempt {
             run_id: run.run_id.ok_or(AttemptError::NoRunAttached)?,
             attempt_date: OffsetDateTime::now_utc(),
             user_defined_vars: run.user_defined_vars.clone(),
-            commit_hash: "".to_string(),
+            form_identification: run.form_identification.clone(),
             status: RunStatus::Idle,
             comment: String::new(),
         })
@@ -85,9 +92,15 @@ impl Attempt {
         Ok(Run::get_run_from_id(self.run_id, pool).await?)
     }
 
-    pub async fn get_form(&self, _pool: &SqlitePool) -> Result<Form, ModelError> {
-        // Form::get_form()
-        todo!()
+    pub async fn get_form(&self) -> Result<Form, ModelError> {
+        let config = get_mercure_config();
+
+        match config.pipelines {
+            GitWebConfig::GitlabV4 { .. } => {
+                return Err(anyhow::format_err!("Gitlab n'est pas encore supporté...").into());
+            }
+            GitWebConfig::GiteaV1 { .. } => Form::get_form(self.form_identification.clone()).await,
+        }
     }
 
     /// Récupère un HgAttempt à partir de son attempt_number et run_id
@@ -118,7 +131,10 @@ impl Attempt {
             run_id: run_id,
             attempt_date: row.try_get("attempt_date")?,
             user_defined_vars,
-            commit_hash: row.try_get("commit_hash")?,
+            form_identification: FormIdentification::GitCommit {
+                commit_hash: row.try_get("commit_hash")?,
+                form_path: PathBuf::from_str(row.try_get("form_path")?)?,
+            },
             status,
             comment: row.try_get("comment")?,
         };
@@ -155,7 +171,10 @@ impl Attempt {
                     run_id: row.try_get("run_id").ok()?,
                     attempt_date: row.try_get("attempt_date").ok()?,
                     user_defined_vars,
-                    commit_hash: row.try_get("commit_hash").ok()?,
+                    form_identification: FormIdentification::GitCommit {
+                        commit_hash: row.try_get("commit_hash").ok()?,
+                        form_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
+                    },
                     status,
                     comment: row.try_get("comment").ok()?,
                 })

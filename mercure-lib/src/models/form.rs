@@ -156,8 +156,8 @@ pub enum FormIdentification {
         file_path: PathBuf,
     },
     GitCommit {
-        hash: String,
-        file_path: PathBuf,
+        commit_hash: String,
+        form_path: PathBuf,
     },
     #[default]
     None,
@@ -228,7 +228,7 @@ impl Form {
                                     FormIdentification::GitBranchAndPath { file_path, .. } => {
                                         file_path
                                     }
-                                    FormIdentification::GitCommit { file_path, .. } => file_path,
+                                    FormIdentification::GitCommit { form_path, .. } => form_path,
                                     _ => &PathBuf::new(),
                                 };
 

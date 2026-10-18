@@ -78,6 +78,7 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
             attempt_date DATETIME NOT NULL,
             user_defined_vars TEXT NOT NULL,
             commit_hash TEXT NOT NULL,
+            form_path TEXT NOT NULL,
             status TEXT NOT NULL,
             comment TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (run_id) REFERENCES Runs(run_id) ON DELETE CASCADE

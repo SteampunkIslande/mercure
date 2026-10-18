@@ -12,13 +12,25 @@ pub enum AnalysisStateMachineError {
     #[error("Transition invalide de {} vers {}",.from,.to)]
     InvalidTransition { from: String, to: String },
     #[error("{location}: {source}")]
-    ModelError{#[from] source: ModelError, location: &'static std::panic::Location<'static>},
+    ModelError {
+        #[from]
+        source: ModelError,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("{location}: {source}")]
-    RunDefinitionError{#[from] source: RunDefinitionError, location: &'static std::panic::Location<'static>},
+    RunDefinitionError {
+        #[from]
+        source: RunDefinitionError,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("{0}")]
     InvalidOperation(String),
     #[error("{location}: {source}")]
-    GitCheckError{#[from] source: GitCheckError, location: &'static std::panic::Location<'static>},
+    GitCheckError {
+        #[from]
+        source: GitCheckError,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 /// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative (appelé par le backend)
@@ -44,7 +56,7 @@ pub async fn validate_form(
                 .ok_or(GitCheckError::NoSuchBranch(branch))?
                 .last_commit
         }
-        FormIdentification::GitCommit { hash, .. } => hash,
+        FormIdentification::GitCommit { commit_hash, .. } => commit_hash,
         FormIdentification::None => "".to_string(),
     };
     super::hgrun::Run::validate_form(run_id, pool).await?;

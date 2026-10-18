@@ -181,8 +181,8 @@ pub async fn get_file_giteav1(
             )
         }
         FormIdentification::GitCommit {
-            hash,
-            file_path: path,
+            commit_hash: hash,
+            form_path: path,
         } => {
             format!(
                 "{}/{}/{}/raw/commit/{}/{}",

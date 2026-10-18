@@ -79,7 +79,7 @@ pub async fn show_run_get(
                 "common/idlerun",
                 context! {
                     run=> &run,
-                    form=> &run.get_form().await.context("Impossible d'obtenir le formulaire associé...")?,
+                    form=> &run.get_form().await.context("Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible")?,
                     run_creation_date,
                     attempt=> &attempt,
                     history=> history,
@@ -98,6 +98,8 @@ pub async fn show_run_get(
                     attempt_number, run_id
                 ))?;
 
+            let attempt_form = attempt.get_form().await?;
+
             let attempt_date =
                 utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
 
@@ -107,7 +109,7 @@ pub async fn show_run_get(
                     "common/pendingrun",
                     context! {
                         run=> &run,
-                        form=> &run.get_form().await?,
+                        form=> &attempt_form,
                         run_creation_date,
                         attempt_date,
                         attempt=> &attempt,
@@ -119,7 +121,7 @@ pub async fn show_run_get(
                     "common/runningrun",
                     context! {
                         run=> &run,
-                        form=> &run.get_form().await?,
+                        form=> &attempt_form,
                         run_creation_date,
                         attempt_date,
                         attempt=> &attempt,
@@ -131,7 +133,7 @@ pub async fn show_run_get(
                     "common/successrun",
                     context! {
                         run=> &run,
-                        form=> &run.get_form().await?,
+                        form=> &attempt_form,
                         attempt=> &attempt,
                         history=> &history,
                         user=> auth.user,
