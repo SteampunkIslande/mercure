@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use mercure::models::{ModelError, appstate};
+use mercure::models::ModelError;
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
 use std::process::ExitStatus;
@@ -149,7 +149,7 @@ async fn send_sigint_then_kill(
 
 async fn run_script(
     attempt: &Attempt,
-    pool: &SqlitePool,
+    _pool: &SqlitePool,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
     // let script_file

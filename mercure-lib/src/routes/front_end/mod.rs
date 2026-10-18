@@ -21,11 +21,18 @@ pub use home::*;
 pub use newgroup::*;
 pub use newrun::*;
 pub use redirect::*;
-use rocket::{Response, http::Status, response::Responder};
+use rocket::{
+    Response,
+    http::{Status, uri::error::PathError},
+    response::Responder,
+};
 pub use runtime_config::*;
 pub use showrun::*;
 
-use crate::templates::{Template, context};
+use crate::{
+    routes::frontend::FrontendError::InvalidPath,
+    templates::{Template, context},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum FrontendError {
@@ -37,6 +44,25 @@ pub enum FrontendError {
     AnyhowError(#[from] anyhow::Error),
     #[error("Accès réservé aux admins")]
     AdminsOnly,
+    #[error("Chemin invalide")]
+    InvalidPath(String),
+}
+
+/// Convert a rocket::...::PathError into a FrontendError because PathError doesn't implement as_dyn_error
+impl From<PathError> for FrontendError {
+    fn from(value: PathError) -> Self {
+        match value {
+            PathError::BadChar(c) => {
+                InvalidPath(format!("caractère invalide dans le chemin:{}", c))
+            }
+            PathError::BadStart(c) => {
+                InvalidPath(format!("premier caractère invalide dans le chemin:{}", c))
+            }
+            PathError::BadEnd(c) => {
+                InvalidPath(format!("dernier caractère invalide dans le chemin:{}", c))
+            }
+        }
+    }
 }
 
 impl<'r> Responder<'r, 'static> for FrontendError {
@@ -71,6 +97,10 @@ impl<'r> Responder<'r, 'static> for FrontendError {
             FrontendError::AdminsOnly => {
                 return Template::render("error/admin_only", context! {}).respond_to(req);
             }
+            FrontendError::InvalidPath(s) => (
+                "Chemin invalide".to_string(),
+                format!("Erreur de chemin: {s}"),
+            ),
         };
 
         Template::render(

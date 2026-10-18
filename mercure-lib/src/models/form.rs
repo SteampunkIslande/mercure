@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::Context;
 use log::warn;
@@ -136,11 +137,11 @@ impl Default for FormExecType {
 pub enum FormIdentification {
     GitBranchAndPath {
         branch: String,
-        file_path: String,
+        file_path: PathBuf,
     },
     GitCommit {
         hash: String,
-        file_path: String,
+        file_path: PathBuf,
     },
     #[default]
     None,
@@ -211,12 +212,15 @@ impl Form {
                                     FormIdentification::GitBranchAndPath { file_path, .. } => {
                                         file_path
                                     }
-                                    _ => "unknown_path", // Or handle exhaustively depending on your enum
+                                    FormIdentification::GitCommit { file_path, .. } => file_path,
+                                    _ => &PathBuf::new(),
                                 };
 
                                 warn!(
                                     "Impossible de sérialiser {} sur la branche {}: {}",
-                                    path_for_warn, branch_name, e
+                                    path_for_warn.display(),
+                                    branch_name,
+                                    e
                                 );
                                 continue;
                             }
@@ -467,7 +471,7 @@ impl CachedForm {
                 "#,
             )
             .bind(&branch)
-            .bind(&file_path)
+            .bind(&file_path.to_string_lossy())
             .bind(&name)
             .bind(&description)
             .fetch_one(&mut *tx)
@@ -487,7 +491,10 @@ impl CachedForm {
                             .await?;
                         }
                         None => log::warn!(
-                            "Le formulaire {branch}/{file_path} attend le groupe {group_name}, qui n'existe pas en base"
+                            "Le formulaire {}/{} attend le groupe {}, qui n'existe pas en base",
+                            branch,
+                            file_path.display(),
+                            group_name,
                         ),
                     }
                 }
@@ -677,7 +684,7 @@ ORDER BY fd.branch, fd.file_path"#,
 /// Builds a `FormDef` from a row selecting `form_def_id`, `branch` and `file_path`
 fn form_def_from_row(row: &sqlx::sqlite::SqliteRow) -> Option<CachedForm> {
     let branch = row.try_get("branch").ok()?;
-    let file_path = row.try_get("file_path").ok()?;
+    let file_path = PathBuf::from_str(&row.try_get::<String, _>("file_path").ok()?).ok()?;
     Some(CachedForm {
         form_def_id: row.try_get("form_def_id").ok()?,
         form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
@@ -866,6 +873,8 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 /// Tests du cache SQL (`FormDefs` / `FormDefHasGroup`)
 #[cfg(test)]
 mod form_def_cache_tests {
+    use std::path::Path;
+
     use sqlx::SqlitePool;
 
     use crate::models::{CachedForm, Form, FormIdentification, Group};
@@ -890,7 +899,7 @@ mod form_def_cache_tests {
             workdir: String::new(),
             form_identification: FormIdentification::GitBranchAndPath {
                 branch: branch.to_string(),
-                file_path: file_path.to_string(),
+                file_path: Path::new(file_path).to_path_buf(),
             },
             groups: Some(groups.iter().map(|s| s.to_string()).collect()),
         }
@@ -966,7 +975,7 @@ mod form_def_cache_tests {
             forms_with_group[0].form_identification,
             FormIdentification::GitBranchAndPath {
                 branch: "main".to_string(),
-                file_path: ".forms/f1.yaml".to_string()
+                file_path: Path::new(".forms/f1.yaml").to_path_buf()
             }
         );
 
@@ -1041,7 +1050,7 @@ mod form_def_cache_tests {
             all[0].form_identification,
             FormIdentification::GitBranchAndPath {
                 branch: "main".to_string(),
-                file_path: ".forms/f1.yaml".to_string()
+                file_path: Path::new(".forms/f1.yaml").to_path_buf()
             }
         );
 

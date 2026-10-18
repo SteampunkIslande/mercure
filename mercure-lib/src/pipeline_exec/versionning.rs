@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     config::{GitWebConfig, MercureConfig, get_mercure_config},
     models::FormIdentification,
@@ -85,7 +87,7 @@ pub async fn get_latest_commit(
 #[derive(Debug, Deserialize)]
 pub struct DirContentsItem {
     pub name: String,
-    pub path: String,
+    pub path: PathBuf,
     #[serde(rename = "type")]
     pub item_type: String,
     pub size: Option<u64>,
@@ -104,32 +106,49 @@ pub async fn list_yaml_forms_giteav1(
     branch_name: &str,
 ) -> Result<Vec<DirContentsItem>, GitCheckError> {
     let client = Client::new();
+    let mut results = Vec::new();
+    let mut stack = vec![".".to_string()];
+    while let Some(current_path) = stack.pop() {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/contents-ext/{}",
+            base_url, owner, repo, current_path
+        );
 
-    let url = format!(
-        "{}/api/v1/repos/{}/{}/contents-ext/.forms",
-        base_url, owner, repo
-    );
+        let resp = client
+            .get(&url)
+            .query(&[("ref", branch_name)])
+            .send()
+            .await
+            .map_err(|e| GitCheckError::ReqwestError(e))?;
 
-    let resp = client
-        .get(&url)
-        .query(&[("ref", branch_name)])
-        .send()
-        .await?
-        .error_for_status()?;
+        if !resp.status().is_success() {
+            // Skip missing directories
+            continue;
+        }
 
-    let body = resp.json::<DirContentsResponse>().await?;
+        let body: DirContentsResponse = match resp.json::<DirContentsResponse>().await {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
 
-    // filtre uniquement les fichiers yml / yaml
-    let filtered = body
-        .dir_contents
-        .into_iter()
-        .filter(|item| {
-            item.item_type.eq_ignore_ascii_case("file")
+        for item in body.dir_contents {
+            if item.item_type.eq_ignore_ascii_case("file")
                 && (item.name.ends_with(".yml") || item.name.ends_with(".yaml"))
-        })
-        .collect::<Vec<_>>();
+            {
+                results.push(item);
+            } else if item.item_type.eq_ignore_ascii_case("dir") {
+                // Use the item's path if provided, otherwise construct it
+                let next_path = if item.path.as_os_str().is_empty() {
+                    format!("{}/{}", current_path, item.name)
+                } else {
+                    item.path.to_string_lossy().into_owned()
+                };
+                stack.push(next_path);
+            }
+        }
+    }
 
-    Ok(filtered)
+    Ok(results)
 }
 
 pub async fn get_file_giteav1(
@@ -147,7 +166,11 @@ pub async fn get_file_giteav1(
         } => {
             format!(
                 "{}/{}/{}/raw/branch/{}/{}",
-                base_url, owner, repo, branch, path
+                base_url,
+                owner,
+                repo,
+                branch,
+                path.display()
             )
         }
         FormIdentification::GitCommit {
@@ -156,7 +179,11 @@ pub async fn get_file_giteav1(
         } => {
             format!(
                 "{}/{}/{}/raw/commit/{}/{}",
-                base_url, owner, repo, hash, path
+                base_url,
+                owner,
+                repo,
+                hash,
+                path.display()
             )
         }
         FormIdentification::None => {

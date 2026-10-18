@@ -85,7 +85,7 @@ impl Attempt {
         Ok(Run::get_run_from_id(self.run_id, pool).await?)
     }
 
-    pub async fn get_form(&self, pool: &SqlitePool) -> Result<Form, ModelError> {
+    pub async fn get_form(&self, _pool: &SqlitePool) -> Result<Form, ModelError> {
         // Form::get_form()
         todo!()
     }

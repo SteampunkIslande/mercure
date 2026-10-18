@@ -103,7 +103,6 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::backend::login_post,
                 routes::backend::newgroup_get,
                 routes::backend::list_groups,
-                routes::backend::get_form_from_id,
                 routes::backend::get_all_forms_for_group,
                 // Simple GET pour lister les utilisateurs
                 routes::backend::list_users,

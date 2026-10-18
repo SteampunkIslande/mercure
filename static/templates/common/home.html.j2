@@ -144,12 +144,12 @@
                         // FIX: Because of #[serde(flatten)], branch and file_path are on the root 'form' object, 
                         // not inside 'form.form_id' (which is just the string tag "GitBranchAndPath").
                         const { branch, file_path } = form;
-                        submitUrl = `/mercure/runs/submit/branch/${encodeURIComponent(branch)}/${encodeURIComponent(file_path)}`;
+                        submitUrl = `/mercure/runs/submit/branch/${branch}/${file_path}`;
                         break;
                     }
                     case "GitCommit": {
                         const { hash, file_path } = form;
-                        submitUrl = `/mercure/runs/submit/commit/${encodeURIComponent(hash)}/${encodeURIComponent(file_path)}`;
+                        submitUrl = `/mercure/runs/submit/commit/${hash}/${file_path}`;
                         break;
                     }
                     default:

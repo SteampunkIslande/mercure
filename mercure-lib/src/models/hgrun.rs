@@ -17,6 +17,7 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::str::FromStr;
 use time::{OffsetDateTime, UtcOffset};
 
@@ -121,11 +122,9 @@ pub struct Run {
     /// User defined variables
     pub user_defined_vars: HashMap<String, String>,
 
-    /// Path to the yaml file within said `branch`
-    pub form_path: String,
-
-    /// Name of the branch this run will take its code from
-    pub branch_name: String,
+    #[serde(skip_deserializing)]
+    #[serde(flatten)]
+    pub form_identification: FormIdentification,
 }
 
 impl Run {
@@ -154,26 +153,31 @@ impl Run {
         ))
         .await?;
 
-        let run_id = sqlx::query(
-            r#"
-            INSERT INTO Runs (user_id, run_name, creation_date, status, attempt_count, branch_name, user_defined_vars, form_path)
-            VALUES (?,?,?,?,?,?,?,?)
-            RETURNING run_id
-            "#,
-        )
-        .bind(&run_submission.user_id)
-        .bind(&run_submission.run_name)
-        .bind(&run_submission.creation_date)
-        .bind(RunStatus::Idle.to_string())
-        .bind(0)
-        .bind(&run_submission.branch_name)
-        .bind(&user_defined_vars_str)
-        .bind(&run_submission.form_path)
-        .fetch_one(pool)
-        .await?
-        .try_get("run_id")?;
+        match run_submission.form_identification {
+            FormIdentification::GitBranchAndPath { branch, file_path } => {
+                let run_id = sqlx::query(
+                    r#"
+                    INSERT INTO Runs (user_id, run_name, creation_date, status, attempt_count, branch_name, user_defined_vars, form_path)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    RETURNING run_id
+                    "#,
+                )
+                .bind(&run_submission.user_id)
+                .bind(&run_submission.run_name)
+                .bind(&run_submission.creation_date)
+                .bind(RunStatus::Idle.to_string())
+                .bind(0)
+                .bind(&branch)
+                .bind(&user_defined_vars_str)
+                .bind(&file_path.to_string_lossy())
+                .fetch_one(pool)
+                .await?
+                .try_get("run_id")?;
 
-        Ok(run_id)
+                Ok(run_id)
+            }
+            _ => Err(anyhow::format_err!("Impossible de créer un nouveau run sans faire référence à une branche et un nom de fichier").into()),
+        }
     }
 
     /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
@@ -591,20 +595,23 @@ impl Run {
             creation_date,
             status,
             attempt_count,
-            branch_name,
             user_defined_vars,
-            form_path,
+            form_identification: FormIdentification::GitBranchAndPath {
+                branch: branch_name,
+                file_path: PathBuf::from_str(&form_path).with_context(|| {
+                    format!(
+                        "Impossible de convertir {} en chemin de fichier!",
+                        form_path
+                    )
+                })?,
+            },
         };
 
         Ok(hgrun)
     }
 
     pub async fn get_form(&self) -> Result<Form, ModelError> {
-        Form::get_form(FormIdentification::GitBranchAndPath {
-            branch: self.branch_name.clone(),
-            file_path: self.form_path.clone(),
-        })
-        .await
+        Form::get_form(self.form_identification.clone()).await
     }
 
     pub async fn get_user(&self, pool: &SqlitePool) -> Result<User, ModelError> {
@@ -711,6 +718,10 @@ struct RunFilters<'a> {
 /// Reconstruit un `Run` depuis une ligne de la requête de listing,
 /// puis le sérialise pour le tableau du front.
 fn run_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Option<Value> {
+    let form_identification = FormIdentification::GitBranchAndPath {
+        branch: row.try_get("branch_name").ok()?,
+        file_path: PathBuf::from_str(&row.try_get::<String, _>("form_path").ok()?).ok()?,
+    };
     let run = Run {
         run_id: row.try_get("run_id").ok()?,
         user_id: row.try_get("user_id").ok()?,
@@ -719,8 +730,7 @@ fn run_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Option<Value> {
         status: RunStatus::from_str(row.try_get("status").ok()?).ok()?,
         attempt_count: row.try_get("attempt_count").ok()?,
         user_defined_vars: serde_json::from_str(row.try_get("user_defined_vars").ok()?).ok()?,
-        form_path: row.try_get("form_path").ok()?,
-        branch_name: row.try_get("branch_name").ok()?,
+        form_identification,
     };
     let username: String = row.try_get("username").ok()?;
 
