@@ -36,12 +36,20 @@ use crate::{
 
 #[derive(Debug, wherror::Error)]
 pub enum FrontendError {
-    #[error(transparent)]
-    ModelError(#[from] crate::models::ModelError),
+    #[error("{location}: {source}")]
+    ModelError {
+        #[from]
+        source: crate::models::ModelError,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("Erreur logique: {0}")]
     LogicalError(String),
-    #[error(transparent)]
-    AnyhowError(#[from] anyhow::Error),
+    #[error("{location}: {source}")]
+    AnyhowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("Accès réservé aux admins")]
     AdminsOnly,
     #[error("Chemin invalide")]
@@ -68,15 +76,18 @@ impl From<PathError> for FrontendError {
 impl<'r> Responder<'r, 'static> for FrontendError {
     fn respond_to(self, req: &'r rocket::Request<'_>) -> Result<Response<'static>, Status> {
         let (title, detail) = match &self {
-            FrontendError::ModelError(e) => ("Erreur de modèle".to_string(), e.to_string()),
+            FrontendError::ModelError { source, location } => (
+                format!("Erreur de modèle dans le fichier {location}"),
+                source.to_string(),
+            ),
             FrontendError::LogicalError(e) => ("Erreur logique".to_string(), e.to_string()),
-            FrontendError::AnyhowError(e) => {
+            FrontendError::AnyhowError { source, location } => {
                 // 1. The outermost error (first in the chain) becomes the title.
                 // anyhow::Error's Display implementation already gives us this.
-                let title = format!("Erreur : {}", e);
+                let title = format!("Erreur dans le fichier {}", location);
 
                 // 2. We skip the first error and collect the underlying causes.
-                let causes_html = e
+                let causes_html = source
                     .chain()
                     .skip(1)
                     .map(|cause| format!("<li>{}</li>", cause))

@@ -18,20 +18,36 @@ use crate::{
 
 #[derive(wherror::Error, Debug)]
 pub enum FormDefinitionError {
-    #[error(transparent)]
-    SerdeError(#[from] yaml_serde::Error),
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    #[error("{location}: {source}")]
+    SerdeError {
+        #[from]
+        source: yaml_serde::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    IOError {
+        #[from]
+        source: std::io::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
     DuplicateVarError(String),
     #[error("Les variables suivantes sont requises:{}",.0)]
     MissingVar(String),
     #[error("Erreur de formulaire: {0}")]
     InvalidData(String),
-    #[error(transparent)]
-    MinijinjaError(#[from] minijinja::Error),
-    #[error(transparent)]
-    AnyHowError(#[from] anyhow::Error),
+    #[error("{location}: {source}")]
+    MinijinjaError {
+        #[from]
+        source: minijinja::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AnyHowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("Nom de variable réservé: {}",.0)]
     ReservedVarName(String),
 }

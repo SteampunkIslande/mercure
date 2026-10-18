@@ -24,20 +24,48 @@ use nix::{sys::signal::kill, unistd::Pid};
 
 #[derive(Error, Debug)]
 enum RoutineError {
-    #[error(transparent)]
-    Sqlx(#[from] Error),
-    #[error(transparent)]
-    AnalysisStateMachine(#[from] AnalysisStateMachineError),
-    #[error(transparent)]
-    Model(#[from] ModelError),
-    #[error(transparent)]
-    IO(#[from] IoError),
-    #[error(transparent)]
-    TokioJoin(#[from] TokioJoinError),
-    #[error(transparent)]
-    InvalidRegex(#[from] RegexError),
-    #[error(transparent)]
-    AnyhowError(#[from] anyhow::Error),
+    #[error("{location}: {source}")]
+    Sqlx {
+        #[from]
+        source: Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AnalysisStateMachine {
+        #[from]
+        source: AnalysisStateMachineError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    Model {
+        #[from]
+        source: ModelError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    IO {
+        #[from]
+        source: IoError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    TokioJoin {
+        #[from]
+        source: TokioJoinError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    InvalidRegex {
+        #[from]
+        source: RegexError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AnyhowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 pub async fn run_routine_loop(

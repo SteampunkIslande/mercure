@@ -29,12 +29,24 @@ pub enum RunDefinitionError {
     UneditableRun,
     #[error("RunID manquant!")]
     MissingRunID,
-    #[error(transparent)]
-    SqlxError(#[from] sqlx::Error),
-    #[error(transparent)]
-    SerdeJsonError(#[from] serde_json::Error),
-    #[error(transparent)]
-    AnyHowError(#[from] anyhow::Error),
+    #[error("{location}: {source}")]
+    SqlxError {
+        #[from]
+        source: sqlx::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    SerdeJsonError {
+        #[from]
+        source: serde_json::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AnyHowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]

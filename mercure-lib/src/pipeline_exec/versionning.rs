@@ -11,14 +11,26 @@ use wherror::Error;
 
 #[derive(Error, Debug)]
 pub enum GitCheckError {
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
-    #[error(transparent)]
-    SerdeJsonError(#[from] serde_json::Error),
+    #[error("{location}: {source}")]
+    ReqwestError {
+        #[from]
+        source: reqwest::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    SerdeJsonError {
+        #[from]
+        source: serde_json::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("La branche {0} n'existe pas!")]
     NoSuchBranch(String),
-    #[error(transparent)]
-    AnyhowError(#[from] anyhow::Error),
+    #[error("{location}: {source}")]
+    AnyhowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("{0}")]
     Unsupported(String),
 }
@@ -116,8 +128,7 @@ pub async fn list_yaml_forms_giteav1(
             .get(&url)
             .query(&[("ref", branch_name)])
             .send()
-            .await
-            .map_err(GitCheckError::ReqwestError)?;
+            .await?;
 
         if !resp.status().is_success() {
             continue;

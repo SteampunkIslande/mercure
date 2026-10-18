@@ -11,14 +11,14 @@ use wherror::Error;
 pub enum AnalysisStateMachineError {
     #[error("Transition invalide de {} vers {}",.from,.to)]
     InvalidTransition { from: String, to: String },
-    #[error(transparent)]
-    ModelError(#[from] ModelError),
-    #[error(transparent)]
-    RunDefinitionError(#[from] RunDefinitionError),
+    #[error("{location}: {source}")]
+    ModelError{#[from] source: ModelError, location: &'static std::panic::Location<'static>},
+    #[error("{location}: {source}")]
+    RunDefinitionError{#[from] source: RunDefinitionError, location: &'static std::panic::Location<'static>},
     #[error("{0}")]
     InvalidOperation(String),
-    #[error(transparent)]
-    GitCheckError(#[from] GitCheckError),
+    #[error("{location}: {source}")]
+    GitCheckError{#[from] source: GitCheckError, location: &'static std::panic::Location<'static>},
 }
 
 /// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative (appelé par le backend)

@@ -22,14 +22,26 @@ pub enum AuthError {
     DatabaseError(String),
     #[error("Token error: {0}")]
     TokenError(String),
-    #[error(transparent)]
-    SqliteError(#[from] sqlx::Error),
-    #[error(transparent)]
-    BcryptError(#[from] bcrypt::BcryptError),
+    #[error("{location}: {source}")]
+    SqliteError {
+        #[from]
+        source: sqlx::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    BcryptError {
+        #[from]
+        source: bcrypt::BcryptError,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("No password given")]
     NoPassword,
-    #[error(transparent)]
-    ModelError(#[from] models::ModelError),
+    #[error("{location}: {source}")]
+    ModelError {
+        #[from]
+        source: models::ModelError,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 impl<'r> Responder<'r, 'static> for AuthError {
@@ -52,21 +64,21 @@ impl<'r> Responder<'r, 'static> for AuthError {
                 response.status(Status::Unauthorized);
                 ApiResponse::<()>::error("Utilisateur inconnu".to_string())
             }
-            AuthError::SqliteError(e) => {
+            AuthError::SqliteError { source, location } => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<()>::error(e.to_string())
+                ApiResponse::<()>::error(format!("Erreur dans le fichier {location}: {source}"))
             }
-            AuthError::BcryptError(e) => {
+            AuthError::BcryptError { source, location } => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<()>::error(e.to_string())
+                ApiResponse::<()>::error(format!("Erreur dans le fichier {location}: {source}"))
             }
             AuthError::NoPassword => {
                 response.status(Status::BadRequest);
                 ApiResponse::<()>::error(self.to_string())
             }
-            AuthError::ModelError(e) => {
+            AuthError::ModelError { source, location } => {
                 response.status(Status::InternalServerError);
-                ApiResponse::<()>::error(e.to_string())
+                ApiResponse::<()>::error(format!("Erreur dans le fichier {location}: {source}"))
             }
         };
 

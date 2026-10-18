@@ -20,26 +20,66 @@ use crate::pipeline_exec::versionning;
 
 #[derive(Debug, wherror::Error)]
 pub enum ModelError {
-    #[error("Form serde error from/to json: {0}")]
-    SerdeJsonError(#[from] serde_json::Error),
-    #[error("Form serde error from/to yaml: {0}")]
-    SerdeYamlError(#[from] yaml_serde::Error),
-    #[error("Database error: {0}")]
-    DatabaseError(#[from] sqlx::Error),
-    #[error(transparent)]
-    RunDefinitionError(#[from] hgrun::RunDefinitionError),
-    #[error(transparent)]
-    GitCheckError(#[from] versionning::GitCheckError),
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
-    #[error(transparent)]
-    AttemptError(#[from] attempt::AttemptError),
-    #[error(transparent)]
-    BcryptError(#[from] bcrypt::BcryptError),
-    #[error(transparent)]
-    FormError(#[from] form::FormDefinitionError),
-    #[error(transparent)]
-    AnyHowError(#[from] anyhow::Error),
+    #[error("Form serde error from/to json in file {location}: {source}")]
+    SerdeJsonError {
+        #[from]
+        source: serde_json::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("Form serde error from/to yaml in file {location}: {source}")]
+    SerdeYamlError {
+        #[from]
+        source: yaml_serde::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    DatabaseError {
+        #[from]
+        source: sqlx::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    RunDefinitionError {
+        #[from]
+        source: hgrun::RunDefinitionError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    GitCheckError {
+        #[from]
+        source: versionning::GitCheckError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    IOError {
+        #[from]
+        source: std::io::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AttemptError {
+        #[from]
+        source: attempt::AttemptError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    BcryptError {
+        #[from]
+        source: bcrypt::BcryptError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    FormError {
+        #[from]
+        source: form::FormDefinitionError,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    AnyHowError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 }
