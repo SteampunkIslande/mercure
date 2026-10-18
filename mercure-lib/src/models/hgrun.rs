@@ -134,7 +134,6 @@ pub struct Run {
     /// User defined variables
     pub user_defined_vars: HashMap<String, String>,
 
-    #[serde(skip_deserializing)]
     #[serde(flatten)]
     pub form_identification: FormIdentification,
 }
