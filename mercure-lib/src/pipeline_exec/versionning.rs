@@ -108,40 +108,36 @@ pub async fn list_yaml_forms_giteav1(
     let client = Client::new();
     let mut results = Vec::new();
     let mut stack = vec![".".to_string()];
+
     while let Some(current_path) = stack.pop() {
-        let url = format!(
-            "{}/api/v1/repos/{}/{}/contents-ext/{}",
-            base_url, owner, repo, current_path
-        );
+        let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/contents-ext/{current_path}");
 
         let resp = client
             .get(&url)
             .query(&[("ref", branch_name)])
             .send()
             .await
-            .map_err(|e| GitCheckError::ReqwestError(e))?;
+            .map_err(GitCheckError::ReqwestError)?;
 
         if !resp.status().is_success() {
-            // Skip missing directories
             continue;
         }
 
-        let body: DirContentsResponse = match resp.json::<DirContentsResponse>().await {
-            Ok(b) => b,
-            Err(_) => continue,
+        // Idiomatic let-else pattern replaces the verbose match block
+        let Ok(body) = resp.json::<DirContentsResponse>().await else {
+            continue;
         };
 
         for item in body.dir_contents {
-            if item.item_type.eq_ignore_ascii_case("file")
-                && (item.name.ends_with(".yml") || item.name.ends_with(".yaml"))
-            {
+            let is_yaml = item.name.ends_with(".yml") || item.name.ends_with(".yaml");
+
+            if item.item_type.eq_ignore_ascii_case("file") && is_yaml {
                 results.push(item);
             } else if item.item_type.eq_ignore_ascii_case("dir") {
-                // Use the item's path if provided, otherwise construct it
-                let next_path = if item.path.as_os_str().is_empty() {
-                    format!("{}/{}", current_path, item.name)
-                } else {
-                    item.path.to_string_lossy().into_owned()
+                // Cleaner path handling without OS-string lossy conversions
+                let next_path = match item.path.to_str() {
+                    Some("") | None => format!("{current_path}/{}", item.name),
+                    Some(valid_path) => valid_path.to_string(),
                 };
                 stack.push(next_path);
             }
