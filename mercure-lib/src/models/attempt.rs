@@ -142,6 +142,35 @@ impl Attempt {
         Ok(attempt)
     }
 
+    pub async fn get_pending_runs(pool: &SqlitePool) -> Result<Vec<Self>, ModelError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT * FROM Attempts WHERE status = 'Pending' ORDER BY attempt_number DESC
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                Some(Attempt {
+                    attempt_number: row.try_get("attempt_number").ok()?,
+                    run_id: row.try_get("run_id").ok()?,
+                    attempt_date: row.try_get("attempt_date").ok()?,
+                    user_defined_vars: serde_json::from_str(row.try_get("attempt_number").ok()?)
+                        .ok()?,
+                    form_identification: FormIdentification::GitCommit {
+                        commit_hash: row.try_get("commit_hash").ok()?,
+                        form_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
+                    },
+                    status: RunStatus::Pending,
+                    comment: row.try_get("comment").ok()?,
+                })
+            })
+            .collect())
+    }
+
     /// Récupère toutes les tentatives pour un run_id
     pub async fn list_attempts_for_run(
         run_id: i64,

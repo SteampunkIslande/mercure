@@ -87,7 +87,9 @@ pub async fn run_routine_loop(
             }
 
             _ = interval.tick() => {
-                if let Some(attempt) = find_run_to_launch(pool).await {
+                let mut runs_to_launch = find_run_to_launch(pool).await?;
+
+                while let Some(attempt) = runs_to_launch.pop() {
                     let child_rx = child_shutdown_tx.subscribe();
 
                     // 1. Clone the pool handle. This is cheap (Arc clone under the hood).
@@ -108,7 +110,7 @@ pub async fn run_routine_loop(
     match child_shutdown_tx.send(()) {
         Ok(n) => {
             info!(
-                "{} jobs sont encore en cours, un signal SIGINT leur a été envoyé",
+                "{} jobs sont encore en cours, leur task tokio est informée.",
                 n
             );
         }
@@ -132,9 +134,8 @@ pub async fn run_routine_loop(
     Ok(())
 }
 
-async fn find_run_to_launch(_pool: &SqlitePool) -> Option<Attempt> {
-    // Lire dans la base de données, pour trouver une tentative dans l'état 'Pending'
-    None
+async fn find_run_to_launch(pool: &SqlitePool) -> Result<Vec<Attempt>, RoutineError> {
+    Ok(Attempt::get_pending_runs(pool).await?)
 }
 
 async fn send_sigint_then_kill(
