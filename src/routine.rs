@@ -1,9 +1,12 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
+use mercure::config::{MercureConfig, get_mercure_config};
 use mercure::models::ModelError;
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
+use std::path::{self, PathBuf};
 use std::process::ExitStatus;
+use std::str::FromStr;
 use tokio::task::{JoinError as TokioJoinError, JoinSet};
 
 use sqlx::SqlitePool;
@@ -181,8 +184,29 @@ async fn run_script(
     _pool: &SqlitePool,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
-    // let script_file
-    let mut child = match Command::new("bash").spawn() {
+    let scripts_dir = {
+        let MercureConfig { scripts_dir, .. } = get_mercure_config();
+        let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
+        if !scripts_dir.exists() {
+            std::fs::create_dir_all(&scripts_dir)
+                .with_context(|| format!("Impossible de créer le dossier"))?;
+        }
+        scripts_dir
+    };
+
+    let script_path = scripts_dir.join(path::Path::new(&format!(
+        "{}-run-{:0<8}-tentative-{:0<8}.sh",
+        time::Timestamp::now().as_seconds(),
+        attempt.run_id,
+        attempt.attempt_number
+    )));
+
+    let rendered = attempt.render_script().await?;
+    std::fs::create_dir_all(attempt.outdir())
+        .with_context(|| format!("Impossible de créer le dossier outdir"))?;
+    std::fs::write(&script_path, &rendered)?;
+
+    let mut child = match Command::new("bash").arg(&script_path).spawn() {
         Ok(c) => c,
         Err(e) => {
             return Err(anyhow::format_err!(

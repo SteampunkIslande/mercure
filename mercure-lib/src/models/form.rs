@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 
+use crate::config::get_mercure_config;
 use crate::{
     config::{GitWebConfig, MercureConfig},
     models::{ModelError, groups},
@@ -50,6 +51,12 @@ pub enum FormDefinitionError {
     },
     #[error("Nom de variable réservé: {}",.0)]
     ReservedVarName(String),
+    #[error("{location}: {source}")]
+    GitCheckError {
+        #[from]
+        source: GitCheckError,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -150,14 +157,14 @@ impl Default for FormExecType {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "form_id")]
-pub enum FormIdentification {
+pub enum FileIdentification {
     GitBranchAndPath {
         branch: String,
         file_path: PathBuf,
     },
     GitCommit {
         commit_hash: String,
-        form_path: PathBuf,
+        file_path: PathBuf,
     },
     #[default]
     None,
@@ -173,7 +180,7 @@ pub struct Form {
     pub workdir: String,
     #[serde(flatten)]
     #[serde(skip_deserializing)]
-    pub form_identification: FormIdentification,
+    pub form_identification: FileIdentification,
     pub groups: Option<Vec<String>>,
 }
 
@@ -201,7 +208,7 @@ impl Form {
                             .unwrap_or_default();
                     // For each form in given branch
                     for dir_item in items {
-                        let form_identification = FormIdentification::GitBranchAndPath {
+                        let form_identification = FileIdentification::GitBranchAndPath {
                             branch: branch_name.to_string(), // Clone is mandatory
                             file_path: dir_item.path,        // MOVED: No clone needed!
                         };
@@ -225,10 +232,13 @@ impl Form {
                             Err(e) => {
                                 // Read the path back out of the enum you just created
                                 let path_for_warn = match &form_identification {
-                                    FormIdentification::GitBranchAndPath { file_path, .. } => {
+                                    FileIdentification::GitBranchAndPath { file_path, .. } => {
                                         file_path
                                     }
-                                    FormIdentification::GitCommit { form_path, .. } => form_path,
+                                    FileIdentification::GitCommit {
+                                        file_path: form_path,
+                                        ..
+                                    } => form_path,
                                     _ => &PathBuf::new(),
                                 };
 
@@ -260,7 +270,7 @@ impl Form {
         Ok(all_forms)
     }
 
-    pub async fn get_form(form_identification: FormIdentification) -> Result<Form, ModelError> {
+    pub async fn get_form(form_identification: FileIdentification) -> Result<Form, ModelError> {
         let MercureConfig { pipelines, .. } = crate::config::get_mercure_config();
 
         match &pipelines {
@@ -285,26 +295,116 @@ impl Form {
         }
     }
 
+    /// Variables injected into every Form jinja context. Single definition point.
+    pub const INJECTED_VARS: [&'static str; 2] = ["outdir", "attempt_number"];
+
+    /// Build the full jinja context: user vars + injected (`outdir`, `attempt_number`).
+    /// Injected values win over user vars with the same name.
+    ///
+    /// TODO: find a way to make sure INJECTED_VARS are always up to date with this function's signature
+    pub fn jinja_context(
+        &self,
+        user_vars: &HashMap<String, String>,
+        attempt_number: u32,
+        outdir: &str,
+    ) -> HashMap<String, String> {
+        let mut ctx = user_vars.clone();
+        ctx.insert("outdir".to_string(), outdir.to_string());
+        ctx.insert("attempt_number".to_string(), attempt_number.to_string());
+        ctx
+    }
+
+    /// Resolve the raw jinja template source for this form.
+    /// - `Shell`: inline `exec` string.
+    /// - `Script`: file fetched from the repo. `script_name` is relative to the
+    ///   repo root (no `..` traversal allowed) and resolved at the same
+    ///   ref/commit as `self.form_identification`.
+    pub async fn template_source(&self) -> Result<String, FormDefinitionError> {
+        match &self.exec_type {
+            FormExecType::Shell { exec } => Ok(exec.clone()),
+            FormExecType::Script { script_name } => {
+                if script_name.is_absolute()
+                    || script_name.components().any(|c| {
+                        matches!(
+                            c,
+                            std::path::Component::ParentDir | std::path::Component::RootDir
+                        )
+                    })
+                {
+                    return Err(FormDefinitionError::InvalidData(format!(
+                        "script_name `{}` doit être relatif à la racine du dépôt, sans `..`",
+                        script_name.display()
+                    )));
+                }
+                let config = get_mercure_config();
+                match config.pipelines {
+                    GitWebConfig::GiteaV1 {
+                        base_url,
+                        owner,
+                        repo,
+                    } => {
+                        let script_ident = match &self.form_identification {
+                            FileIdentification::GitBranchAndPath { branch, .. } => {
+                                FileIdentification::GitBranchAndPath {
+                                    branch: branch.clone(),
+                                    file_path: script_name.clone(),
+                                }
+                            }
+                            FileIdentification::GitCommit { commit_hash, .. } => {
+                                FileIdentification::GitCommit {
+                                    commit_hash: commit_hash.clone(),
+                                    file_path: script_name.clone(),
+                                }
+                            }
+                            FileIdentification::None => {
+                                return Err(FormDefinitionError::InvalidData(
+                                    "Identification du formulaire invalide".into(),
+                                ));
+                            }
+                        };
+                        Ok(
+                            versionning::get_file_giteav1(&base_url, &owner, &repo, &script_ident)
+                                .await
+                                .context("Impossible de lire le fichier de script")?,
+                        )
+                    }
+                    GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
+                        "L'API Gitlab V4 n'est pas encore prise en charge!".to_string(),
+                    )
+                    .into()),
+                }
+            }
+        }
+    }
+
+    /// Render the template with the given context, returning the final script.
+    pub async fn render_template(
+        &self,
+        context: &impl Serialize,
+    ) -> Result<String, FormDefinitionError> {
+        let template = self.template_source().await?;
+        let mut env = Environment::new();
+        env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
+        match env.render_str(&template, context) {
+            Ok(s) => Ok(s),
+            Err(e) => match e.kind() {
+                minijinja::ErrorKind::UndefinedError => Err(FormDefinitionError::MissingVar(
+                    Self::list_missing_vars(&template, context)?
+                        .join(", ")
+                        .to_string(),
+                )),
+                _ => Err(e.into()),
+            },
+        }
+    }
+
     /// Makes sure this form is valid under given circumstances
     ///
-    /// # Arguments
-    ///
-    /// - `&self` (`undefined`) - This form
-    /// - `variables` (`Option<&T>`) - Any serializable object, optional
-    ///
-    /// If `variables` is None, then check the template for syntax errors. In fact, if variables is None, we try to render the template with self.variables, which comes, itself, from deserializing the
-    /// form definition.
-    ///
-    /// If `variables` is Some, then we make sure we received every required variable for this form (plus the template syntax).
-    ///
-    /// # Returns
-    ///
-    /// - `Result<(), FormDefinitionError> where T: Serialize,` - Returns an error if anything goes wrong while rendering the template. Otherwise, returns nothing
-    ///
-    /// # Errors
-    ///
-    /// - There is a syntax error in the template definition
-    /// - One or more variables are missing
+    /// - `None`: definition-time check. Rejects reserved var names
+    ///   (`outdir`, `attempt_number`) in `self.variables`, then renders the
+    ///   template with every declared var set to `""` plus injected vars.
+    /// - `Some(vars)`: submission-time check. Renders with the provided user
+    ///   vars plus injected placeholders.
     pub async fn check_validity(
         &self,
         variables: Option<&HashMap<String, String>>,
@@ -314,22 +414,23 @@ impl Form {
                 if let Some(v) = self
                     .variables
                     .iter()
-                    .find(|v| (&["outdir", "attempt_id"]).contains(&v.name.as_str()))
+                    .find(|v| Self::INJECTED_VARS.contains(&v.name.as_str()))
                 {
                     return Err(FormDefinitionError::ReservedVarName(v.name.to_string()));
                 }
-                self.try_render_template(
-                    &self
-                        .variables
-                        .iter()
-                        .map(|v| (v.name.as_str(), "")) // For each user-provided variable, replace with empty string to get
-                        .chain([("outdir", ""), ("attempt_id", "")])
-                        .collect::<HashMap<&str, &str>>(),
-                )?;
+                let ctx: HashMap<&str, &str> = self
+                    .variables
+                    .iter()
+                    .map(|v| (v.name.as_str(), ""))
+                    .chain(Self::INJECTED_VARS.iter().map(|n| (*n, "")))
+                    .collect();
+                self.render_template(&ctx).await.map(|_| ())?;
             }
-            Some(vars) => self.try_render_template(vars)?,
+            Some(vars) => {
+                let ctx = self.jinja_context(vars, 0, "");
+                self.render_template(&ctx).await.map(|_| ())?;
+            }
         }
-
         Ok(())
     }
 
@@ -369,32 +470,6 @@ impl Form {
         missing.sort();
         Ok(missing)
     }
-
-    pub fn try_render_template(&self, context: &impl Serialize) -> Result<(), FormDefinitionError> {
-        let template = match &self.exec_type {
-            FormExecType::Script { script_name } => {
-                std::fs::read_to_string(&script_name).context("Impossible de lire le template")?
-            }
-            FormExecType::Shell { exec } => exec.to_string(),
-        };
-        let mut env = Environment::new();
-        env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
-
-        match env.render_str(&template, context) {
-            Ok(_) => {}
-            Err(e) => match e.kind() {
-                minijinja::ErrorKind::UndefinedError => {
-                    return Err(FormDefinitionError::MissingVar(
-                        Self::list_missing_vars(&template, context)?
-                            .join(", ")
-                            .to_string(),
-                    ));
-                }
-                _ => return Err(e.into()),
-            },
-        }
-        Ok(())
-    }
 }
 
 /// Aperçu d'un formulaire, mis en cache en base de données.
@@ -413,7 +488,7 @@ pub struct CachedForm {
     pub form_def_id: i64,
     #[serde(flatten)]
     #[serde(skip_deserializing)]
-    pub form_identification: FormIdentification,
+    pub form_identification: FileIdentification,
     pub name: String,
     pub description: String,
 }
@@ -473,7 +548,7 @@ impl CachedForm {
                 name,
                 description,
                 groups,
-                form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
+                form_identification: FileIdentification::GitBranchAndPath { branch, file_path },
                 ..
             } = form
             else {
@@ -518,7 +593,7 @@ impl CachedForm {
 
             cached.push(CachedForm {
                 form_def_id,
-                form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
+                form_identification: FileIdentification::GitBranchAndPath { branch, file_path },
                 description,
                 name,
             });
@@ -703,7 +778,7 @@ fn form_def_from_row(row: &sqlx::sqlite::SqliteRow) -> Option<CachedForm> {
     let file_path = PathBuf::from_str(&row.try_get::<String, _>("file_path").ok()?).ok()?;
     Some(CachedForm {
         form_def_id: row.try_get("form_def_id").ok()?,
-        form_identification: FormIdentification::GitBranchAndPath { branch, file_path },
+        form_identification: FileIdentification::GitBranchAndPath { branch, file_path },
         description: row.try_get("description").ok()?,
         name: row.try_get("name").ok()?,
     })
@@ -752,12 +827,6 @@ mod test {
                                 },
                             },
                             Variable {
-                                name: "outdir".to_string(),
-                                title: "Dossier de sortie".to_string(),
-                                description: "Le dossier de travail pour snakemake".to_string(),
-                                variable_type: VariableType::LineEdit,
-                            },
-                            Variable {
                                 name: "panel".to_string(),
                                 title: "Nom du panel".to_string(),
                                 description: "Le nom du panel".to_string(),
@@ -772,7 +841,7 @@ mod test {
                                 variable_type: VariableType::ExistingFile,
                             }
                         ],
-                        form_identification: FormIdentification::None,
+                        form_identification: FileIdentification::None,
 
                         workdir: "outdir".to_string(),
                         groups: Some(vec!["Admin".to_string(),"Génétique".to_string()]),
@@ -893,7 +962,7 @@ mod form_def_cache_tests {
 
     use sqlx::SqlitePool;
 
-    use crate::models::{CachedForm, Form, FormIdentification, Group};
+    use crate::models::{CachedForm, FileIdentification, Form, Group};
 
     async fn test_pool() -> SqlitePool {
         // Le cache en mémoire vit par connexion : une seule connexion dans le pool
@@ -913,7 +982,7 @@ mod form_def_cache_tests {
             variables: vec![],
             exec_type: Default::default(),
             workdir: String::new(),
-            form_identification: FormIdentification::GitBranchAndPath {
+            form_identification: FileIdentification::GitBranchAndPath {
                 branch: branch.to_string(),
                 file_path: Path::new(file_path).to_path_buf(),
             },
@@ -955,7 +1024,7 @@ mod form_def_cache_tests {
             vec![
                 CachedForm {
                     form_def_id: all[0].form_def_id,
-                    form_identification: FormIdentification::GitBranchAndPath {
+                    form_identification: FileIdentification::GitBranchAndPath {
                         branch: "dev".into(),
                         file_path: ".forms/f2.yaml".into()
                     },
@@ -964,7 +1033,7 @@ mod form_def_cache_tests {
                 },
                 CachedForm {
                     form_def_id: all[1].form_def_id,
-                    form_identification: FormIdentification::GitBranchAndPath {
+                    form_identification: FileIdentification::GitBranchAndPath {
                         branch: "main".into(),
                         file_path: ".forms/f1.yaml".into()
                     },
@@ -973,7 +1042,7 @@ mod form_def_cache_tests {
                 },
                 CachedForm {
                     form_def_id: all[2].form_def_id,
-                    form_identification: FormIdentification::GitBranchAndPath {
+                    form_identification: FileIdentification::GitBranchAndPath {
                         branch: "main".into(),
                         file_path: ".forms/f3.yaml".into()
                     },
@@ -989,7 +1058,7 @@ mod form_def_cache_tests {
         assert_eq!(forms_with_group.len(), 1);
         assert_eq!(
             forms_with_group[0].form_identification,
-            FormIdentification::GitBranchAndPath {
+            FileIdentification::GitBranchAndPath {
                 branch: "main".to_string(),
                 file_path: Path::new(".forms/f1.yaml").to_path_buf()
             }
@@ -1064,7 +1133,7 @@ mod form_def_cache_tests {
         assert_eq!(all.len(), 1);
         assert_eq!(
             all[0].form_identification,
-            FormIdentification::GitBranchAndPath {
+            FileIdentification::GitBranchAndPath {
                 branch: "main".to_string(),
                 file_path: Path::new(".forms/f1.yaml").to_path_buf()
             }

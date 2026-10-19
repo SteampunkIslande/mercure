@@ -1,4 +1,4 @@
-use crate::models::{Form, FormIdentification};
+use crate::models::{FileIdentification, Form};
 use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
 use rocket::http::uri::{Segments, fmt::Path};
@@ -14,7 +14,7 @@ pub async fn new_run_get(
     file_path: Segments<'_, Path>,
     _pool: &State<SqlitePool>,
 ) -> Result<Template, FrontendError> {
-    let form = Form::get_form(FormIdentification::GitBranchAndPath {
+    let form = Form::get_form(FileIdentification::GitBranchAndPath {
         branch: branch.to_string(),
         file_path: file_path.to_path_buf(true)?,
     })

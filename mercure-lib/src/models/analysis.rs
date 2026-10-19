@@ -1,5 +1,5 @@
 use crate::{
-    models::{Attempt, FormIdentification, Run, RunDefinitionError, RunStatus},
+    models::{Attempt, FileIdentification, Run, RunDefinitionError, RunStatus},
     pipeline_exec::{GitCheckError, versionning},
 };
 
@@ -48,7 +48,7 @@ pub async fn validate_form(
     }
 
     let current_commit_hash = match run.form_identification {
-        FormIdentification::GitBranchAndPath { branch, .. } => {
+        FileIdentification::GitBranchAndPath { branch, .. } => {
             versionning::get_latest_commit(Some(&branch))
                 .await?
                 .into_iter()
@@ -56,8 +56,8 @@ pub async fn validate_form(
                 .ok_or(GitCheckError::NoSuchBranch(branch))?
                 .last_commit
         }
-        FormIdentification::GitCommit { commit_hash, .. } => commit_hash,
-        FormIdentification::None => "".to_string(),
+        FileIdentification::GitCommit { commit_hash, .. } => commit_hash,
+        FileIdentification::None => "".to_string(),
     };
     super::hgrun::Run::validate_form(run_id, pool).await?;
     super::attempt::Attempt::new_attempt(run_id, &current_commit_hash, pool)

@@ -18,10 +18,6 @@ variables:
     description: Le dossier de run brut Illumina
     type: ListFromURL
     source: /mercure/api/aux/list_illumina_dirs
-  - name: outdir
-    title: Dossier de sortie
-    description: Le dossier de travail pour snakemake
-    type: LineEdit
   - name: panel
     title: Nom du panel
     description: "Le nom du panel"
@@ -49,7 +45,7 @@ exec: |
   rsync -a --info=progress2 "{{ outdir }}/fastq" user@depot:/where/it/should/go
 
   # Smaug v3
-  snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}
+  snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_number }}
 
   # Copie NAS
   rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ panel }}

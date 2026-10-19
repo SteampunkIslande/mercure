@@ -1,6 +1,6 @@
 use crate::models::CachedForm;
+use crate::models::FileIdentification;
 use crate::models::Form;
-use crate::models::FormIdentification;
 use crate::models::Group;
 use crate::models::User;
 
@@ -135,7 +135,7 @@ pub struct Run {
     pub user_defined_vars: HashMap<String, String>,
 
     #[serde(flatten)]
-    pub form_identification: FormIdentification,
+    pub form_identification: FileIdentification,
 }
 
 impl Run {
@@ -148,24 +148,13 @@ impl Run {
 
         // Insérer dans la table Runs
         let form = run_submission.get_form().await?;
-        // S'assurer que le formulaire est bien rempli
-        form.check_validity(Some(
-            &run_submission
-                .user_defined_vars
-                .into_iter()
-                .chain(
-                    [
-                        ("outdir".to_string(), "".to_string()), // Additional fields, left empty for now (testing) that will be added at execution time
-                        ("attempt_id".to_string(), "".to_string()),
-                    ]
-                    .into_iter(),
-                )
-                .collect::<HashMap<String, String>>(),
-        ))
-        .await?;
+        // S'assurer que le formulaire est bien rempli (les vars injectées
+        // `outdir`/`attempt_number` sont ajoutées à l'exécution)
+        form.check_validity(Some(&run_submission.user_defined_vars))
+            .await?;
 
         match run_submission.form_identification {
-            FormIdentification::GitBranchAndPath { branch, file_path } => {
+            FileIdentification::GitBranchAndPath { branch, file_path } => {
                 let run_id = sqlx::query(
                     r#"
                     INSERT INTO Runs (user_id, run_name, creation_date, status, attempt_count, branch_name, user_defined_vars, form_path)
@@ -206,19 +195,7 @@ impl Run {
 
         let form = run.get_form().await?;
         // S'assurer que le formulaire est bien rempli
-        form.check_validity(Some(
-            &user_defined_vars
-                .into_iter()
-                .chain(
-                    [
-                        ("outdir".to_string(), "".to_string()),
-                        ("attempt_id".to_string(), "".to_string()),
-                    ]
-                    .into_iter(),
-                )
-                .collect::<HashMap<String, String>>(),
-        ))
-        .await?;
+        form.check_validity(Some(&user_defined_vars)).await?;
 
         sqlx::query(
             r#"
@@ -607,7 +584,7 @@ impl Run {
             status,
             attempt_count,
             user_defined_vars,
-            form_identification: FormIdentification::GitBranchAndPath {
+            form_identification: FileIdentification::GitBranchAndPath {
                 branch: branch_name,
                 file_path: PathBuf::from_str(&form_path).with_context(|| {
                     format!(
@@ -729,7 +706,7 @@ struct RunFilters<'a> {
 /// Reconstruit un `Run` depuis une ligne de la requête de listing,
 /// puis le sérialise pour le tableau du front.
 fn run_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Option<Value> {
-    let form_identification = FormIdentification::GitBranchAndPath {
+    let form_identification = FileIdentification::GitBranchAndPath {
         branch: row.try_get("branch_name").ok()?,
         file_path: PathBuf::from_str(&row.try_get::<String, _>("form_path").ok()?).ok()?,
     };

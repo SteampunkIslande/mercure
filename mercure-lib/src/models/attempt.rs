@@ -1,5 +1,5 @@
-use crate::config::{GitWebConfig, get_mercure_config};
-use crate::models::{Form, FormIdentification};
+use crate::config::get_mercure_config;
+use crate::models::{FileIdentification, Form};
 use crate::models::{ModelError, Run, RunStatus};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -29,7 +29,7 @@ pub struct Attempt {
 
     pub user_defined_vars: HashMap<String, String>,
 
-    pub form_identification: FormIdentification,
+    pub form_identification: FileIdentification,
 
     /// One of the only two editable fields
     pub status: RunStatus,
@@ -46,7 +46,7 @@ impl Attempt {
     ) -> Result<(), ModelError> {
         let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
-        let FormIdentification::GitBranchAndPath { file_path, .. } = run.form_identification else {
+        let FileIdentification::GitBranchAndPath { file_path, .. } = run.form_identification else {
             return Err(anyhow::format_err!("Une nouvelle tentative ne peut être créée qu'à partir d'un formulaire défini par une branche et un chemin.").into());
         };
 
@@ -93,14 +93,22 @@ impl Attempt {
     }
 
     pub async fn get_form(&self) -> Result<Form, ModelError> {
-        let config = get_mercure_config();
+        Form::get_form(self.form_identification.clone()).await
+    }
 
-        match config.pipelines {
-            GitWebConfig::GitlabV4 { .. } => {
-                return Err(anyhow::format_err!("Gitlab n'est pas encore supporté...").into());
-            }
-            GitWebConfig::GiteaV1 { .. } => Form::get_form(self.form_identification.clone()).await,
-        }
+    /// Auto-computed output directory for this attempt. Single definition point
+    /// for the injected `outdir` jinja variable.
+    pub fn outdir(&self) -> PathBuf {
+        PathBuf::from(&get_mercure_config().logs_dir)
+            .join(format!("run-{:0<8}", self.run_id))
+            .join(format!("attempt-{:0<8}", self.attempt_number))
+    }
+
+    pub async fn render_script(&self) -> Result<String, ModelError> {
+        let form = self.get_form().await?;
+        let outdir = self.outdir().display().to_string();
+        let ctx = form.jinja_context(&self.user_defined_vars, self.attempt_number, &outdir);
+        Ok(form.render_template(&ctx).await?)
     }
 
     /// Récupère un HgAttempt à partir de son attempt_number et run_id
@@ -131,9 +139,9 @@ impl Attempt {
             run_id: run_id,
             attempt_date: row.try_get("attempt_date")?,
             user_defined_vars,
-            form_identification: FormIdentification::GitCommit {
+            form_identification: FileIdentification::GitCommit {
                 commit_hash: row.try_get("commit_hash")?,
-                form_path: PathBuf::from_str(row.try_get("form_path")?)?,
+                file_path: PathBuf::from_str(row.try_get("form_path")?)?,
             },
             status,
             comment: row.try_get("comment")?,
@@ -160,9 +168,9 @@ impl Attempt {
                     attempt_date: row.try_get("attempt_date").ok()?,
                     user_defined_vars: serde_json::from_str(row.try_get("attempt_number").ok()?)
                         .ok()?,
-                    form_identification: FormIdentification::GitCommit {
+                    form_identification: FileIdentification::GitCommit {
                         commit_hash: row.try_get("commit_hash").ok()?,
-                        form_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
+                        file_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
                     },
                     status: RunStatus::Pending,
                     comment: row.try_get("comment").ok()?,
@@ -200,9 +208,9 @@ impl Attempt {
                     run_id: row.try_get("run_id").ok()?,
                     attempt_date: row.try_get("attempt_date").ok()?,
                     user_defined_vars,
-                    form_identification: FormIdentification::GitCommit {
+                    form_identification: FileIdentification::GitCommit {
                         commit_hash: row.try_get("commit_hash").ok()?,
-                        form_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
+                        file_path: PathBuf::from_str(row.try_get("form_path").ok()?).ok()?,
                     },
                     status,
                     comment: row.try_get("comment").ok()?,

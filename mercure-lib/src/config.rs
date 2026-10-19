@@ -24,6 +24,7 @@ pub struct MercureConfig {
     pub mercure_db: String,
     pub upload_dir: String,
     pub logs_dir: String,
+    pub scripts_dir: String,
     pub pipelines: GitWebConfig,
     pub webhook_secret: String,
 }
@@ -44,6 +45,7 @@ impl Default for MercureConfig {
             mercure_db: "sqlite://mercure.db".into(),
             upload_dir: "/home/charles/mercure/uploads".into(),
             logs_dir: "/home/charles/mercure/LOGS".into(),
+            scripts_dir: "/home/charles/mercure/scripts".into(),
             pipelines: GitWebConfig::default(),
             webhook_secret: String::new(),
         }

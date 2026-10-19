@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     config::{GitWebConfig, MercureConfig, get_mercure_config},
-    models::FormIdentification,
+    models::FileIdentification,
 };
 use reqwest::Client;
 use serde::Deserialize;
@@ -162,12 +162,12 @@ pub async fn get_file_giteav1(
     base_url: &str,
     owner: &str,
     repo: &str,
-    form_identification: &FormIdentification,
+    form_identification: &FileIdentification,
 ) -> Result<String, GitCheckError> {
     let client = Client::new();
     // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
     let url = match form_identification {
-        FormIdentification::GitBranchAndPath {
+        FileIdentification::GitBranchAndPath {
             branch,
             file_path: path,
         } => {
@@ -180,9 +180,9 @@ pub async fn get_file_giteav1(
                 path.display()
             )
         }
-        FormIdentification::GitCommit {
+        FileIdentification::GitCommit {
             commit_hash: hash,
-            form_path: path,
+            file_path: path,
         } => {
             format!(
                 "{}/{}/{}/raw/commit/{}/{}",
@@ -193,7 +193,7 @@ pub async fn get_file_giteav1(
                 path.display()
             )
         }
-        FormIdentification::None => {
+        FileIdentification::None => {
             return Err(anyhow::format_err!("Identification du formulaire invalide").into());
         }
     };
