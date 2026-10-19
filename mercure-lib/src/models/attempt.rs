@@ -107,7 +107,12 @@ impl Attempt {
     pub async fn render_script(&self) -> Result<String, ModelError> {
         let form = self.get_form().await?;
         let outdir = self.outdir().display().to_string();
-        let ctx = form.jinja_context(&self.user_defined_vars, self.attempt_number, &outdir);
+        let ctx = form.jinja_context(
+            &self.user_defined_vars,
+            self.attempt_number,
+            &outdir,
+            self.run_id,
+        );
         Ok(form.render_template(&ctx).await?)
     }
 

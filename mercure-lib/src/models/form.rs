@@ -17,6 +17,34 @@ use crate::{
     pipeline_exec::{GitCheckError, versionning},
 };
 
+macro_rules! additional_vars {
+    (
+        // Match a comma-separated list of identifiers and their types
+        $($var_name:ident: $var_type:ty),* $(,)?
+    ) => {
+        // 1. Automatically generate the list of reserved names
+        pub const INJECTED_VARS: &'static [&'static str] = &[
+            $( stringify!($var_name) ),*
+        ];
+
+        // 2. Generate the method signature and body
+        pub fn jinja_context(
+            &self,
+            user_vars: &HashMap<String, String>,
+            $( $var_name: $var_type ),*
+        ) -> HashMap<String, String> {
+            let mut ctx = user_vars.clone();
+
+            $(
+                // stringify! converts the variable name to a string literal at compile time
+                ctx.insert(stringify!($var_name).to_string(), $var_name.to_string());
+            )*
+
+            ctx
+        }
+    };
+}
+
 #[derive(wherror::Error, Debug)]
 pub enum FormDefinitionError {
     #[error("{location}: {source}")]
@@ -295,24 +323,9 @@ impl Form {
         }
     }
 
-    /// Variables injected into every Form jinja context. Single definition point.
-    pub const INJECTED_VARS: [&'static str; 2] = ["outdir", "attempt_number"];
-
-    /// Build the full jinja context: user vars + injected (`outdir`, `attempt_number`).
-    /// Injected values win over user vars with the same name.
-    ///
-    /// TODO: find a way to make sure INJECTED_VARS are always up to date with this function's signature
-    pub fn jinja_context(
-        &self,
-        user_vars: &HashMap<String, String>,
-        attempt_number: u32,
-        outdir: &str,
-    ) -> HashMap<String, String> {
-        let mut ctx = user_vars.clone();
-        ctx.insert("outdir".to_string(), outdir.to_string());
-        ctx.insert("attempt_number".to_string(), attempt_number.to_string());
-        ctx
-    }
+    // Define variable names (and types) that will be added at launch time
+    // It automatically defines the list of reserved names as a const &'static [&'static str]
+    additional_vars!(attempt_number: u32, outdir: &str, run_id: i64);
 
     /// Resolve the raw jinja template source for this form.
     /// - `Shell`: inline `exec` string.
@@ -427,7 +440,7 @@ impl Form {
                 self.render_template(&ctx).await.map(|_| ())?;
             }
             Some(vars) => {
-                let ctx = self.jinja_context(vars, 0, "");
+                let ctx = self.jinja_context(vars, 0, "", 0);
                 self.render_template(&ctx).await.map(|_| ())?;
             }
         }
