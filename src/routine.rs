@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
 use mercure::config::{MercureConfig, get_mercure_config};
-use mercure::models::ModelError;
+use mercure::models::{ModelError, SigintBehavior, analysis, appstate};
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
 use std::path::{self, PathBuf};
@@ -181,7 +181,7 @@ async fn send_sigint_then_kill(
 
 async fn run_script(
     attempt: &Attempt,
-    _pool: &SqlitePool,
+    pool: &SqlitePool,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
     let scripts_dir = {
@@ -189,24 +189,30 @@ async fn run_script(
         let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
         if !scripts_dir.exists() {
             std::fs::create_dir_all(&scripts_dir)
-                .with_context(|| format!("Impossible de créer le dossier"))?;
+                .with_context(|| format!("Impossible de créer le dossier des scripts"))?;
         }
         scripts_dir
     };
 
-    let script_path = scripts_dir.join(path::Path::new(&format!(
-        "{}-run-{:0<8}-tentative-{:0<8}.sh",
+    let script_id = format!(
+        "{}-run-{:0<8}-tentative-{:0<8}",
         time::Timestamp::now().as_seconds(),
         attempt.run_id,
         attempt.attempt_number
-    )));
+    );
+
+    let script_path = scripts_dir.join(path::Path::new(&format!("{}.sh", script_id)));
 
     let rendered = attempt.render_script().await?;
     std::fs::create_dir_all(attempt.outdir())
         .with_context(|| format!("Impossible de créer le dossier outdir"))?;
     std::fs::write(&script_path, &rendered)?;
 
-    let mut child = match Command::new("bash").arg(&script_path).spawn() {
+    let mut child = match Command::new("bash")
+        .arg(&script_path)
+        .process_group(0)
+        .spawn()
+    {
         Ok(c) => c,
         Err(e) => {
             return Err(anyhow::format_err!(
@@ -225,13 +231,24 @@ async fn run_script(
             // Le processus s'est terminé de lui-même
             match status_res {
                 Ok(status) if status.success() => {
-                    println!("Le processus s'est bien lancé. Penser à écrire dans la base de données...");
+                    analysis::complete_success(attempt.run_id, pool).await?;
                 }
                 Ok(status) => {
-                    println!("Le processus s'est terminé avec une erreur... Code d'erreur: {} Il faudrait écrire ça dans la base de données aussi...",status.code().map(|c| c.to_string()).unwrap_or("?".to_string()));
+                    analysis::complete_failure(
+                        attempt.run_id,
+                        &format!(
+                            "(exit code {})",
+                            &status
+                                .code()
+                                .map(|c| c.to_string())
+                                .unwrap_or("?".to_string())
+                        ),
+                        pool,
+                    )
+                    .await?;
                 }
                 Err(e) => {
-                    eprintln!("Erreur lors de l'attente de la fin de l'analyse... {}",  e);
+                    return Err(e.into());
                 }
             }
             Ok(())
@@ -239,16 +256,24 @@ async fn run_script(
 
         _ = shutdown_rx.recv() => {
             eprintln!("Attention, la tentative {} du run {} a reçu un signal d'arrêt prématuré", attempt.attempt_number, attempt.run_id);
-            match send_sigint_then_kill(&mut child, None).await
-            {
-                Ok(status) if status.success() =>{
-                    eprintln!("OK. On a envoyé SIGINT mais tout va bien, status 0.");
+            let sigint_behavior: appstate::SigintBehavior = appstate::AppState::get(pool).await?;
+            match sigint_behavior {
+                SigintBehavior::StopJobs => match send_sigint_then_kill(&mut child, None).await {
+                    Ok(status) if status.success() => {
+                        eprintln!("OK. On a envoyé SIGINT mais tout va bien, status 0.");
+                    }
+                    Ok(status) => {
+                        eprintln!("Ooops. Status: {}", status);
+                    }
+                    Err(e) => {
+                        eprintln!("Double oops: {}", e);
+                    }
                 },
-                Ok(status)=>{
-                    eprintln!("Ooops. Status: {}",status);
-                },
-                Err(e)=>{
-                    eprintln!("Double oops: {}",e);
+                SigintBehavior::WaitForJobCompletion => {
+                    match child.wait().await {
+                        Ok(status) => eprintln!("Le job s'est finalement terminé avec le status: {}", status),
+                        Err(e) => eprintln!("Erreur en attendant la fin du job: {}", e),
+                    }
                 }
             }
             Ok(())
