@@ -4,6 +4,7 @@ use crate::{
     config::{GitWebConfig, MercureConfig, get_mercure_config},
     models::FileIdentification,
 };
+
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
@@ -111,6 +112,11 @@ pub struct DirContentsResponse {
     pub dir_contents: Vec<DirContentsItem>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FileContentsResponse {
+    pub file_contents: DirContentsItem,
+}
+
 pub async fn list_yaml_forms_giteav1(
     base_url: &str,
     owner: &str,
@@ -165,6 +171,53 @@ pub async fn list_yaml_forms_giteav1(
     Ok(results)
 }
 
+async fn is_file_giteav1(
+    base_url: &str,
+    owner: &str,
+    repo: &str,
+    form_identification: &FileIdentification,
+) -> Result<bool, GitCheckError> {
+    let client = Client::new();
+    let url = match form_identification {
+        FileIdentification::GitBranchAndPath { branch, file_path } => {
+            format!(
+                "{}/api/v1/repos/{}/{}/contents-ext/{}?ref={}",
+                base_url,
+                owner,
+                repo,
+                file_path.display(),
+                branch
+            )
+        }
+        FileIdentification::GitCommit {
+            commit_hash,
+            file_path,
+        } => {
+            format!(
+                "{}/api/v1/repos/{}/{}/contents-ext/{}?ref={}",
+                base_url,
+                owner,
+                repo,
+                file_path.display(),
+                commit_hash
+            )
+        }
+        FileIdentification::None => {
+            return Err(anyhow::format_err!("Identification du formulaire invalide").into());
+        }
+    };
+    Ok(client
+        .get(&url)
+        .send()
+        .await?
+        .json::<FileContentsResponse>()
+        .await?
+        .file_contents
+        .item_type
+        .as_str()
+        == "file")
+}
+
 pub async fn get_file_giteav1(
     base_url: &str,
     owner: &str,
@@ -172,6 +225,11 @@ pub async fn get_file_giteav1(
     form_identification: &FileIdentification,
 ) -> Result<String, GitCheckError> {
     let client = Client::new();
+
+    if !is_file_giteav1(base_url, owner, repo, form_identification).await? {
+        return Err(anyhow::format_err!("Ceci n'est pas un fichier!").into());
+    }
+
     // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
     let url = match form_identification {
         FileIdentification::GitBranchAndPath {
