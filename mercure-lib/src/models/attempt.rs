@@ -99,9 +99,7 @@ impl Attempt {
     /// Auto-computed output directory for this attempt. Single definition point
     /// for the injected `outdir` jinja variable.
     pub fn outdir(&self) -> PathBuf {
-        PathBuf::from(&get_mercure_config().logs_dir)
-            .join(format!("run-{:0<8}", self.run_id))
-            .join(format!("attempt-{:0<8}", self.attempt_number))
+        PathBuf::from(&get_mercure_config().analysis_dir).join(format!("run-{:0<8}", self.run_id))
     }
 
     pub async fn render_script(&self) -> Result<String, ModelError> {
@@ -171,7 +169,7 @@ impl Attempt {
                     attempt_number: row.try_get("attempt_number").ok()?,
                     run_id: row.try_get("run_id").ok()?,
                     attempt_date: row.try_get("attempt_date").ok()?,
-                    user_defined_vars: serde_json::from_str(row.try_get("attempt_number").ok()?)
+                    user_defined_vars: serde_json::from_str(row.try_get("user_defined_vars").ok()?)
                         .ok()?,
                     form_identification: FileIdentification::GitCommit {
                         commit_hash: row.try_get("commit_hash").ok()?,

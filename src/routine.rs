@@ -5,9 +5,10 @@ use mercure::models::{ModelError, SigintBehavior, analysis, appstate};
 use nix::sys::signal::Signal;
 use std::io::Error as IoError;
 use std::path::{self, PathBuf};
-use std::process::ExitStatus;
+use std::process::{ExitStatus, Stdio};
 use std::str::FromStr;
-use tokio::task::{JoinError as TokioJoinError, JoinSet};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::task::{JoinError as TokioJoinError, JoinHandle, JoinSet};
 
 use sqlx::SqlitePool;
 
@@ -100,9 +101,32 @@ pub async fn run_routine_loop(
 
                     // 2. Move the cloned handle into the spawned task
                     join_set.spawn(async move {
+                        match analysis::start_run_analysis(attempt.run_id, &pool_clone).await {
+                            // OK: Tout va bien
+                            Ok(()) => {
+                                info!("Lancement de la tentative {} du run {}", attempt.attempt_number, attempt.run_id);
+                            },
+                            // Erreur au moment de start run: tenter de faire remonter cette erreur
+                            Err(e) => {
+                                // Impossible d'écrire l'erreur dans la base: très fâcheux, écrire dans stder en dernier recours
+                                if let Err(e) = analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool_clone).await {
+                                    error!("{}", e);
+                                }
+                            }
+                        }
                         match run_script(&attempt, &pool_clone, child_rx).await {
-                            Ok(()) => { info!("Run terminé"); }
-                            Err(e) => { error!("{}", e.to_string()); }
+                            Ok(()) => {
+                                info!("Tentative {} du run {} terminée", attempt.attempt_number, attempt.attempt_number);
+                                if let Err(e) = analysis::complete_success(attempt.run_id, &pool_clone).await {
+                                    error!("{}", e);
+                                }
+                            }
+                            // D'abord on essaye d'écrire l'erreur dans la base de données, mais si la transition est invalide, on l'affiche dans stderr
+                            Err(e) => {
+                                if let Err(e) = analysis::complete_failure(attempt.run_id, &e.to_string(), &pool_clone).await {
+                                    error!("{}", e)
+                                }
+                            }
                         }
                     });
                 }
@@ -179,29 +203,56 @@ async fn send_sigint_then_kill(
     }
 }
 
+/// Cette fonction peut paniquer, ou retourner une erreur, les conséquences seront minimes
+///
+/// Si elle panique, c'est juste une tâche tokio parmi d'autres, qui faisait partie du JoinSet global de la routine (le set qui stocke tous les jobs en cours)
 async fn run_script(
     attempt: &Attempt,
     pool: &SqlitePool,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
-    let scripts_dir = {
-        let MercureConfig { scripts_dir, .. } = get_mercure_config();
+    let (scripts_dir, logs_dir) = {
+        let MercureConfig {
+            scripts_dir,
+            logs_dir,
+            ..
+        } = get_mercure_config();
         let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
+        if !scripts_dir.is_absolute() {
+            return Err(anyhow::format_err!(
+                "Le dossier `scripts_dir` est mal configuré, un chemin absolu est requis"
+            )
+            .into());
+        }
         if !scripts_dir.exists() {
             std::fs::create_dir_all(&scripts_dir)
                 .with_context(|| format!("Impossible de créer le dossier des scripts"))?;
         }
-        scripts_dir
+
+        let logs_dir = PathBuf::from_str(&logs_dir).context("Le paramètre `logs_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
+        if !logs_dir.is_absolute() {
+            return Err(anyhow::format_err!(
+                "Le dossier `logs_dir` est mal configuré, un chemin absolu est requis"
+            )
+            .into());
+        }
+        if !logs_dir.exists() {
+            std::fs::create_dir_all(&logs_dir)
+                .with_context(|| format!("Impossible de créer le dossier des logs"))?;
+        }
+        (scripts_dir, logs_dir)
     };
 
     let script_id = format!(
-        "{}-run-{:0<8}-tentative-{:0<8}",
+        "{}-run-{:0>8}-tentative-{:0>8}",
         time::Timestamp::now().as_seconds(),
         attempt.run_id,
         attempt.attempt_number
     );
 
     let script_path = scripts_dir.join(path::Path::new(&format!("{}.sh", script_id)));
+    let stdout_path = logs_dir.join(path::Path::new(&format!("{}.stdout", script_id)));
+    let stderr_path = logs_dir.join(path::Path::new(&format!("{}.stderr", script_id)));
 
     let rendered = attempt.render_script().await?;
     std::fs::create_dir_all(attempt.outdir())
@@ -210,7 +261,10 @@ async fn run_script(
 
     let mut child = match Command::new("bash")
         .arg(&script_path)
+        .current_dir(attempt.outdir()) // Pour l'exécution du script, on se place dans outdir
         .process_group(0)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
     {
         Ok(c) => c,
@@ -224,10 +278,43 @@ async fn run_script(
             .into());
         }
     };
+    let stdout = child.stdout.take().ok_or(anyhow::format_err!("Fuck"))?;
+    let stderr = child.stderr.take().ok_or(anyhow::format_err!("Fuck"))?;
+
+    let stdout_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        let mut stdout_writer = BufWriter::new(
+            tokio::fs::File::options()
+                .create(true)
+                .write(true)
+                .open(&stdout_path)
+                .await?,
+        );
+        while let Ok(Some(line)) = reader.next_line().await {
+            stdout_writer.write_all(line.as_bytes()).await?;
+        }
+        Ok(())
+    });
+    let stderr_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        let mut stderr_writer = BufWriter::new(
+            tokio::fs::File::options()
+                .create(true)
+                .write(true)
+                .open(&stderr_path)
+                .await?,
+        );
+        while let Ok(Some(line)) = reader.next_line().await {
+            stderr_writer.write_all(line.as_bytes()).await?;
+        }
+        Ok(())
+    });
 
     // Compétition entre la fin du script et le signal d'interruption
     tokio::select! {
         status_res = child.wait() => {
+            stdout_handle.await??;
+            stderr_handle.await??;
             // Le processus s'est terminé de lui-même
             match status_res {
                 Ok(status) if status.success() => {
@@ -251,7 +338,6 @@ async fn run_script(
                     return Err(e.into());
                 }
             }
-            Ok(())
         }
 
         _ = shutdown_rx.recv() => {
@@ -270,13 +356,15 @@ async fn run_script(
                     }
                 },
                 SigintBehavior::WaitForJobCompletion => {
+                    eprintln!("Waiting for job completion...");
                     match child.wait().await {
-                        Ok(status) => eprintln!("Le job s'est finalement terminé avec le status: {}", status),
+                        Ok(status) if status.success() => eprintln!("Le job s'est terminé avec succès"),
+                        Ok(status) => eprintln!("Le job s'est terminé avec le status: {}", status.code().unwrap_or(-1)),
                         Err(e) => eprintln!("Erreur en attendant la fin du job: {}", e),
                     }
                 }
             }
-            Ok(())
         }
     }
+    Ok(())
 }
