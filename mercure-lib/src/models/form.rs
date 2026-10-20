@@ -868,7 +868,7 @@ snakemake -s pipelines/demul/Snakefile --config indir={{ indir }} outdir={{ outd
 rsync -a --info=progress2 "{{ outdir }}/fastq" user@depot:/where/it/should/go
 
 # Smaug v3
-snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_id }}
+snakemake -s pipelines/smaug-v3/Snakefile --configfile pipelines/smaug-v3/config.yaml --config indir={{ outdir }} outdir={{ outdir }}/tentative-{{ attempt_number }}
 
 # Copie NAS
 rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ panel }}
@@ -879,25 +879,20 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
         let expected_str = serde_json::to_string(&expected).expect("Cannot serialize");
         let form_str = serde_json::to_string(&form).expect("Cannot serialize back");
 
-        assert_eq!(
-            expected_str, form_str,
-            "Left should be:\n-----\n {} and right should be:\n------\n {}",
-            expected_str, form_str
-        );
+        assert_eq_display_helper(&expected_str, &form_str);
     }
 
     /// Just a helper to print what the assert_eq actually got on the left side.
     /// Applies to types that implement the Display trait.
     #[track_caller]
-    fn assert_eq_display_helper<T, U>(left: &T, right: &U)
+    fn assert_eq_display_helper<T>(left: &T, right: &T)
     where
-        T: Display + Debug + PartialEq<U> + ?Sized,
-        U: Debug + ?Sized,
+        T: Display + Debug + PartialEq<T> + ?Sized,
     {
         assert_eq!(
             left, right,
-            "\n------BEGIN_LEFT------\n{}\n-------END_LEFT-------\n",
-            left
+            "\n------BEGIN_LEFT------\n{}\n-------END_LEFT-------\n\n------BEGIN_RIGHT------\n{}\n-------END_RIGHT-------\n",
+            left, right
         );
     }
 
@@ -914,7 +909,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
         };
         let v_html = v.to_html_safe();
         assert_eq_display_helper(
-            &v_html,
+            v_html.as_str(),
             r#"<div class="card-container" id="v1-card">
             <label>Une variable</label>
             <span>Une simple description</span>
@@ -938,7 +933,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
         };
         let v_html = v.to_html_safe();
         assert_eq_display_helper(
-            &v_html,
+            v_html.as_str(),
             r#"<div class="card-container" id="v2-card">
             <label>Une autre variable</label>
             <span>Whatever</span>
@@ -958,7 +953,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
         };
         let v1_html = v1.to_html_safe();
         assert_eq_display_helper(
-            &v1_html,
+            v1_html.as_str(),
             r#"<div class="card-container" id="v1-card">
             <label>Une variable</label>
             <span>Une simple description</span>
@@ -971,11 +966,13 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 /// Tests du cache SQL (`FormDefs` / `FormDefHasGroup`)
 #[cfg(test)]
 mod form_def_cache_tests {
-    use std::path::Path;
+    use std::{collections::HashMap, path::Path};
 
     use sqlx::SqlitePool;
 
-    use crate::models::{CachedForm, FileIdentification, Form, Group};
+    use crate::models::{
+        CachedForm, FileIdentification, Form, FormDefinitionError, FormExecType, Group,
+    };
 
     async fn test_pool() -> SqlitePool {
         // Le cache en mémoire vit par connexion : une seule connexion dans le pool
@@ -994,6 +991,29 @@ mod form_def_cache_tests {
             description: String::new(),
             variables: vec![],
             exec_type: Default::default(),
+            workdir: String::new(),
+            form_identification: FileIdentification::GitBranchAndPath {
+                branch: branch.to_string(),
+                file_path: Path::new(file_path).to_path_buf(),
+            },
+            groups: Some(groups.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
+    fn form_with_shell(
+        name: &str,
+        branch: &str,
+        file_path: &str,
+        groups: &[&str],
+        shell: &str,
+    ) -> Form {
+        Form {
+            name: name.to_string(),
+            description: String::new(),
+            variables: vec![],
+            exec_type: FormExecType::Shell {
+                exec: shell.to_string(),
+            },
             workdir: String::new(),
             form_identification: FileIdentification::GitBranchAndPath {
                 branch: branch.to_string(),
@@ -1168,5 +1188,26 @@ mod form_def_cache_tests {
             .expect("for no group");
         assert!(forms_with_group.is_empty());
         assert_eq!(forms_without_group.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_render() {
+        let ctx: HashMap<&str, &str> = [("a", "valueA"), ("b", "valueB")].into_iter().collect();
+        let simple_form = form_with_shell(
+            "whatever",
+            "main",
+            "pipelineA/form.yaml",
+            &["admin", "genet"],
+            "une {{a}} erreur {{b}} manifeste {{c}}",
+        );
+        let Err(e) = simple_form.render_template(&ctx).await else {
+            panic!("Should be an error")
+        };
+        match e {
+            FormDefinitionError::MissingVar(v) if v.as_str() == "c" => {}
+            _ => {
+                panic!(r#"Expected FormDefinitionError::MissingVar("c")"#)
+            }
+        }
     }
 }
