@@ -7,7 +7,6 @@ use std::io::Error as IoError;
 use std::path::{self, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::str::FromStr;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::task::{JoinError as TokioJoinError, JoinHandle, JoinSet};
 
 use sqlx::SqlitePool;
@@ -282,31 +281,16 @@ async fn run_script(
     let stderr = child.stderr.take().ok_or(anyhow::format_err!("Fuck"))?;
 
     let stdout_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout).lines();
-        let mut stdout_writer = BufWriter::new(
-            tokio::fs::File::options()
-                .create(true)
-                .write(true)
-                .open(&stdout_path)
-                .await?,
-        );
-        while let Ok(Some(line)) = reader.next_line().await {
-            stdout_writer.write_all(line.as_bytes()).await?;
-        }
+        let mut file = tokio::fs::File::create(&stdout_path).await?;
+        let mut stdout = stdout;
+        tokio::io::copy(&mut stdout, &mut file).await?;
         Ok(())
     });
+
     let stderr_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr).lines();
-        let mut stderr_writer = BufWriter::new(
-            tokio::fs::File::options()
-                .create(true)
-                .write(true)
-                .open(&stderr_path)
-                .await?,
-        );
-        while let Ok(Some(line)) = reader.next_line().await {
-            stderr_writer.write_all(line.as_bytes()).await?;
-        }
+        let mut file = tokio::fs::File::create(&stderr_path).await?;
+        let mut stderr = stderr;
+        tokio::io::copy(&mut stderr, &mut file).await?;
         Ok(())
     });
 
