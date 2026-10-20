@@ -142,8 +142,15 @@ pub async fn list_yaml_forms_giteav1(
         for item in body.dir_contents {
             let is_yaml = item.name.ends_with(".yml") || item.name.ends_with(".yaml");
 
-            if item.item_type.eq_ignore_ascii_case("file") && is_yaml {
-                results.push(item);
+            if item.item_type.eq_ignore_ascii_case("file")      // Is a file
+                && is_yaml                                      // Is a yaml file
+                && item                                         // Has a folder named .forms in its parents
+                    .path
+                    .components()
+                    .find(|c| c.as_os_str().eq_ignore_ascii_case(".forms"))
+                    .is_some()
+            {
+                results.push(item); // Then it must be a valid form :)
             } else if item.item_type.eq_ignore_ascii_case("dir") {
                 // Cleaner path handling without OS-string lossy conversions
                 let next_path = match item.path.to_str() {
