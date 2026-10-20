@@ -54,11 +54,15 @@ async fn update_cache(pool: &State<SqlitePool>, config: &State<MercureConfig>) -
 
 #[get("/update/cache/forms")]
 pub async fn update_cache_get(
-    _auth: Authenticated,
+    auth: Authenticated,
     pool: &State<SqlitePool>,
     config: &State<MercureConfig>,
 ) -> (Status, String) {
-    update_cache(pool, config).await
+    if !auth.user.is_admin {
+        (Status::Unauthorized, "Only admins can update forms!".into())
+    } else {
+        update_cache(pool, config).await
+    }
 }
 
 #[post("/update/cache/forms/gitea", data = "<body>")]
