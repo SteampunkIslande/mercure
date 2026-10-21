@@ -1,0 +1,9 @@
+[book]
+title = "Guide pratique d'utilisation de smaug"
+authors = ["Charles Monod-Broca"]
+language = "fr"
+
+[output.html]
+site-url = "/smaug/documentation/"
+default-theme = "navy"
+additional-css = ["src/custom.css"]
