@@ -39,6 +39,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
 
       - name: Cache Cargo dependencies
         uses: swatinem/rust-cache@v2
@@ -50,14 +51,14 @@ jobs:
 
       - name: Rename binary
         run: |
-          # Remplace "mon_binaire" par le nom exact de ton exécutable
-          cp target/${{ matrix.target }}/release/mon_binaire target/${{ matrix.target }}/release/mon_binaire-${{ matrix.target }}
+          # Remplace "smaug" par le nom exact de ton exécutable
+          cp target/${{ matrix.target }}/release/smaug target/${{ matrix.target }}/release/smaug-${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/mon_binaire-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/smaug-${{ matrix.target }}
 
   release:
     name: Create GitHub Release
