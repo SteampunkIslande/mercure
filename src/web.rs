@@ -76,6 +76,9 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::search_run,
                 // Edition d'un run
                 routes::frontend::edit_run_get,
+                // Documentation
+                routes::frontend::serve_doc,
+                routes::frontend::doc_redirect,
             ],
         )
         .mount(

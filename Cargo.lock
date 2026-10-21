@@ -2720,6 +2720,7 @@ dependencies = [
  "hex",
  "hmac",
  "html-escape",
+ "include_dir",
  "intersection",
  "lazy-regex",
  "log",
