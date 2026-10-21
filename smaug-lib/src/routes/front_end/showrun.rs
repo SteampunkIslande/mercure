@@ -137,6 +137,8 @@ pub async fn show_run_get(
                     context! {
                         run=> &run,
                         form=> &attempt_form,
+                        run_creation_date,
+                        attempt_date,
                         attempt=> &attempt,
                         history=> &history,
                         user=> auth.user,
@@ -146,11 +148,13 @@ pub async fn show_run_get(
                     "common/failurerun",
                     context! {
                         run=> &run,
-                        attempt=> &attempt,
                         form=> &run.get_form().await?,
+                        run_creation_date,
+                        attempt_date,
+                        attempt=> &attempt,
                         history=> &history,
-                        fail_reason=> fail_reason,
                         user=> auth.user,
+                        fail_reason=> fail_reason,
                     },
                 )),
                 RunStatus::Idle => Err(FrontendError::LogicalError(

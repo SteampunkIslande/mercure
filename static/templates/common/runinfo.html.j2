@@ -2,8 +2,8 @@
     <div id="basic-info" style="flex: 1;">
         <h2>Détails du run</h2>
         <div>
-            <label><strong>Identifiant:</strong></label>
-            <span>{{ run.run_id }}</span>
+            <label><strong>Numéro de la tentative:</strong></label>
+            <span>{{ attempt.attempt_number }}</span>
         </div>
         <div>
             <label><strong>Nom du run:</strong></label>
@@ -17,7 +17,7 @@
             <label><strong>Run créé le:</strong></label>
             <span>{{ run_creation_date }}</span>
         </div>
-        {% if run.status != "Idle" %}
+        {% if attempt_date %}
         <div>
             <label><strong>Tentative démarrée le:</strong></label>
             <span>{{ attempt_date }}</span>
