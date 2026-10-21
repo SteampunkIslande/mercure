@@ -61,15 +61,11 @@ pub async fn retry_run_get(
         )));
     }
 
-    if let Err(e) = analysis::relaunch_run(run_id, pool).await {
-        return Json(ApiResponse::error(format!("{e}")));
-    }
-
-    match analysis::validate_form(run_id, pool).await {
-        Ok(_) => Json(ApiResponse::success(
-            json!({"data": true, "run_id": run_id}),
-        )),
+    match analysis::relaunch_run(run_id, pool).await {
         Err(e) => Json(ApiResponse::error(format!("{e}"))),
+        Ok(()) => Json(ApiResponse::success(
+            json!({"message":"Le run est à nouveau à valider"}),
+        )),
     }
 }
 
