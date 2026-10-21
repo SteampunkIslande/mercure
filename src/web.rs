@@ -3,12 +3,17 @@ use std::net::Ipv4Addr;
 
 use anyhow::bail;
 use clap::Parser;
+use include_dir::Dir;
+use include_dir::include_dir;
 use log::info;
 use rocket::Build;
 use rocket::Config;
 use rocket::Rocket;
 use rocket::config::Shutdown;
 use rocket::fs::FileServer;
+use rocket::get;
+use rocket::response::Redirect;
+use rocket_include_dir::StaticFiles;
 use smaug_lib::templates::{Template, context, minijinja_fairing};
 use tokio::signal::unix::{SignalKind, signal};
 
@@ -32,6 +37,11 @@ async fn unauthorized() -> Template {
             message=> "Votre session a expirée, veuillez vous reconnecter"
         },
     )
+}
+
+#[get("/documentation")]
+pub fn doc_redirect() -> Redirect {
+    Redirect::permanent("/smaug/documentation/index.html")
 }
 
 async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
@@ -76,9 +86,8 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::frontend::search_run,
                 // Edition d'un run
                 routes::frontend::edit_run_get,
-                // Documentation
-                routes::frontend::serve_doc,
-                routes::frontend::doc_redirect,
+                // Redirection pour la doc
+                doc_redirect
             ],
         )
         .mount(
@@ -155,6 +164,8 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         static PROJECT_DIR: Dir = include_dir!("static");
         r = r.mount("/smaug/static", StaticFiles::from(&PROJECT_DIR));
     }
+    static DOC_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/documentation/book");
+    r = r.mount("/smaug/documentation", StaticFiles::from(&DOC_DIR));
     r
 }
 
