@@ -1,39 +1,158 @@
-# Procédure de lancement
+# Qu'est-ce que ce logiciel
 
-## Etape 1: nginx doit être actif
+Le logiciel `smaug` est une application web couplée à une routine d'exécution automatique de scripts.
 
-Sur le serveur de production, `hmn-genseq-p01`, nginx est une instance singularity, qui tourne comme un service. Elle s'exécute en tant que root, car elle doit pouvoir écouter sur le port 80.
+Cette application permet d'exécuter des tâches définies dans un répertoire git web (pour l'instant seul gitea est supporté).
 
-Pour savoir si nginx est actif, il faut lancer, en tant que root:
-```bash
-singularity instance list | grep nginx
+
+# Instructions d'installation
+
+## Prérequis
+
+### Logiciels
+
+- Linux (support de windows envisageable, mais pas prévu pour le moment)
+- nginx (ou autre reverse-proxy, optionnel)
+
+### Environnement web
+
+- un dépôt gitea accessible depuis le serveur qui exécute smaug
+
+### Système de fichiers
+
+Fichiers et dossiers de travail:
+
+- Un dossier pour stocker les logs d'exécution des scripts lancés par la routine
+- Un dossier pour stocker les scripts exécutés
+- Un dossier pour stocker les fichiers uploadés par l'utilisateur
+- Un fichier `Rocket.toml` pour configurer l'application
+
+Pour des raisons pratiques, il peut être judicieux de créer un seul dossier, par exemple dans `/opt/webapps/smaug`, et d'y placer tous ces dossiers ainsi que le fichier `Rocket.toml`.
+
+Fichiers d'installation:
+
+- Un fichier `/etc/systemd/system/smaug.service` (optionnel mais très pratique): permet de servir smaug en permanence, à chaque démarrage.
+- L'exécutable lui-même, qui peut être stocké n'importe où (attention aux permissions, notamment SELinux, pour l'utiliser avec systemd). Emplacement recommandé: `/usr/local/bin/smaug`.
+
+
+## Etape 1 (optionnelle): Installation et configuration de nginx
+
+Installer et configurer nginx sur le serveur de production. Au choix, soit en dur, soit dans une image podman, ou singularity.
+
+Quel que soit le choix, voici une configuration nginx qui fonctionne, pour servir smaug sur son IP/port par défaut:
+
+```conf
+location /smaug {
+    proxy_pass http://127.0.0.1:8000/smaug;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
-Si le résultat n'est pas vide, activer l'instance nginx.
+Remplacer `:8000` par le port que vous utilisez effectivement (voir les options de smaug web).
+Il est conseillé de garder `127.0.0.1` comme adresse d'écoute au lieu de l'IP que vous voulez exposer, cela permet d'éviter une connexion directe sans passer par le reverse-proxy.
 
-En tant que root:
+## Etape 2: Installation de smaug
+
+### Installation du binaire
+
+Télécharger le binaire adapté à votre architecture (pour l'instant, seulement x86_64 avec GLIBC 2.39, ou x86_64 avec musl).
+
+Le plus compatible est la version musl, quoiqu'un peu moins performante que la version glibc.
+Avec musl, l'avantage est que le binaire est entièrement statique (aucune dépendance aux bibliothèques de l'OS, pas même GLIBC).
+
+Sinon, le compiler avec la version de rust du système:
+
 ```bash
-mkdir -p /var/log/nginx /var/cache/nginx /var/run
-singularity instance start -B /var/log -B /var/cache -B /var/run nginx.sif nginx
+cargo build --release
 ```
 
-## Etape 2: lancer mercure
+En tant que root, écrire le fichier `smaug` dans `/usr/local/bin`
 
-En tant qu'utilisateur hermes:
 ```bash
-singularity instance start -B /OPT/JOBS -B /OPT/hermes
+mv smaug /usr/local/bin
+# S'assurer qu'il est exécutable
+chmod +x /usr/local/bin/smaug
 ```
 
-# Configuration
+Si vous utilisez SELinux et que le contexte de `/usr/local/bin/smaug` est incorrect:
 
-J'ai créé deux configurations, une de développement (qui fait tourner tous les outils en local), et une configuration de production, qui permet d'écouter sur l'adresse IP du serveur de production.
+```bash
+restorecon /usr/local/bin/smaug
+```
 
-## Configuration de développement
+Le binaire est prêt à être exécuté.
 
-Cette configuration repose sur `nginx-test.conf`, présent dans `nginx-test.sif`, défini par `nginx-test.def`.
-Pour ce qui est de l'application web mercure, c'est la compilation en mode debug qui permet d'accéder à ces options (voir la section debug de Rocket.toml).
+### Configuration
 
-Dans cette configuration:
-- mercure écoute à l'adresse 127.0.0.1
-- nginx redirige le flux de 
+L'application est configurée à l'aide d'un fichier unique, `Rocket.toml`. En mode release, l'option `secret_key` est obligatoire.
+
+Ci-dessous, un exemple de configuration valide, à adapter:
+
+```toml
+[release]
+# Web
+secret_key = "$(openssl rand -base64 32)"
+port = 8000
+address = 127.0.0.1
+
+# Token de mise à jour des pipelines
+webhook_secret = "$(openssl rand -base64 32)"
+
+# Fonctionnement spécifique de smaug
+smaug_db = "sqlite:///OPT/webapps/smaug/smaug.db?mode=rwc"
+upload_dir = "/OPT/webapps/smaug/uploads"
+logs_dir = "/OPT/webapps/smaug/logs"
+analysis_dir = "/data/analysis"
+
+[release.pipelines]
+# Configuration de la base de vérité des pipelines
+api = "gitea_v1" # Pour l'instant, seule l'API gitea v1 est supportée
+base_url = "http://localhost/gitea" # Pas uniquement localhost, n'importe quelle URL de base valide avec l'API v1 de gitea disponible
+owner = "bioinfo"
+repo = "pipelines" # Un dépôt de confiance
+```
+
+### Définition du service
+
+Créer un fichier `/etc/systemd/system/smaug.service` avec le contenu suivant:
+
+```ini
+[Unit]
+Description=Smaug web app
+After=network.target
+
+[Service]
+Type=simple
+User=hermes
+ExecStart=/usr/local/bin/smaug web -p 8000 -H 127.0.0.1
+WorkingDirectory=/OPT/webapps/smaug
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Recharger les services:
+
+```bash
+systemctl daemon-reload
+```
+
+Activer smaug
+
+```bash
+systemctl enable smaug
+```
+
+## Etape 3: lancer smaug
+
+Lancer smaug
+
+```bash
+systemctl start smaug
+```
+
 
