@@ -46,6 +46,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install mdbook
+        run: cargo install mdbook
+      
+      - name: Build mdbook
+        run: mdbook build documentation
+
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
