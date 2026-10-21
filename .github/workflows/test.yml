@@ -26,6 +26,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools
           rustup target add x86_64-unknown-linux-musl
+      
+      - name: Install mdbook
+        run: cargo install mdbook
+      
+      - name: Build mdbook
+        run: mdbook build documentation
         
       - name: Cache Cargo dependencies
         uses: swatinem/rust-cache@v2
