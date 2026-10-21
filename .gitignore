@@ -1,5 +1,5 @@
 /target
-mercure.db
-mercure-lib/target
+smaug.db
+smaug-lib/target
 *.sif
 Rocket.toml

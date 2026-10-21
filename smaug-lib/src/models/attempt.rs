@@ -1,4 +1,4 @@
-use crate::config::get_mercure_config;
+use crate::config::get_smaug_config;
 use crate::models::{FileIdentification, Form};
 use crate::models::{ModelError, Run, RunStatus};
 use serde::{Deserialize, Serialize};
@@ -99,7 +99,7 @@ impl Attempt {
     /// Auto-computed output directory for this attempt. Single definition point
     /// for the injected `outdir` jinja variable.
     pub fn outdir(&self) -> PathBuf {
-        PathBuf::from(&get_mercure_config().analysis_dir).join(format!("run-{:0<8}", self.run_id))
+        PathBuf::from(&get_smaug_config().analysis_dir).join(format!("run-{:0<8}", self.run_id))
     }
 
     pub async fn render_script(&self) -> Result<String, ModelError> {

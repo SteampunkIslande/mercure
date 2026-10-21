@@ -14,7 +14,7 @@
 
 <!-- Removed inline styles in favor of classes and removed inline onclick handler -->
 <div class="mt-4 d-flex justify-content-start gap-2">
-    <a class="btn btn-secondary" href="/mercure/admin/editusers">Retour à la liste des utilisateurs</a>
+    <a class="btn btn-secondary" href="/smaug/admin/editusers">Retour à la liste des utilisateurs</a>
     <a class="btn btn-primary" id="btn-update-groups">Mettre à jour les groupes</a>
 </div>
 {% endblock %}
@@ -32,8 +32,8 @@
         try {
             // Fetch both API endpoints concurrently to halve the loading time
             const [groupsRes, userGroupsRes] = await Promise.all([
-                fetch("/mercure/api/groups/list"),
-                fetch(`/mercure/api/groups/list/${userId}`)
+                fetch("/smaug/api/groups/list"),
+                fetch(`/smaug/api/groups/list/${userId}`)
             ]);
 
             if (!groupsRes.ok || !userGroupsRes.ok) {
@@ -115,7 +115,7 @@
         });
 
         try {
-            const response = await fetch("/mercure/api/groups/update", {
+            const response = await fetch("/smaug/api/groups/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: payload

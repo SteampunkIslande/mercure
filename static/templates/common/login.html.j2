@@ -1,6 +1,6 @@
 {% extends "base.html.j2" %}
 
-{% block title %}Connexion - Mercure{% endblock %}
+{% block title %}Connexion - Smaug{% endblock %}
 
 {% block banner_text %} Connexion {% endblock %}
 {% block banner_actions %}{% endblock %}
@@ -21,7 +21,7 @@
                 <input type="password" id="password" name="password" placeholder="Mot de passe" required>
             </div>
         <a id="loginButton" class="btn btn-primary" onclick="onConnect(event)" type="submit">Se connecter</a>
-        <a href="/mercure" class="btn btn-secondary">Retour</a>
+        <a href="/smaug" class="btn btn-secondary">Retour</a>
         <button type="submit" style="display: none;" tabindex="-1" aria-hidden="true"></button>
         </form>
     </div>
@@ -40,7 +40,7 @@
             const password = document.getElementById('password').value;
 
             try {
-                const response = await fetch('/mercure/api/login', {
+                const response = await fetch('/smaug/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

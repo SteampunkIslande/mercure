@@ -1,14 +1,14 @@
 use anyhow::{Result, bail};
 use env_logger::Builder;
-use mercure::config::get_mercure_config;
-use mercure::models::appstate;
+use smaug::config::get_smaug_config;
+use smaug::models::appstate;
 use std::io::Write;
 
 mod admin;
 mod routine;
 mod web;
 use clap::{Parser, Subcommand};
-use mercure::db;
+use smaug::db;
 
 use crate::admin::Admin;
 use crate::web::Web;
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let database_path = cli.database.unwrap_or(get_mercure_config().mercure_db);
+    let database_path = cli.database.unwrap_or(get_smaug_config().smaug_db);
 
     let pool = match db::init_db_from_url(&database_path).await {
         Ok(pool) => pool,

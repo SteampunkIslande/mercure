@@ -15,9 +15,9 @@
 <p>{{ fail_reason }}</p>
 
 <div style="margin-top: 30px; text-align: left;">
-    <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/runs">Retour</a>
+    <a id="back-to-runs" class="btn btn-secondary" href="/smaug/show/runs">Retour</a>
     {% if run.status in ("Idle", "Pending", "Running") %}
-    <a id="analysis-current" class="btn btn-primary" href="/mercure/show/run/{{ run.run_id }}">Voir la tentative
+    <a id="analysis-current" class="btn btn-primary" href="/smaug/show/run/{{ run.run_id }}">Voir la tentative
         actuelle</a>
     {% else %}
     <a id="retry" class="btn btn-primary" onclick="restartRun()">Relancer</a>

@@ -1,6 +1,6 @@
 use bcrypt::{DEFAULT_COST, hash};
 use clap::Subcommand;
-use mercure::models::user::{NewUser, User};
+use smaug::models::user::{NewUser, User};
 use sqlx::SqlitePool;
 
 use std::process;

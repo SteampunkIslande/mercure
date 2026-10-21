@@ -21,7 +21,7 @@
                 <label for="password">Mot de passe:</label>
                 <input type="password" id="password" name="password" placeholder="Mot de passe" autocomplete="new-password" >
             </div>
-            <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+            <a href="/smaug/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
             <a id="create-user-button" class="btn btn-primary" onclick="submitForm(event)" type="submit">Créer l'utilisateur</a>
             <button type="submit" style="display: none;" tabindex="-1" aria-hidden="true"></button>
             </form>
@@ -39,7 +39,7 @@
             const password = document.getElementById('password').value;
 
             try {
-                const response = await fetch('/mercure/api/register', {
+                const response = await fetch('/smaug/api/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

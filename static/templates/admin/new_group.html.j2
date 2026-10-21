@@ -13,7 +13,7 @@
         <input name="new_group_name" type="text">
     </div>
     <div style="text-align: left; margin-top: 20px;">
-        <a class="btn btn-secondary" href="/mercure/admin/dashboard">Retour au tableau de bord</a>
+        <a class="btn btn-secondary" href="/smaug/admin/dashboard">Retour au tableau de bord</a>
         <a class="btn btn-primary" onclick="submitForm(event)">Créer un nouveau groupe</a>
         <button type="submit" style="display: none;" tabindex="-1" aria-hidden="true"></button>
     </div>
@@ -33,7 +33,7 @@
                 showMessage('error', 'Veuillez entrer un nom de groupe.');
                 return;
             }
-            const response = await fetch(`/mercure/api/newgroup/${encodeURIComponent(new_group_name)}`);
+            const response = await fetch(`/smaug/api/newgroup/${encodeURIComponent(new_group_name)}`);
             const data = await response.json();
 
             if (isApiSuccess(data)) {

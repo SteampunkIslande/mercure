@@ -5,7 +5,7 @@ variables:
     title: BED
     description: Le fichier BED à utiliser pour cette analyse
     type: ListFromURL
-    source: /mercure/api/aux/list_beds
+    source: /smaug/api/aux/list_beds
   - name: genome
     title: Génome
     description: Le génome à utiliser
@@ -17,12 +17,12 @@ variables:
     title: Dossier BCL
     description: Le dossier de run brut Illumina
     type: ListFromURL
-    source: /mercure/api/aux/list_illumina_dirs
+    source: /smaug/api/aux/list_illumina_dirs
   - name: panel
     title: Nom du panel
     description: "Le nom du panel"
     type: ListFromURL
-    source: /mercure/api/aux/list_panels
+    source: /smaug/api/aux/list_panels
   - name: sample_sheet
     title: SampleSheet
     description: La samplesheet, espèce de neuneu

@@ -17,11 +17,11 @@ pub enum GitWebConfig {
     },
 }
 
-/// Additional configuration for Mercure
+/// Additional configuration for Smaug
 #[derive(Deserialize, Debug)]
 #[serde(default)]
-pub struct MercureConfig {
-    pub mercure_db: String,
+pub struct SmaugConfig {
+    pub smaug_db: String,
     pub upload_dir: String,
     pub logs_dir: String,
     pub scripts_dir: String,
@@ -35,27 +35,27 @@ impl Default for GitWebConfig {
         GitWebConfig::GiteaV1 {
             base_url: "localhost:3333".into(),
             owner: "bioinfo".into(),
-            repo: "mercure".into(),
+            repo: "smaug".into(),
         }
     }
 }
 
-impl Default for MercureConfig {
+impl Default for SmaugConfig {
     fn default() -> Self {
         Self {
-            mercure_db: "sqlite://mercure.db".into(),
-            upload_dir: "/home/charles/mercure/uploads".into(),
-            logs_dir: "/home/charles/mercure/LOGS".into(),
-            scripts_dir: "/home/charles/mercure/scripts".into(),
-            analysis_dir: "/home/charles/mercure/analysis".into(),
+            smaug_db: "sqlite://smaug.db".into(),
+            upload_dir: "/home/charles/smaug/uploads".into(),
+            logs_dir: "/home/charles/smaug/LOGS".into(),
+            scripts_dir: "/home/charles/smaug/scripts".into(),
+            analysis_dir: "/home/charles/smaug/analysis".into(),
             pipelines: GitWebConfig::default(),
             webhook_secret: String::new(),
         }
     }
 }
 
-pub fn get_mercure_config() -> MercureConfig {
+pub fn get_smaug_config() -> SmaugConfig {
     config::Config::figment()
-        .extract::<MercureConfig>()
+        .extract::<SmaugConfig>()
         .expect("Invalid rocket configuration")
 }

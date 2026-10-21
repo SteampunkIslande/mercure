@@ -52,7 +52,7 @@ async function uploadVariableFile(file) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("file_name_base", file.name);
-  const response = await fetch("/mercure/api/upload", { method: "POST", body: formData });
+  const response = await fetch("/smaug/api/upload", { method: "POST", body: formData });
   const result = await response.json();
   if (!isApiSuccess(result)) {
     throw new Error(getApiMessage(result) || "Erreur lors de l'envoi du fichier");

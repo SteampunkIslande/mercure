@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    config::{GitWebConfig, MercureConfig, get_mercure_config},
+    config::{GitWebConfig, SmaugConfig, get_smaug_config},
     models::FileIdentification,
 };
 
@@ -70,7 +70,7 @@ impl BranchInfo {
 pub async fn get_latest_commit(
     branch_name: Option<&str>,
 ) -> Result<Vec<BranchInfo>, GitCheckError> {
-    let MercureConfig { pipelines, .. } = get_mercure_config();
+    let SmaugConfig { pipelines, .. } = get_smaug_config();
 
     match &pipelines {
         GitWebConfig::GiteaV1 {
@@ -230,7 +230,7 @@ pub async fn get_file_giteav1(
         return Err(anyhow::format_err!("Ceci n'est pas un fichier!").into());
     }
 
-    // bioinfo/mercure/raw/branch/new/mercure-lib/Cargo.lock
+    // bioinfo/smaug/raw/branch/new/smaug-lib/Cargo.lock
     let url = match form_identification {
         FileIdentification::GitBranchAndPath {
             branch,
@@ -267,7 +267,7 @@ pub async fn get_file_giteav1(
 }
 
 pub async fn get_all_branches() -> Result<Vec<String>, GitCheckError> {
-    let MercureConfig { pipelines, .. } = get_mercure_config();
+    let SmaugConfig { pipelines, .. } = get_smaug_config();
 
     match &pipelines {
         GitWebConfig::GiteaV1 {

@@ -38,8 +38,8 @@ pub async fn login_post(
     cookies.add_private(cookie);
 
     if user.is_admin {
-        Ok(Redirect::to(uri!("/mercure/admin/dashboard")))
+        Ok(Redirect::to(uri!("/smaug/admin/dashboard")))
     } else {
-        Ok(Redirect::to(uri!("/mercure/home")))
+        Ok(Redirect::to(uri!("/smaug/home")))
     }
 }

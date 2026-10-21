@@ -7,7 +7,7 @@ use sha2::Sha256;
 use sqlx::SqlitePool;
 
 use crate::auth::Authenticated;
-use crate::config::MercureConfig;
+use crate::config::SmaugConfig;
 use crate::models::form;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -31,12 +31,12 @@ impl<'r> FromRequest<'r> for GiteaSignature<'r> {
 /// # Arguments
 ///
 /// - `pool` (`&State<SqlitePool>`) - sqlite database connection
-/// - `config` (`&State<MercureConfig>`) - configuration
+/// - `config` (`&State<SmaugConfig>`) - configuration
 ///
 /// # Returns
 ///
 /// - `(Status, String)` - A tuple of HTTP Status with a custom message
-async fn update_cache(pool: &State<SqlitePool>, config: &State<MercureConfig>) -> (Status, String) {
+async fn update_cache(pool: &State<SqlitePool>, config: &State<SmaugConfig>) -> (Status, String) {
     match form::CachedForm::refresh_cache(pool, config).await {
         Ok(v) => (
             Status::Ok,
@@ -56,7 +56,7 @@ async fn update_cache(pool: &State<SqlitePool>, config: &State<MercureConfig>) -
 pub async fn update_cache_get(
     auth: Authenticated,
     pool: &State<SqlitePool>,
-    config: &State<MercureConfig>,
+    config: &State<SmaugConfig>,
 ) -> (Status, String) {
     if !auth.user.is_admin {
         (Status::Unauthorized, "Only admins can update forms!".into())
@@ -68,7 +68,7 @@ pub async fn update_cache_get(
 #[post("/update/cache/forms/gitea", data = "<body>")]
 pub async fn gitea_webhook_update_form_cache(
     signature: GiteaSignature<'_>,
-    config: &State<MercureConfig>,
+    config: &State<SmaugConfig>,
     pool: &State<SqlitePool>,
     body: Vec<u8>,
 ) -> (Status, String) {

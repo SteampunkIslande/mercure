@@ -3,7 +3,7 @@
 {% block title %}Group Forms{% endblock %}
 
 {% block extra_head %}
-<script src="/mercure/static/scripts/json_table.js"></script>
+<script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
 
 {% block banner_text %}Bienvenue, {{user.username }}{% endblock %}
@@ -12,17 +12,17 @@
 
 {% block content %}
 <div class="dropdown">
-    <button onclick="navigateTo(`/mercure/show/runs`)" class="dropbtn"><span
+    <button onclick="navigateTo(`/smaug/show/runs`)" class="dropbtn"><span
             class="material-icons icon-align">science</span> Voir tous mes runs</button>
 </div>
 {% if is_admin %}
 <div class="dropdown" style="float:right;">
-    <button onclick="navigateTo(`/mercure/admin/dashboard`)" class="dropbtn"><span
+    <button onclick="navigateTo(`/smaug/admin/dashboard`)" class="dropbtn"><span
             class="material-icons icon-align">settings</span>Administration</button>
 </div>
 {% else %}
 <div class="dropdown" style="float:right;">
-    <button onclick="navigateTo(`/mercure/passedit/{{ user.id }}`)" class="dropbtn"><span
+    <button onclick="navigateTo(`/smaug/passedit/{{ user.id }}`)" class="dropbtn"><span
             class="material-icons icon-align">key</span>Modifier le mot de passe</button>
 </div>
 {% endif %}
@@ -119,7 +119,7 @@
     const userGroups = {{ user_groups | tojson }};
     async function fetchAndRenderForms(groupId, listKey) {
         try {
-            const response = await fetch(`/mercure/api/groups/forms/${groupId}`);
+            const response = await fetch(`/smaug/api/groups/forms/${groupId}`);
             const result = await response.json();
 
             if (!isApiSuccess(result)) {
@@ -144,12 +144,12 @@
                         // FIX: Because of #[serde(flatten)], branch and file_path are on the root 'form' object, 
                         // not inside 'form.form_id' (which is just the string tag "GitBranchAndPath").
                         const { branch, file_path } = form;
-                        submitUrl = `/mercure/runs/submit/branch/${branch}/${file_path}`;
+                        submitUrl = `/smaug/runs/submit/branch/${branch}/${file_path}`;
                         break;
                     }
                     case "GitCommit": {
                         const { hash, file_path } = form;
-                        submitUrl = `/mercure/runs/submit/commit/${hash}/${file_path}`;
+                        submitUrl = `/smaug/runs/submit/commit/${hash}/${file_path}`;
                         break;
                     }
                     default:
@@ -195,7 +195,7 @@
     }
     async function lastRuns() {
         try {
-            const response = await fetch(`/mercure/api/listruns?page=1&page_size=5`);
+            const response = await fetch(`/smaug/api/listruns?page=1&page_size=5`);
             const json = await response.json();
             if (isApiSuccess(json)) {
                 const data = getApiData(json);

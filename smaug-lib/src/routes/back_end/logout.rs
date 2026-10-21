@@ -6,5 +6,5 @@ use rocket::uri;
 #[get("/logout")]
 pub fn logout_get(cookies: &CookieJar<'_>) -> Redirect {
     cookies.remove_private(Cookie::build("user_id"));
-    Redirect::to(uri!("/mercure"))
+    Redirect::to(uri!("/smaug"))
 }

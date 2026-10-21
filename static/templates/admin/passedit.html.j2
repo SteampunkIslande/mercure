@@ -23,9 +23,9 @@
 
             <div style="text-align: left; margin-top: 20px;">
                 {% if auth_user.is_admin %}
-                <a class="btn btn-secondary" href="/mercure/admin/editusers">Retour à la liste des utilisateurs</a>
+                <a class="btn btn-secondary" href="/smaug/admin/editusers">Retour à la liste des utilisateurs</a>
                 {% else %}
-                <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+                <a class="btn btn-secondary" href="/smaug/home">Retour</a>
                 {% endif %}
                 <a class="btn btn-primary" onclick="submitForm()">Modifier le mot de passe</a>
             </div>
@@ -69,7 +69,7 @@
 
             try
             {
-                const response = await fetch('/mercure/api/passedit', {
+                const response = await fetch('/smaug/api/passedit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -85,9 +85,9 @@
                 if (isApiSuccess(data)) {
                     alert(getApiData(data));
                     {% if auth_user.is_admin %}
-                    window.location.href = "/mercure/admin/editusers"
+                    window.location.href = "/smaug/admin/editusers"
                     {% else %}
-                    window.location.href = "/mercure/home"
+                    window.location.href = "/smaug/home"
                     {% endif %}
                 } else {
                     showMessage('error', getApiMessage(data));

@@ -1632,55 +1632,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5449c8c750f1a07ea702bbd212bd999fceece9b3d1508b17023b3e174583124b"
 
 [[package]]
-name = "mercure"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcrypt",
- "clap",
- "env_logger",
- "include_dir",
- "log",
- "mercure-lib",
- "nix",
- "regex",
- "rocket",
- "rocket-include-dir",
- "sqlx",
- "time",
- "tokio",
- "wherror",
-]
-
-[[package]]
-name = "mercure-lib"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcrypt",
- "diacritics",
- "hex",
- "hmac",
- "html-escape",
- "intersection",
- "lazy-regex",
- "log",
- "minijinja",
- "reqwest",
- "rocket",
- "rust-embed",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "sqlx",
- "time",
- "tokio",
- "walkdir",
- "wherror",
- "yaml_serde",
-]
-
-[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2737,6 +2688,55 @@ name = "smallvec"
 version = "1.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9395f0f0eee849a9b707b2f06bb92a6a422090e2123bb2ef8e87a0e61892a8e"
+
+[[package]]
+name = "smaug"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcrypt",
+ "clap",
+ "env_logger",
+ "include_dir",
+ "log",
+ "nix",
+ "regex",
+ "rocket",
+ "rocket-include-dir",
+ "smaug-lib",
+ "sqlx",
+ "time",
+ "tokio",
+ "wherror",
+]
+
+[[package]]
+name = "smaug-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcrypt",
+ "diacritics",
+ "hex",
+ "hmac",
+ "html-escape",
+ "intersection",
+ "lazy-regex",
+ "log",
+ "minijinja",
+ "reqwest",
+ "rocket",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "time",
+ "tokio",
+ "walkdir",
+ "wherror",
+ "yaml_serde",
+]
 
 [[package]]
 name = "socket2"

@@ -4,7 +4,7 @@
 
 {% block extra_head %}
     {% include "common/pagination_styles.html.j2" %}
-    <script src="/mercure/static/scripts/json_table.js"></script>
+    <script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
 
 {% block banner_text_attrs %} id="banner-title"{% endblock %}
@@ -62,8 +62,8 @@
 
     <br>
 
-    <a class="btn btn-secondary" href="/mercure/home"><span class="material-icons icon-align">home</span>Retour</a>
-    <a class="btn btn-primary" href="/mercure/search/run" style="margin-right:10px;">
+    <a class="btn btn-secondary" href="/smaug/home"><span class="material-icons icon-align">home</span>Retour</a>
+    <a class="btn btn-primary" href="/smaug/search/run" style="margin-right:10px;">
         <span class="material-icons icon-align">search</span>Recherche avancée
     </a>
 {% endblock %}
@@ -79,7 +79,7 @@
                 let params = new URLSearchParams(document.location.search);
                 let status = params.get("status");
                 const status_param = status ? `&status=${status}` : "";
-                const response = await fetch(`/mercure/api/listruns?page=${page}&page_size=${size}${status_param}`);
+                const response = await fetch(`/smaug/api/listruns?page=${page}&page_size=${size}${status_param}`);
                 const json = await response.json();
                 if (isApiSuccess(json)) {
                     const data = getApiData(json);

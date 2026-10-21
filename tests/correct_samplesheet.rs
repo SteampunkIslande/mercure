@@ -1,4 +1,4 @@
-use mercure::utils::correct_samplesheet;
+use smaug::utils::correct_samplesheet;
 use std::fs;
 
 #[test]

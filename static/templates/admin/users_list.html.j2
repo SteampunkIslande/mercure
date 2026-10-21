@@ -20,7 +20,7 @@
         </tbody>
     </table>
     <div style="text-align: left; margin-top: 20px;">
-        <a href="/mercure/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
+        <a href="/smaug/admin/dashboard" class="btn btn-secondary">Retour au tableau de bord</a>
     </div>
 {% endblock %}
 
@@ -28,7 +28,7 @@
     <script>
         async function fetchUsers() {
             try {
-                const response = await fetch('/mercure/api/users/list');
+                const response = await fetch('/smaug/api/users/list');
                 const data = await response.json();
 
                 if (isApiSuccess(data) && getApiData(data)) {
@@ -43,7 +43,7 @@
 
                         const groupEditCell = document.createElement('td');
                         const groupEditLink = document.createElement('a');
-                        groupEditLink.href = `/mercure/admin/groupedit/${user.id}`;
+                        groupEditLink.href = `/smaug/admin/groupedit/${user.id}`;
                         groupEditLink.textContent = 'Editer les groupes';
                         groupEditLink.className = "inline-table centered";
                         groupEditCell.appendChild(groupEditLink);
@@ -51,7 +51,7 @@
 
                         const passEditCell = document.createElement('td');
                         const passEditLink = document.createElement('a');
-                        passEditLink.href = `/mercure/passedit/${user.id}`;
+                        passEditLink.href = `/smaug/passedit/${user.id}`;
                         passEditLink.textContent = 'Modifier le mot de passe';
                         passEditLink.className = "inline-table centered";
                         passEditCell.appendChild(passEditLink);

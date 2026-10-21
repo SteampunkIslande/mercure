@@ -1,16 +1,16 @@
 [package]
-name = "mercure"
+name = "smaug"
 version = "0.1.0"
 edition = "2024"
 
-default-run = "mercure"
+default-run = "smaug"
 
 [workspace]
-members = ["mercure-lib"]
+members = ["smaug-lib"]
 
 
 [dependencies]
-mercure-lib = { path = "./mercure-lib" }
+smaug-lib = { path = "./smaug-lib" }
 rocket = { version = "0.5", features = ["secrets", "json"] }
 sqlx = { version = "0.7", features = [
     "runtime-tokio-rustls",

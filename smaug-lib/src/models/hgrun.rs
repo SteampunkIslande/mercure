@@ -224,7 +224,7 @@ impl Run {
             // Colonne 1 - Nom du run
             json!({
                 "content": &self.run_name,
-                "href": Some(format!("/mercure/show/run/{}", self.run_id?)),
+                "href": Some(format!("/smaug/show/run/{}", self.run_id?)),
                 "td_class": "content-column"
             }),
             // Colonne 2 - Utilisateur

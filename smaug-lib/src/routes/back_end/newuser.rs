@@ -8,7 +8,7 @@ use crate::models::{NewUser, User};
 
 /// API endpoint for admins to register new users
 ///
-/// ROUTE: /mercure/api/register
+/// ROUTE: /smaug/api/register
 #[post("/register", data = "<user>")]
 pub async fn register_post(
     user: Json<NewUser>,

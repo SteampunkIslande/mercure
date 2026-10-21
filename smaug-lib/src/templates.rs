@@ -207,8 +207,8 @@ mod tests {
             .render(context! {})
             .unwrap();
         assert!(html.contains("<!DOCTYPE html>"));
-        assert!(html.contains("Bienvenue sur Mercure"));
-        assert!(html.contains("/mercure/static/styles/default.css"));
+        assert!(html.contains("Bienvenue sur Smaug"));
+        assert!(html.contains("/smaug/static/styles/default.css"));
         assert!(!html.contains("Déconnexion"));
     }
 
@@ -220,7 +220,7 @@ mod tests {
             .unwrap()
             .render(context! {})
             .unwrap();
-        assert!(html.contains("Connexion - Mercure"));
+        assert!(html.contains("Connexion - Smaug"));
         assert!(html.contains("show_message.js"));
         assert!(html.contains("banner-text"));
     }

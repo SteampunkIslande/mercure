@@ -1,6 +1,6 @@
-pub use mercure_lib::auth;
-pub use mercure_lib::config;
-pub use mercure_lib::db;
-pub use mercure_lib::models;
-pub use mercure_lib::routes;
-pub use mercure_lib::utils;
+pub use smaug_lib::auth;
+pub use smaug_lib::config;
+pub use smaug_lib::db;
+pub use smaug_lib::models;
+pub use smaug_lib::routes;
+pub use smaug_lib::utils;

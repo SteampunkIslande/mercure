@@ -10,7 +10,7 @@ use crate::models::Run;
 use crate::models::analysis;
 use crate::models::hgrun;
 
-/// Route: /mercure/api/newrun
+/// Route: /smaug/api/newrun
 #[post("/newrun", data = "<run>")]
 pub async fn newrun_post(
     auth: Authenticated,
@@ -28,7 +28,7 @@ pub async fn newrun_post(
     }
 }
 
-/// Route: /mercure/api/validate/<run_id>
+/// Route: /smaug/api/validate/<run_id>
 #[post("/validate/<run_id>")]
 pub async fn validate_run_post(
     _auth: Authenticated,
@@ -73,7 +73,7 @@ pub async fn retry_run_get(
     }
 }
 
-/// Route: /mercure/api/editrun/
+/// Route: /smaug/api/editrun/
 #[post("/editrun", data = "<run>")]
 pub async fn editrun_post(
     _auth: Authenticated,

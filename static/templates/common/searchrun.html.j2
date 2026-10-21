@@ -4,7 +4,7 @@
 
 {% block extra_head %}
     {% include "common/pagination_styles.html.j2" %}
-    <script src="/mercure/static/scripts/json_table.js"></script>
+    <script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
 
 {% block banner_text %}Recherche avancée de runs{% endblock %}
@@ -40,7 +40,7 @@
         </div>
 
         <div style="margin-top: 1em; text-align: left;">
-            <a class="btn btn-secondary" href="/mercure/show/runs">Retour à la liste</a>
+            <a class="btn btn-secondary" href="/smaug/show/runs">Retour à la liste</a>
             <a id="searchrun-button" class="btn primary" onclick="searchRuns(1)">Rechercher</a>
         </div>
     </form>
@@ -95,7 +95,7 @@
             if (run_name_search) params.append('run_name_search', run_name_search);
 
             try {
-                const response = await fetch(`/mercure/api/searchrun?${params.toString()}`);
+                const response = await fetch(`/smaug/api/searchrun?${params.toString()}`);
                 const json = await response.json();
                 const resultsDiv = document.getElementById('search-results');
                 const paginationDiv = document.getElementById('pagination-controls');

@@ -6,7 +6,7 @@ use std::fs::read_to_string;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::config::get_mercure_config;
+use crate::config::get_smaug_config;
 use crate::routes::ApiResponse;
 use crate::utils::correct_samplesheet;
 
@@ -41,7 +41,7 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
             return Json(ApiResponse::error(e.to_string()));
         }
     };
-    let config = get_mercure_config();
+    let config = get_smaug_config();
     // Get upload directory
     let upload_dir = PathBuf::from(config.upload_dir);
 

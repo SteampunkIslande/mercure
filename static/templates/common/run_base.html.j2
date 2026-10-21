@@ -16,10 +16,10 @@
             return;
         }
         try {
-            const response = await fetch('/mercure/api/validate/' + runId, { method: 'POST' });
+            const response = await fetch('/smaug/api/validate/' + runId, { method: 'POST' });
             const data = await response.json();
             if (isApiSuccess(data)) {
-                window.location = "/mercure/api/redirect?target_url=/mercure/show/run/" + runId +
+                window.location = "/smaug/api/redirect?target_url=/smaug/show/run/" + runId +
                     "&title=" + encodeURIComponent("Succès") +
                     "&message=" + encodeURIComponent(getApiData(data).message) +
                     "&seconds=5";
@@ -40,10 +40,10 @@
             return;
         }
         try {
-            const response = await fetch(`/mercure/api/retry/${runId}`);
+            const response = await fetch(`/smaug/api/retry/${runId}`);
             const data = await response.json();
             if (isApiSuccess(data)) {
-                window.location.href = `/mercure/show/run/${runId}`;
+                window.location.href = `/smaug/show/run/${runId}`;
             } else {
                 showMessage("error", getApiMessage(data) || "Relance de l'analyse refusée");
             }

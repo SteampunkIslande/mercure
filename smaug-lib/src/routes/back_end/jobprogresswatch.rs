@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 #[get("/watch/<job_id>/<attempt_number>")]
 pub async fn watch(job_id: i64, attempt_number: i64) -> Json<ApiResponse<Value>> {
-    let config = crate::config::get_mercure_config();
+    let config = crate::config::get_smaug_config();
 
     let logs_folder = PathBuf::from(&config.logs_dir);
 

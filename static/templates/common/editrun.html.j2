@@ -43,10 +43,10 @@
 
     <div style="text-align: left; margin-top: 20px;">
         {% if run %}
-        <a id="back-to-runs" class="btn btn-secondary" href="/mercure/show/run/{{ run.run_id }}">Retour</a>
+        <a id="back-to-runs" class="btn btn-secondary" href="/smaug/show/run/{{ run.run_id }}">Retour</a>
         <a id="save-changes" onclick="handleSubmit()" class="btn btn-primary">Enregistrer les modifications</a>
         {% else %}
-        <a class="btn btn-secondary" href="/mercure/home">Retour</a>
+        <a class="btn btn-secondary" href="/smaug/home">Retour</a>
         <a class="btn btn-primary" onclick="handleSubmit()">Soumettre</a>
         {% endif %}
     </div>
@@ -160,7 +160,7 @@
                     const formData = new FormData();
                     formData.append('file', file);
                     formData.append('file_name_base', file.name);
-                    const response = await fetch('/mercure/api/upload', { method: 'POST', body: formData });
+                    const response = await fetch('/smaug/api/upload', { method: 'POST', body: formData });
                     const json = await response.json();
                     if (!isApiSuccess(json)) {
                         throw new Error(`Upload failed for ${key}: ${json.error || response.statusText}`);
@@ -191,7 +191,7 @@
                 ...currentRun,
                 user_defined_vars: userDefinedVars
             };
-            const endpoint = '/mercure/api/editrun';
+            const endpoint = '/smaug/api/editrun';
             {% else %}
             const run_name = document.getElementById('run_name').value;
             if (!run_name) {
@@ -213,7 +213,7 @@
                 status: "Idle",
                 attempt_count: 0
             };
-            const endpoint = '/mercure/api/newrun';
+            const endpoint = '/smaug/api/newrun';
             {% endif %}
 
             const response = await fetch(endpoint, {
@@ -231,9 +231,9 @@
             // Assume isApiSuccess, getApiData, and getApiMessage are defined globally
             if (isApiSuccess(data)) {
                 {% if run %}
-                let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/{{ run.run_id }}";
+                let new_url = "/smaug/api/redirect?target_url=/smaug/show/run/{{ run.run_id }}";
                 {% else %}
-                let new_url = "/mercure/api/redirect?target_url=/mercure/show/run/" + getApiData(data).run_id;
+                let new_url = "/smaug/api/redirect?target_url=/smaug/show/run/" + getApiData(data).run_id;
                 {% endif %}
                 new_url += "&title=" + encodeURIComponent("Succès") +
                     "&message=" + encodeURIComponent(getApiData(data).message) +

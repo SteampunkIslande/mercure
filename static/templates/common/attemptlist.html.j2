@@ -12,7 +12,7 @@
     {% set status_class = "success" %}
 {% endif %}
 <div class="run-attempt {{ status_class }}">
-    <a href="/mercure/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
+    <a href="/smaug/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
         <strong>Tentative {{ att.attempt_number }}:</strong>
         <span>
             {{ status_label }}

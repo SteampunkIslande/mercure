@@ -7,7 +7,7 @@ use crate::models::CachedForm;
 use crate::routes::ApiResponse;
 
 /// Lists every cached FormDef straight from the database (no HTTP request to the git
-/// repository). The cache is rebuilt by `POST /mercure/api/update/cache`
+/// repository). The cache is rebuilt by `POST /smaug/api/update/cache`
 /// (see `forms_cache.rs`).
 #[get("/forms/all")]
 pub async fn get_all_forms(pool: &State<SqlitePool>) -> Json<ApiResponse<Vec<CachedForm>>> {

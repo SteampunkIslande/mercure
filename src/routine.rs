@@ -1,8 +1,8 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use mercure::config::{MercureConfig, get_mercure_config};
-use mercure::models::{ModelError, SigintBehavior, analysis, appstate};
 use nix::sys::signal::Signal;
+use smaug::config::{SmaugConfig, get_smaug_config};
+use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
 use std::io::Error as IoError;
 use std::path::{self, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -13,11 +13,11 @@ use sqlx::SqlitePool;
 
 use wherror::Error;
 
-use mercure_lib::models::AnalysisStateMachineError;
 use regex::Error as RegexError;
+use smaug_lib::models::AnalysisStateMachineError;
 use sqlx::Error;
 
-use mercure_lib::models::Attempt;
+use smaug_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
@@ -211,11 +211,11 @@ async fn run_script(
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
     let (scripts_dir, logs_dir) = {
-        let MercureConfig {
+        let SmaugConfig {
             scripts_dir,
             logs_dir,
             ..
-        } = get_mercure_config();
+        } = get_smaug_config();
         let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
         if !scripts_dir.is_absolute() {
             return Err(anyhow::format_err!(

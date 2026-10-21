@@ -3,7 +3,7 @@
 {% block title %}Configuration d'exécution{% endblock %}
 
 {% block extra_head %}
-<script src="/mercure/static/scripts/json_table.js"></script>
+<script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
 
 {% block banner_text %}Configuration d'exécution{% endblock %}
@@ -40,7 +40,7 @@
         </tbody>
     </table>
 
-    <a href="/mercure/admin/dashboard" class="btn btn-secondary" style="margin-top: 20px;">
+    <a href="/smaug/admin/dashboard" class="btn btn-secondary" style="margin-top: 20px;">
         <span class="material-icons icon-align">arrow_back</span> Retour au tableau de bord
     </a>
 </div>
@@ -60,7 +60,7 @@
                 this.disabled = true;
 
                 try {
-                    const response = await fetch('/mercure/api/config/set', {
+                    const response = await fetch('/smaug/api/config/set', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

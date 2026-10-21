@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::SqlitePool;
 
-use crate::config::get_mercure_config;
+use crate::config::get_smaug_config;
 use crate::{
-    config::{GitWebConfig, MercureConfig},
+    config::{GitWebConfig, SmaugConfig},
     models::{ModelError, groups},
     pipeline_exec::{GitCheckError, versionning},
 };
@@ -213,11 +213,11 @@ pub struct Form {
 }
 
 impl Form {
-    pub async fn get_all_form_defs(config: &MercureConfig) -> Result<Vec<Form>, ModelError> {
+    pub async fn get_all_form_defs(config: &SmaugConfig) -> Result<Vec<Form>, ModelError> {
         let all_branches = versionning::get_all_branches()
             .await
             .context("Impossible de lister les branches")?;
-        let MercureConfig { pipelines, .. } = config;
+        let SmaugConfig { pipelines, .. } = config;
 
         let mut all_forms: Vec<Form> = Vec::new();
 
@@ -299,7 +299,7 @@ impl Form {
     }
 
     pub async fn get_form(form_identification: FileIdentification) -> Result<Form, ModelError> {
-        let MercureConfig { pipelines, .. } = crate::config::get_mercure_config();
+        let SmaugConfig { pipelines, .. } = crate::config::get_smaug_config();
 
         match &pipelines {
             GitWebConfig::GiteaV1 {
@@ -349,7 +349,7 @@ impl Form {
                         script_name.display()
                     )));
                 }
-                let config = get_mercure_config();
+                let config = get_smaug_config();
                 match config.pipelines {
                     GitWebConfig::GiteaV1 {
                         base_url,
@@ -517,7 +517,7 @@ impl CachedForm {
     /// # Arguments
     ///
     /// - `pool` (`&SqlitePool`) - A handle to the database
-    /// - `config` (`&MercureConfig`) - Application configuration (git repository, mainly)
+    /// - `config` (`&SmaugConfig`) - Application configuration (git repository, mainly)
     ///
     /// # Returns
     ///
@@ -529,7 +529,7 @@ impl CachedForm {
     /// Returns an error in case of database or git repository issues.
     pub async fn refresh_cache(
         pool: &SqlitePool,
-        config: &MercureConfig,
+        config: &SmaugConfig,
     ) -> Result<Vec<Self>, ModelError> {
         let all_forms = Form::get_all_form_defs(config).await?;
         Self::rebuild_cache_from_forms(pool, all_forms).await
@@ -820,7 +820,7 @@ mod test {
                                 title: "BED".to_string(),
                                 description: "Le fichier BED à utiliser pour cette analyse".to_string(),
                                 variable_type: VariableType::ListFromURL {
-                                    source: "/mercure/api/aux/list_beds".to_string()
+                                    source: "/smaug/api/aux/list_beds".to_string()
                                 },
                             },
                             Variable {
@@ -836,7 +836,7 @@ mod test {
                                 title: "Dossier BCL".to_string(),
                                 description: "Le dossier de run brut Illumina".to_string(),
                                 variable_type: VariableType::ListFromURL {
-                                    source: "/mercure/api/aux/list_illumina_dirs".to_string()
+                                    source: "/smaug/api/aux/list_illumina_dirs".to_string()
                                 },
                             },
                             Variable {
@@ -844,7 +844,7 @@ mod test {
                                 title: "Nom du panel".to_string(),
                                 description: "Le nom du panel".to_string(),
                                 variable_type: VariableType::ListFromURL {
-                                    source: "/mercure/api/aux/list_panels".to_string()
+                                    source: "/smaug/api/aux/list_panels".to_string()
                                 },
                             },
                             Variable {

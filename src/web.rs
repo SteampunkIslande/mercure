@@ -4,19 +4,19 @@ use std::net::Ipv4Addr;
 use anyhow::bail;
 use clap::Parser;
 use log::info;
-use mercure_lib::templates::{Template, context, minijinja_fairing};
 use rocket::Build;
 use rocket::Config;
 use rocket::Rocket;
 use rocket::config::Shutdown;
 use rocket::fs::FileServer;
+use smaug_lib::templates::{Template, context, minijinja_fairing};
 use tokio::signal::unix::{SignalKind, signal};
 
 use rocket::{catch, catchers, routes};
 
 use anyhow::Result;
-use mercure_lib::config;
-use mercure_lib::routes;
+use smaug_lib::config;
+use smaug_lib::routes;
 use sqlx::SqlitePool;
 use tokio::sync::broadcast;
 
@@ -35,7 +35,7 @@ async fn unauthorized() -> Template {
 }
 
 async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
-    let config = config::get_mercure_config();
+    let config = config::get_smaug_config();
 
     let shutdown_config = Shutdown {
         ctrlc: false,
@@ -52,11 +52,11 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
     }
 
     let mut r = rocket::custom(figment)
-        .register("/mercure", catchers![unauthorized])
-        .mount("/mercure/uploads", FileServer::from(&config.upload_dir))
-        .mount("/mercure/logs", FileServer::from(&config.logs_dir))
+        .register("/smaug", catchers![unauthorized])
+        .mount("/smaug/uploads", FileServer::from(&config.upload_dir))
+        .mount("/smaug/logs", FileServer::from(&config.logs_dir))
         .mount(
-            "/mercure",
+            "/smaug",
             routes![
                 // Page d'accueil
                 routes::frontend::welcome_page_get,
@@ -79,7 +79,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             ],
         )
         .mount(
-            "/mercure/admin",
+            "/smaug/admin",
             //Routes réservées à l'admin
             routes![
                 routes::frontend::register_get,
@@ -92,7 +92,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             ],
         )
         .mount(
-            "/mercure/api",
+            "/smaug/api",
             routes![
                 // Routes pour le backend: renvoie toujours du JSON
                 routes::backend::register_post,
@@ -144,13 +144,13 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
             .join("static")
             .canonicalize()
             .expect("Impossible de trouver le dossier static");
-        r = r.mount("/mercure/static", FileServer::from(static_path));
+        r = r.mount("/smaug/static", FileServer::from(static_path));
     }
     #[cfg(not(debug_assertions))]
     {
         use rocket_include_dir::{Dir, StaticFiles, include_dir};
         static PROJECT_DIR: Dir = include_dir!("static");
-        r = r.mount("/mercure/static", StaticFiles::from(&PROJECT_DIR));
+        r = r.mount("/smaug/static", StaticFiles::from(&PROJECT_DIR));
     }
     r
 }
