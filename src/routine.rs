@@ -242,12 +242,7 @@ async fn run_script(
         (scripts_dir, logs_dir)
     };
 
-    let script_id = format!(
-        "{}-run-{:0>8}-tentative-{:0>8}",
-        time::Timestamp::now().as_seconds(),
-        attempt.run_id,
-        attempt.attempt_number
-    );
+    let script_id = attempt.attempt_full_name();
 
     let script_path = scripts_dir.join(path::Path::new(&format!("{}.sh", script_id)));
     let stdout_path = logs_dir.join(path::Path::new(&format!("{}.stdout", script_id)));

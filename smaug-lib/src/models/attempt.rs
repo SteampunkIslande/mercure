@@ -99,12 +99,20 @@ impl Attempt {
     /// Auto-computed output directory for this attempt. Single definition point
     /// for the injected `outdir` jinja variable.
     pub fn outdir(&self) -> PathBuf {
-        PathBuf::from(&get_smaug_config().analysis_dir).join(format!("run-{:0<8}", self.run_id))
+        PathBuf::from(&get_smaug_config().analysis_dir).join(self.attempt_full_name())
+    }
+
+    pub fn attempt_full_name(&self) -> String {
+        format!(
+            "run-{:0>8}-tentative-{:0>8}",
+            self.run_id, self.attempt_number
+        )
     }
 
     pub async fn render_script(&self) -> Result<String, ModelError> {
         let form = self.get_form().await?;
         let outdir = self.outdir().display().to_string();
+        // Add { user defined variables } as well as run-related mandatory/convenient variables: [attempt number, output directory (that will be $PWD), run number]
         let ctx = form.jinja_context(
             &self.user_defined_vars,
             self.attempt_number,

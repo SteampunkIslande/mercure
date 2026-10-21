@@ -506,6 +506,16 @@ pub struct CachedForm {
     pub description: String,
 }
 
+/// A proxy for a form definition
+///
+/// Form definitions are stored in a web-served git repository, and can be referred to in two main ways:
+/// - (branch name, file path)
+/// - (commit hash, file path)
+///
+/// Both are great, but not so convenient: having to do a http query and a full form parse
+/// only for the user to get the file identification, name and description, is not really worth it.
+///
+/// Hence, this proxy, that stores those three fields of interest and show them to the user in the 'launch' page.
 impl CachedForm {
     /// Rebuild the FormDef cache from the actual Form repository.
     ///
@@ -1205,6 +1215,30 @@ mod form_def_cache_tests {
         };
         match e {
             FormDefinitionError::MissingVar(v) if v.as_str() == "c" => {}
+            _ => {
+                panic!(r#"Expected FormDefinitionError::MissingVar("c")"#)
+            }
+        }
+
+        let simple_form = form_with_shell(
+            "whatever",
+            "main",
+            "pipelineA/form.yaml",
+            &["admin", "genet"],
+            "une {{a}} erreur {{b}} manifeste {{c}}",
+        );
+
+        let Err(e) = simple_form
+            .render_template(&HashMap::<&str, &str>::new())
+            .await
+        else {
+            panic!("Should be an error")
+        };
+        match e {
+            FormDefinitionError::MissingVar(v) if v.as_str() == "a, b, c" => {}
+            FormDefinitionError::MissingVar(v) => {
+                panic!("Got: {}", v)
+            }
             _ => {
                 panic!(r#"Expected FormDefinitionError::MissingVar("c")"#)
             }
