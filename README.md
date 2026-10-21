@@ -35,7 +35,8 @@ Fichiers d'installation:
 - L'exécutable lui-même, qui peut être stocké n'importe où (attention aux permissions, notamment SELinux, pour l'utiliser avec systemd). Emplacement recommandé: `/usr/local/bin/smaug`.
 
 
-## Etape 1 (optionnelle): Installation et configuration de nginx
+## Etape 1 (optionnelle): Installation et configuration de nginx
+
 
 Installer et configurer nginx sur le serveur de production. Au choix, soit en dur, soit dans une image podman, ou singularity.
 
@@ -54,7 +55,8 @@ location /smaug {
 Remplacer `:8000` par le port que vous utilisez effectivement (voir les options de smaug web).
 Il est conseillé de garder `127.0.0.1` comme adresse d'écoute au lieu de l'IP que vous voulez exposer, cela permet d'éviter une connexion directe sans passer par le reverse-proxy.
 
-## Etape 2: Installation de smaug
+## Etape 2: Installation de smaug
+
 
 ### Installation du binaire
 
