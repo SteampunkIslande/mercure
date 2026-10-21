@@ -98,8 +98,10 @@ impl Attempt {
 
     /// Auto-computed output directory for this attempt. Single definition point
     /// for the injected `outdir` jinja variable.
+    ///
+    /// Less complete than attempt_full_name, so that every run ends up in the same folder, no matter how many attempts
     pub fn outdir(&self) -> PathBuf {
-        PathBuf::from(&get_smaug_config().analysis_dir).join(self.attempt_full_name())
+        PathBuf::from(&get_smaug_config().analysis_dir).join(format!("run-{:0>8}", self.run_id))
     }
 
     pub fn attempt_full_name(&self) -> String {
