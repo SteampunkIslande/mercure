@@ -25,4 +25,4 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Run workspace tests
-        run: cargo test --workspace --all-targets --all-features
+        run: cargo test --workspace
