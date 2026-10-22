@@ -8,6 +8,7 @@ use crate::{
     models::FileIdentification,
 };
 
+use log::{error, info};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
@@ -44,6 +45,8 @@ pub enum GitCheckError {
         source: std::io::Error,
         location: &'static std::panic::Location<'static>,
     },
+    #[error("{0}")]
+    CommandFailed(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -312,6 +315,7 @@ pub async fn git_clone_to(
         FileIdentification::GitBranchAndPath { branch, .. } => branch.to_string(),
         FileIdentification::GitCommit { commit_hash, .. } => commit_hash.to_string(),
         FileIdentification::None => {
+            error!("Clone aborted: No branch or commit provided.");
             return Err(GitCheckError::NoSuchBranch("(none)".to_string()));
         }
     };
@@ -323,31 +327,87 @@ pub async fn git_clone_to(
             repo,
         } => (format!("{base_url}/{owner}/{repo}.git"), repo),
         GitWebConfig::GitlabV4 { .. } => {
+            error!("Clone aborted: Gitlab V4 API is not yet supported.");
             return Err(GitCheckError::Unsupported(
                 "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
             ));
         }
     };
-    let mut child = Command::new("git")
+
+    let repo_path = path.join(&repo_name);
+    info!("Cloning {} into {}", clone_url, repo_path.display());
+
+    let mut clone_child = Command::new("git")
         .arg("clone")
         .arg(&clone_url)
         .arg(&repo_name)
         .current_dir(path)
-        .spawn()?;
-    match tokio::time::timeout(Duration::from_secs(30), child.wait()).await {
-        Ok(status) => {}
-        Err(e) => child.kill().await?,
+        .spawn()
+        .map_err(|e| {
+            error!("Failed to spawn git clone process: {}", e);
+            GitCheckError::CommandFailed(e.to_string()) // Adjust to your actual error variants
+        })?;
+
+    match tokio::time::timeout(Duration::from_secs(30), clone_child.wait()).await {
+        Ok(Ok(status)) if status.success() => info!("Git clone successful."),
+        Ok(Ok(status)) => {
+            error!("Git clone failed with exit status: {}", status);
+            return Err(GitCheckError::CommandFailed(format!(
+                "Clone failed: {}",
+                status
+            )));
+        }
+        Ok(Err(e)) => {
+            error!("Failed to wait for git clone process: {}", e);
+            return Err(GitCheckError::CommandFailed(e.to_string()));
+        }
+        Err(_) => {
+            error!("Git clone timed out after 30 seconds.");
+            let _ = clone_child.kill().await;
+            return Err(GitCheckError::CommandFailed("Clone timeout".into()));
+        }
     }
 
-    let mut child = Command::new("git")
+    info!("Checking out '{}' in {}", checkout, repo_path.display());
+
+    let mut checkout_child = Command::new("git")
         .arg("checkout")
         .arg(&checkout)
-        .current_dir(path)
-        .spawn()?;
-    match tokio::time::timeout(Duration::from_secs(5), child.wait()).await {
-        Ok(status) => {}
-        Err(e) => child.kill().await?,
+        .current_dir(&repo_path) // Fixed: Must run inside the cloned repository
+        .spawn()
+        .map_err(|e| {
+            error!("Failed to spawn git checkout process: {}", e);
+            GitCheckError::CommandFailed(e.to_string())
+        })?;
+
+    match tokio::time::timeout(Duration::from_secs(5), checkout_child.wait()).await {
+        Ok(Ok(status)) if status.success() => info!("Git checkout successful."),
+        Ok(Ok(status)) => {
+            error!("Git checkout failed with exit status: {}", status);
+            return Err(GitCheckError::CommandFailed(format!(
+                "Checkout failed: {}",
+                status
+            )));
+        }
+        Ok(Err(e)) => {
+            error!("Failed to wait for git checkout process: {}", e);
+            return Err(GitCheckError::CommandFailed(e.to_string()));
+        }
+        Err(_) => {
+            error!("Git checkout timed out after 5 seconds.");
+            let _ = checkout_child.kill().await;
+            return Err(GitCheckError::CommandFailed("Checkout timeout".into()));
+        }
     }
-    std::fs::remove_dir_all(path.join(&repo_name).join(".git"))?;
+
+    let git_dir = repo_path.join(".git");
+    info!("Removing {:?}", git_dir);
+
+    if let Err(e) = tokio::fs::remove_dir_all(&git_dir).await {
+        error!("Failed to remove .git directory at {:?}: {}", git_dir, e);
+        return Err(GitCheckError::CommandFailed(format!("FS error: {}", e)));
+    }
+
+    info!("Successfully prepped repository at {:?}", repo_path);
     Ok(())
 }
