@@ -98,7 +98,7 @@ Ci-dessous, un exemple de configuration valide, à adapter:
 # Web
 secret_key = "$(openssl rand -base64 32)"
 port = 8000
-address = 127.0.0.1
+address = "127.0.0.1"
 
 # Token de mise à jour des pipelines
 webhook_secret = "$(openssl rand -base64 32)"

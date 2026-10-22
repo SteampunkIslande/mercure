@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use crate::{
     config::{GitWebConfig, SmaugConfig, get_smaug_config},
@@ -8,6 +11,7 @@ use crate::{
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
+use tokio::process::Command;
 use wherror::Error;
 
 #[derive(Error, Debug)]
@@ -34,6 +38,12 @@ pub enum GitCheckError {
     },
     #[error("{0}")]
     Unsupported(String),
+    #[error("{location}:{source}")]
+    IOError {
+        #[from]
+        source: std::io::Error,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -290,4 +300,54 @@ pub async fn get_all_branches() -> Result<Vec<String>, GitCheckError> {
             todo!("L'API Gitlab V4 n'est pas encore prise en charge!")
         }
     }
+}
+
+pub async fn git_clone_to(
+    path: &Path,
+    file_identification: &FileIdentification,
+) -> Result<(), GitCheckError> {
+    let SmaugConfig { pipelines, .. } = get_smaug_config();
+
+    let checkout = match file_identification {
+        FileIdentification::GitBranchAndPath { branch, .. } => branch.to_string(),
+        FileIdentification::GitCommit { commit_hash, .. } => commit_hash.to_string(),
+        FileIdentification::None => {
+            return Err(GitCheckError::NoSuchBranch("(none)".to_string()));
+        }
+    };
+
+    let (clone_url, repo_name) = match pipelines {
+        GitWebConfig::GiteaV1 {
+            base_url,
+            owner,
+            repo,
+        } => (format!("{base_url}/{owner}/{repo}.git"), repo),
+        GitWebConfig::GitlabV4 { .. } => {
+            return Err(GitCheckError::Unsupported(
+                "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
+            ));
+        }
+    };
+    let mut child = Command::new("git")
+        .arg("clone")
+        .arg(&clone_url)
+        .arg(&repo_name)
+        .current_dir(path)
+        .spawn()?;
+    match tokio::time::timeout(Duration::from_secs(30), child.wait()).await {
+        Ok(status) => {}
+        Err(e) => child.kill().await?,
+    }
+
+    let mut child = Command::new("git")
+        .arg("checkout")
+        .arg(&checkout)
+        .current_dir(path)
+        .spawn()?;
+    match tokio::time::timeout(Duration::from_secs(5), child.wait()).await {
+        Ok(status) => {}
+        Err(e) => child.kill().await?,
+    }
+    std::fs::remove_dir_all(path.join(&repo_name).join(".git"))?;
+    Ok(())
 }

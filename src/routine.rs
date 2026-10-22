@@ -3,6 +3,7 @@ use log::{error, info, warn};
 use nix::sys::signal::Signal;
 use smaug::config::{SmaugConfig, get_smaug_config};
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
+use smaug_lib::pipeline_exec::{git_clone_to, versionning};
 use std::io::Error as IoError;
 use std::path::{self, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -67,6 +68,12 @@ enum RoutineError {
     AnyhowError {
         #[from]
         source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
+    #[error("{location}: {source}")]
+    GitCheckError {
+        #[from]
+        source: versionning::GitCheckError,
         location: &'static std::panic::Location<'static>,
     },
 }
@@ -253,7 +260,11 @@ async fn run_script(
         .with_context(|| format!("Impossible de créer le dossier outdir"))?;
     std::fs::write(&script_path, &rendered)?;
 
+    // clones the whole repo into the working directory
+    git_clone_to(&attempt.outdir(), &attempt.form_identification).await?;
+
     let mut child = match Command::new("bash")
+        .arg("-l") // Important, pour que l'environnement d'exécution soit celui d'un shell login (reproductibilité si relancé avec le même utilisateur)
         .arg(&script_path)
         .current_dir(attempt.outdir()) // Pour l'exécution du script, on se place dans outdir
         .process_group(0)
