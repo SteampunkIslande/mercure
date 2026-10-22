@@ -74,7 +74,7 @@ pub enum ModelError {
         source: form::FormDefinitionError,
         location: &'static std::panic::Location<'static>,
     },
-    #[error("{location}: {source}")]
+    #[error("{location}: {}",source.chain().map(|e|e.to_string()).collect::<Vec<_>>().join("<br>"))]
     AnyHowError {
         #[from]
         source: anyhow::Error,
