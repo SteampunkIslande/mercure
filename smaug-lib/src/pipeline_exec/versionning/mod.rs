@@ -24,12 +24,8 @@ pub struct DirContentsItem {
     pub path: PathBuf,
     #[serde(rename = "type")]
     pub item_type: String,
+    #[serde(skip)]
     pub content: String,
-}
-
-pub struct BranchInfo {
-    pub name: String,
-    pub last_commit: String,
 }
 
 pub async fn git_clone_to(
