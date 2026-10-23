@@ -1,4 +1,5 @@
 use crate::{
+    config::{SmaugConfig, get_smaug_config},
     models::{Attempt, FileIdentification, Run, RunDefinitionError, RunStatus},
     pipeline_exec::{GitCheckError, versionning},
 };
@@ -38,6 +39,7 @@ pub async fn validate_form(
     run_id: i64,
     pool: &SqlitePool,
 ) -> Result<(), AnalysisStateMachineError> {
+    let SmaugConfig { pipelines, .. } = get_smaug_config();
     let run: Run = Run::get_run_from_id(run_id, pool).await?;
 
     if !matches!(run.status, RunStatus::Idle) {
@@ -49,11 +51,8 @@ pub async fn validate_form(
 
     let current_commit_hash = match run.form_identification {
         FileIdentification::GitBranchAndPath { branch, .. } => {
-            versionning::get_latest_commit(Some(&branch))
+            versionning::get_latest_commit(&branch, &pipelines)
                 .await?
-                .into_iter()
-                .next()
-                .ok_or(GitCheckError::NoSuchBranch(branch))?
                 .last_commit
         }
         FileIdentification::GitCommit { commit_hash, .. } => commit_hash,

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::Context;
@@ -12,7 +12,7 @@ use sqlx::SqlitePool;
 
 use crate::config::get_smaug_config;
 use crate::{
-    config::{GitWebConfig, SmaugConfig},
+    config::SmaugConfig,
     models::{ModelError, groups},
     pipeline_exec::{GitCheckError, versionning},
 };
@@ -198,6 +198,16 @@ pub enum FileIdentification {
     None,
 }
 
+impl FileIdentification {
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::GitBranchAndPath { file_path, .. } => &file_path,
+            Self::GitCommit { file_path, .. } => &file_path,
+            Self::None => Path::new(""),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Form {
     pub name: String,
@@ -214,84 +224,60 @@ pub struct Form {
 
 impl Form {
     pub async fn get_all_form_defs(config: &SmaugConfig) -> Result<Vec<Form>, ModelError> {
-        let all_branches = versionning::get_all_branches()
+        let SmaugConfig { pipelines, .. } = get_smaug_config();
+        let all_branches = versionning::get_all_branches(&pipelines)
             .await
             .context("Impossible de lister les branches")?;
         let SmaugConfig { pipelines, .. } = config;
 
         let mut all_forms: Vec<Form> = Vec::new();
 
-        match pipelines {
-            GitWebConfig::GiteaV1 {
-                base_url,
-                owner,
-                repo,
-            } => {
-                // For each branch
-                for branch_name in all_branches.into_iter() {
-                    // 1. List yaml files on this branch
-                    let items =
-                        versionning::list_yaml_forms_giteav1(base_url, owner, repo, &branch_name)
-                            .await
-                            .unwrap_or_default();
-                    // For each form in given branch
-                    for dir_item in items {
-                        let form_identification = FileIdentification::GitBranchAndPath {
-                            branch: branch_name.to_string(), // Clone is mandatory
-                            file_path: dir_item.path,        // MOVED: No clone needed!
+        for branch_name in all_branches.into_iter() {
+            // 1. List yaml files on this branch
+            let items = versionning::list_yaml_forms(&pipelines, &branch_name)
+                .await
+                .unwrap_or_default();
+            // For each form in given branch
+            for dir_item in items {
+                let form_identification = FileIdentification::GitBranchAndPath {
+                    branch: branch_name.to_string(), // Clone is mandatory
+                    file_path: dir_item.path,        // MOVED: No clone needed!
+                };
+
+                // fetch file
+                let content =
+                    match versionning::git_get_file(&pipelines, &form_identification).await {
+                        Ok(c) => c,
+                        Err(_) => continue,
+                    };
+
+                // parse yaml
+                let mut form: Form = match yaml_serde::from_str(&content) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        // Read the path back out of the enum you just created
+                        let path_for_warn = match &form_identification {
+                            FileIdentification::GitBranchAndPath { file_path, .. } => file_path,
+                            FileIdentification::GitCommit {
+                                file_path: form_path,
+                                ..
+                            } => form_path,
+                            _ => &PathBuf::new(),
                         };
 
-                        // fetch file
-                        let content = match versionning::get_file_giteav1(
-                            base_url,
-                            owner,
-                            repo,
-                            &form_identification,
-                        )
-                        .await
-                        {
-                            Ok(c) => c,
-                            Err(_) => continue,
-                        };
-
-                        // parse yaml
-                        let mut form: Form = match yaml_serde::from_str(&content) {
-                            Ok(f) => f,
-                            Err(e) => {
-                                // Read the path back out of the enum you just created
-                                let path_for_warn = match &form_identification {
-                                    FileIdentification::GitBranchAndPath { file_path, .. } => {
-                                        file_path
-                                    }
-                                    FileIdentification::GitCommit {
-                                        file_path: form_path,
-                                        ..
-                                    } => form_path,
-                                    _ => &PathBuf::new(),
-                                };
-
-                                warn!(
-                                    "Impossible de sérialiser {} sur la branche {}: {}",
-                                    path_for_warn.display(),
-                                    branch_name,
-                                    e
-                                );
-                                continue;
-                            }
-                        };
-
-                        // At this point, form identification was set to None, which is the (invalid) default for the FormIdentification type.
-                        form.form_identification = form_identification;
-                        all_forms.push(form);
+                        warn!(
+                            "Impossible de sérialiser {} sur la branche {}: {}",
+                            path_for_warn.display(),
+                            branch_name,
+                            e
+                        );
+                        continue;
                     }
-                }
-            }
-            GitWebConfig::GitlabV4 { .. } => {
-                // keep the original intent, but return a proper error instead of `todo!`
-                return Err(GitCheckError::Unsupported(
-                    "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
-                )
-                .into());
+                };
+
+                // At this point, form identification was set to None, which is the (invalid) default for the FormIdentification type.
+                form.form_identification = form_identification;
+                all_forms.push(form);
             }
         }
 
@@ -301,26 +287,12 @@ impl Form {
     pub async fn get_form(form_identification: FileIdentification) -> Result<Form, ModelError> {
         let SmaugConfig { pipelines, .. } = crate::config::get_smaug_config();
 
-        match &pipelines {
-            GitWebConfig::GiteaV1 {
-                base_url,
-                owner,
-                repo,
-            } => {
-                let content =
-                    versionning::get_file_giteav1(base_url, owner, repo, &form_identification)
-                        .await?;
-                let mut form: Form = yaml_serde::from_str(&content)?;
-                form.form_identification = form_identification;
-                // Check validity of this form by making sure there are no syntax error in the template definition
-                form.check_validity(None).await?;
-                Ok(form)
-            }
-            GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
-                "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
-            )
-            .into()),
-        }
+        let content = versionning::git_get_file(&pipelines, &form_identification).await?;
+        let mut form: Form = yaml_serde::from_str(&content)?;
+        form.form_identification = form_identification;
+        // Check validity of this form by making sure there are no syntax error in the template definition
+        form.check_validity(None).await?;
+        Ok(form)
     }
 
     // Define variable names (and types) that will be added at launch time
@@ -349,43 +321,29 @@ impl Form {
                         script_name.display()
                     )));
                 }
-                let config = get_smaug_config();
-                match config.pipelines {
-                    GitWebConfig::GiteaV1 {
-                        base_url,
-                        owner,
-                        repo,
-                    } => {
-                        let script_ident = match &self.form_identification {
-                            FileIdentification::GitBranchAndPath { branch, .. } => {
-                                FileIdentification::GitBranchAndPath {
-                                    branch: branch.clone(),
-                                    file_path: script_name.clone(),
-                                }
-                            }
-                            FileIdentification::GitCommit { commit_hash, .. } => {
-                                FileIdentification::GitCommit {
-                                    commit_hash: commit_hash.clone(),
-                                    file_path: script_name.clone(),
-                                }
-                            }
-                            FileIdentification::None => {
-                                return Err(FormDefinitionError::InvalidData(
-                                    "Identification du formulaire invalide".into(),
-                                ));
-                            }
-                        };
-                        Ok(
-                            versionning::get_file_giteav1(&base_url, &owner, &repo, &script_ident)
-                                .await
-                                .context("Impossible de lire le fichier de script")?,
-                        )
+                let SmaugConfig { pipelines, .. } = get_smaug_config();
+                let script_ident = match &self.form_identification {
+                    FileIdentification::GitBranchAndPath { branch, .. } => {
+                        FileIdentification::GitBranchAndPath {
+                            branch: branch.clone(),
+                            file_path: script_name.clone(),
+                        }
                     }
-                    GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
-                        "L'API Gitlab V4 n'est pas encore prise en charge!".to_string(),
-                    )
-                    .into()),
-                }
+                    FileIdentification::GitCommit { commit_hash, .. } => {
+                        FileIdentification::GitCommit {
+                            commit_hash: commit_hash.clone(),
+                            file_path: script_name.clone(),
+                        }
+                    }
+                    FileIdentification::None => {
+                        return Err(FormDefinitionError::InvalidData(
+                            "Identification du formulaire invalide".into(),
+                        ));
+                    }
+                };
+                Ok(versionning::git_get_file(&pipelines, &script_ident)
+                    .await
+                    .context("Impossible de lire le fichier de script")?)
             }
         }
     }

@@ -3,7 +3,7 @@ use log::{error, info, warn};
 use nix::sys::signal::Signal;
 use smaug::config::{SmaugConfig, get_smaug_config};
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
-use smaug_lib::pipeline_exec::{git_clone_to, versionning};
+use smaug_lib::pipeline_exec::versionning;
 use std::io::Error as IoError;
 use std::path::{self, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -217,10 +217,11 @@ async fn run_script(
     pool: &SqlitePool,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
-    let (scripts_dir, logs_dir) = {
+    let (git_manager, scripts_dir, logs_dir) = {
         let SmaugConfig {
             scripts_dir,
             logs_dir,
+            pipelines,
             ..
         } = get_smaug_config();
         let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
@@ -246,7 +247,7 @@ async fn run_script(
             std::fs::create_dir_all(&logs_dir)
                 .with_context(|| format!("Impossible de créer le dossier des logs"))?;
         }
-        (scripts_dir, logs_dir)
+        (pipelines, scripts_dir, logs_dir)
     };
 
     let script_id = attempt.attempt_full_name();
@@ -261,7 +262,7 @@ async fn run_script(
     std::fs::write(&script_path, &rendered)?;
 
     // clones the whole repo into the working directory
-    git_clone_to(&attempt.outdir(), &attempt.form_identification).await?;
+    versionning::git_clone_to(&attempt.outdir(), &attempt.form_identification, git_manager).await?;
 
     let mut child = match Command::new("bash")
         .arg("-l") // Important, pour que l'environnement d'exécution soit celui d'un shell login (reproductibilité si relancé avec le même utilisateur)
