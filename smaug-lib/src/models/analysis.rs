@@ -51,9 +51,7 @@ pub async fn validate_form(
 
     let current_commit_hash = match run.form_identification {
         FileIdentification::GitBranchAndPath { branch, .. } => {
-            versionning::get_latest_commit(&branch, &pipelines)
-                .await?
-                .last_commit
+            versionning::get_latest_commit(&branch, &pipelines).await?
         }
         FileIdentification::GitCommit { commit_hash, .. } => commit_hash,
         FileIdentification::None => "".to_string(),

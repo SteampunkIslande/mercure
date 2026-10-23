@@ -142,10 +142,10 @@ pub async fn git_clone_to(
     Ok(())
 }
 
-pub async fn get_latest_commit(
+pub async fn get_latest_commit<'a>(
     branch_name: &str,
     pipelines: &GitWebConfig,
-) -> Result<BranchInfo, GitCheckError> {
+) -> Result<String, GitCheckError> {
     match pipelines {
         GitWebConfig::GiteaV1 {
             base_url,
@@ -153,18 +153,17 @@ pub async fn get_latest_commit(
             repo,
         } => {
             let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/branches/{branch_name}");
-            let v = serde_json::from_str::<Value>(&reqwest::get(&url).await?.text().await?)?;
 
-            Ok(BranchInfo {
-                name: v["name"]
+            Ok(
+                serde_json::from_str::<Value>(&reqwest::get(&url).await?.text().await?)?["commit"]
+                    ["id"]
                     .as_str()
-                    .ok_or(GitCheckError::NoSuchBranch(branch_name.to_string()))?
+                    .ok_or(anyhow::format_err!(
+                        "Cannot get latest commit ID for branch {}",
+                        branch_name
+                    ))?
                     .to_string(),
-                last_commit: v["commit"]["id"]
-                    .as_str()
-                    .ok_or(anyhow::format_err!("Invalid "))?
-                    .to_string(),
-            })
+            )
         }
 
         GitWebConfig::GitlabV4 { base_url: _, id: _ } => Err(GitCheckError::Unsupported(
