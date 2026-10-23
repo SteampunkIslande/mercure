@@ -8,11 +8,6 @@ use reqwest::Client;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-struct DirContentsResponse {
-    pub dir_contents: Vec<DirContentsItem>,
-}
-
-#[derive(Debug, Deserialize)]
 struct FileContentsResponse {
     pub file_contents: DirContentsItem,
 }
@@ -23,57 +18,97 @@ pub async fn list_yaml_forms(
     repo: &str,
     branch_name: &str,
 ) -> Result<Vec<DirContentsItem>, GitCheckError> {
-    let client = Client::new();
-    let mut results = Vec::new();
-    let mut stack = vec![".".to_string()];
+    use std::time::Duration;
+    use tokio::process::Command;
+    use walkdir::WalkDir;
 
-    while let Some(current_path) = stack.pop() {
-        let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/contents-ext/{current_path}");
+    let tmp_id = format!(
+        "smaug_repo_{}_{}_{}",
+        owner,
+        repo,
+        branch_name.replace("/", "_")
+    );
+    let tmp_root = std::env::temp_dir().join(tmp_id);
+    let _ = tokio::fs::create_dir_all(&tmp_root)
+        .await
+        .map_err(|e| GitCheckError::CommandFailed(format!("tmp dir create failed: {}", e)))?;
 
-        let resp = client
-            .get(&url)
-            .query(&[("ref", branch_name)])
-            .send()
-            .await?;
+    let repo_path = tmp_root.join(repo);
+    let clone_url = format!("{base_url}/{owner}/{repo}.git");
 
-        if !resp.status().is_success() {
+    let mut clone_cmd = Command::new("git");
+    clone_cmd
+        .arg("clone")
+        .arg("--branch")
+        .arg(branch_name)
+        .arg(&clone_url)
+        .arg(&repo_path);
+
+    let mut clone_child = clone_cmd
+        .spawn()
+        .map_err(|e| GitCheckError::CommandFailed(format!("git spawn failed: {}", e)))?;
+    let clone_res = tokio::time::timeout(Duration::from_secs(60), clone_child.wait()).await;
+    let clone_ok = match clone_res {
+        Ok(Ok(status)) => status.success(),
+        _ => {
+            let _ = tokio::fs::remove_dir_all(&tmp_root).await;
+            return Err(GitCheckError::CommandFailed(
+                "git clone failed or timed out".into(),
+            ));
+        }
+    };
+
+    if !clone_ok {
+        if let Err(e) = tokio::fs::remove_dir_all(&tmp_root).await {
             warn!(
-                "Failed to list contents at {} (status {})",
-                url,
-                resp.status()
-            );
-            continue;
+                "Cannot delete temp dir '{}', error {}",
+                tmp_root.display(),
+                e
+            )
         }
-
-        // Idiomatic let-else pattern replaces the verbose match block
-        let Ok(body) = resp.json::<DirContentsResponse>().await else {
-            warn!("Failed to parse directory contents at {}", url);
-            continue;
-        };
-
-        for item in body.dir_contents {
-            let is_yaml = item.name.ends_with(".yml") || item.name.ends_with(".yaml");
-
-            if item.item_type.eq_ignore_ascii_case("file")      // Is a file
-                && is_yaml                                      // Is a yaml file
-                && item                                         // Has a folder named .forms in its parents
-                    .path
-                    .components()
-                    .find(|c| c.as_os_str().eq_ignore_ascii_case(".forms"))
-                    .is_some()
-            {
-                results.push(item); // Then it must be a valid form :)
-            } else if item.item_type.eq_ignore_ascii_case("dir") {
-                // Cleaner path handling without OS-string lossy conversions
-                let next_path = match item.path.to_str() {
-                    Some("") | None => format!("{current_path}/{}", item.name),
-                    Some(valid_path) => valid_path.to_string(),
-                };
-                stack.push(next_path);
-            }
-        }
+        return Err(GitCheckError::CommandFailed("git clone failed".into()));
     }
 
+    let mut results = Vec::new();
+    for entry in WalkDir::new(&repo_path) {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let file_name = entry.file_name().to_string_lossy();
+        if !(file_name.ends_with(".yml") || file_name.ends_with(".yaml")) {
+            continue;
+        }
+        let full_path = entry.path();
+        let rel_path = match full_path.strip_prefix(&repo_path) {
+            Ok(p) => p.to_path_buf(),
+            Err(_) => continue,
+        };
+        let has_form = rel_path.components().any(|c| {
+            let s = c.as_os_str().to_string_lossy().to_ascii_lowercase();
+            s == ".form" || s == ".forms"
+        });
+        if !has_form {
+            continue;
+        }
+        results.push(DirContentsItem {
+            name: file_name.into_owned(),
+            path: rel_path,
+            item_type: "file".to_string(),
+            content: tokio::fs::read_to_string(full_path).await?,
+        });
+    }
+
+    if let Err(e) = tokio::fs::remove_dir_all(&tmp_root).await {
+        warn!(
+            "Couldn't remove temp dir {} (error: {})",
+            tmp_root.display(),
+            e
+        )
+    }
     Ok(results)
 }
 
@@ -81,37 +116,27 @@ async fn is_file(
     base_url: &str,
     owner: &str,
     repo: &str,
-    form_identification: &FileIdentification,
+    file_identification: &FileIdentification,
 ) -> Result<bool, GitCheckError> {
     let client = Client::new();
-    let url = match form_identification {
-        FileIdentification::GitBranchAndPath { branch, file_path } => {
-            format!(
-                "{}/api/v1/repos/{}/{}/contents-ext/{}?ref={}",
-                base_url,
-                owner,
-                repo,
-                file_path.display(),
-                branch
-            )
-        }
+    let (file_path, reference_) = match file_identification {
+        FileIdentification::GitBranchAndPath { branch, file_path } => (file_path, branch),
         FileIdentification::GitCommit {
             commit_hash,
             file_path,
-        } => {
-            format!(
-                "{}/api/v1/repos/{}/{}/contents-ext/{}?ref={}",
-                base_url,
-                owner,
-                repo,
-                file_path.display(),
-                commit_hash
-            )
-        }
+        } => (file_path, commit_hash),
         FileIdentification::None => {
-            return Err(anyhow::format_err!("Invalid form identification").into());
+            return Err(anyhow::format_err!("Invalid").into());
         }
     };
+    let url = format!(
+        "{}/api/v1/repos/{}/{}/contents-ext/{}?ref={}",
+        base_url,
+        owner,
+        repo,
+        file_path.display(),
+        reference_
+    );
     let resp = client.get(&url).send().await?;
     if !resp.status().is_success() {
         return Err(
@@ -131,18 +156,18 @@ pub async fn git_get_file(
     base_url: &str,
     owner: &str,
     repo: &str,
-    form_identification: &FileIdentification,
+    file_identification: &FileIdentification,
 ) -> Result<String, GitCheckError> {
     let client = Client::new();
 
-    if !is_file(base_url, owner, repo, form_identification).await? {
+    if !is_file(base_url, owner, repo, file_identification).await? {
         return Err(GitCheckError::NotAFile(format!(
             "{}",
-            form_identification.path().display(),
+            file_identification.path().display(),
         )));
     }
 
-    let url = match form_identification {
+    let url = match file_identification {
         FileIdentification::GitBranchAndPath {
             branch,
             file_path: path,

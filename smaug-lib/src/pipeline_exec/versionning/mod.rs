@@ -10,12 +10,21 @@ use log::{error, info};
 use std::path::PathBuf;
 use tokio::process::Command;
 
+/// A struct holding everything relevant about a file in a git repository
+///
+/// # Fields
+///
+/// - `name` (`String`) - Only the file name, with its extension
+/// - `path` (`PathBuf`) - Relative path of the file in the repository
+/// - `#[serde(rename = "type")] item_type` (`String`) - File, Directory, or Symlink
+/// - `content` (`String`) - The file's content
 #[derive(Debug, Deserialize)]
 pub struct DirContentsItem {
     pub name: String,
     pub path: PathBuf,
     #[serde(rename = "type")]
     pub item_type: String,
+    pub content: String,
 }
 
 pub struct BranchInfo {

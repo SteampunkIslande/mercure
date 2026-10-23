@@ -223,12 +223,24 @@ pub struct Form {
 }
 
 impl Form {
+    /// Build a list of all valid forms hosted at the configured git repository
+    ///
+    /// # Arguments
+    ///
+    /// - `config` (`&SmaugConfig`) - This global webapp's configuration.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<Form>, ModelError>` - A vector of all valid forms
+    ///
+    /// # Errors
+    ///
+    /// A lot of things can go wrong here, but you'll know when something goes wrong!
     pub async fn get_all_form_defs(config: &SmaugConfig) -> Result<Vec<Form>, ModelError> {
-        let SmaugConfig { pipelines, .. } = get_smaug_config();
-        let all_branches = versionning::get_all_branches(&pipelines)
+        let SmaugConfig { pipelines, .. } = config;
+        let all_branches = versionning::get_all_branches(pipelines)
             .await
             .context("Impossible de lister les branches")?;
-        let SmaugConfig { pipelines, .. } = config;
 
         let mut all_forms: Vec<Form> = Vec::new();
 
@@ -244,15 +256,8 @@ impl Form {
                     file_path: dir_item.path,        // MOVED: No clone needed!
                 };
 
-                // fetch file
-                let content =
-                    match versionning::git_get_file(&pipelines, &form_identification).await {
-                        Ok(c) => c,
-                        Err(_) => continue,
-                    };
-
                 // parse yaml
-                let mut form: Form = match yaml_serde::from_str(&content) {
+                let mut form: Form = match yaml_serde::from_str(&dir_item.content) {
                     Ok(f) => f,
                     Err(e) => {
                         // Read the path back out of the enum you just created
