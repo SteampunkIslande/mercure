@@ -1,9 +1,21 @@
-pub use super::GitCheckError;
+use super::GitCheckError;
 
 use crate::models::FileIdentification;
 
-use super::{DirContentsItem, DirContentsResponse, FileContentsResponse};
+use super::DirContentsItem;
+use log::warn;
 use reqwest::Client;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct DirContentsResponse {
+    pub dir_contents: Vec<DirContentsItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FileContentsResponse {
+    pub file_contents: DirContentsItem,
+}
 
 pub async fn list_yaml_forms(
     base_url: &str,
@@ -25,11 +37,17 @@ pub async fn list_yaml_forms(
             .await?;
 
         if !resp.status().is_success() {
+            warn!(
+                "Failed to list contents at {} (status {})",
+                url,
+                resp.status()
+            );
             continue;
         }
 
         // Idiomatic let-else pattern replaces the verbose match block
         let Ok(body) = resp.json::<DirContentsResponse>().await else {
+            warn!("Failed to parse directory contents at {}", url);
             continue;
         };
 
@@ -91,13 +109,16 @@ async fn is_file(
             )
         }
         FileIdentification::None => {
-            return Err(anyhow::format_err!("Identification du formulaire invalide").into());
+            return Err(anyhow::format_err!("Invalid form identification").into());
         }
     };
-    Ok(client
-        .get(&url)
-        .send()
-        .await?
+    let resp = client.get(&url).send().await?;
+    if !resp.status().is_success() {
+        return Err(
+            anyhow::format_err!("Failed to check if file exists: {}", resp.status()).into(),
+        );
+    }
+    Ok(resp
         .json::<FileContentsResponse>()
         .await?
         .file_contents
@@ -121,7 +142,6 @@ pub async fn git_get_file(
         )));
     }
 
-    // bioinfo/smaug/raw/branch/new/smaug-lib/Cargo.lock
     let url = match form_identification {
         FileIdentification::GitBranchAndPath {
             branch,
@@ -150,9 +170,13 @@ pub async fn git_get_file(
             )
         }
         FileIdentification::None => {
-            return Err(anyhow::format_err!("Identification du formulaire invalide").into());
+            return Err(anyhow::format_err!("Invalid form identification").into());
         }
     };
 
-    Ok(client.get(&url).send().await?.text().await?)
+    let resp = client.get(&url).send().await?;
+    if !resp.status().is_success() {
+        return Err(anyhow::format_err!("Failed to fetch file: {}", resp.status()).into());
+    }
+    Ok(resp.text().await?)
 }

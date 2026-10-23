@@ -2,20 +2,13 @@ mod gitea;
 use crate::{config::GitWebConfig, models::FileIdentification};
 use serde::Deserialize;
 use serde_json::Value;
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{path::Path, time::Duration};
 mod error;
 pub use error::GitCheckError;
 
 use log::{error, info};
+use std::path::PathBuf;
 use tokio::process::Command;
-
-pub struct BranchInfo {
-    pub name: String,
-    pub last_commit: String,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct DirContentsItem {
@@ -23,17 +16,11 @@ pub struct DirContentsItem {
     pub path: PathBuf,
     #[serde(rename = "type")]
     pub item_type: String,
-    pub size: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct DirContentsResponse {
-    pub dir_contents: Vec<DirContentsItem>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct FileContentsResponse {
-    pub file_contents: DirContentsItem,
+pub struct BranchInfo {
+    pub name: String,
+    pub last_commit: String,
 }
 
 pub async fn git_clone_to(
@@ -94,6 +81,8 @@ pub async fn git_clone_to(
         Err(_) => {
             error!("Git clone timed out after 30 seconds.");
             let _ = clone_child.kill().await;
+            // Try to clean up if repo was partially created
+            let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed("Clone timeout".into()));
         }
     }
@@ -114,6 +103,7 @@ pub async fn git_clone_to(
         Ok(Ok(status)) if status.success() => info!("Git checkout successful."),
         Ok(Ok(status)) => {
             error!("Git checkout failed with exit status: {}", status);
+            let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed(format!(
                 "Checkout failed: {}",
                 status
@@ -121,11 +111,13 @@ pub async fn git_clone_to(
         }
         Ok(Err(e)) => {
             error!("Failed to wait for git checkout process: {}", e);
+            let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed(e.to_string()));
         }
         Err(_) => {
             error!("Git checkout timed out after 5 seconds.");
             let _ = checkout_child.kill().await;
+            let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed("Checkout timeout".into()));
         }
     }
@@ -178,21 +170,27 @@ pub async fn get_all_branches(pipelines: &GitWebConfig) -> Result<Vec<String>, G
             base_url,
             owner,
             repo,
-        } => Ok(serde_json::from_str::<Value>(
-            &reqwest::get(&format!("{base_url}/api/v1/repos/{owner}/{repo}/branches"))
-                .await?
-                .text()
-                .await?,
-        )?
-        .as_array()
-        .ok_or(anyhow::anyhow!("Gitea should have responded with an array"))?
-        .iter()
-        .filter_map(|v| Some(v["name"].as_str()?.to_string()))
-        .collect()),
-
-        GitWebConfig::GitlabV4 { base_url: _, id: _ } => {
-            todo!("L'API Gitlab V4 n'est pas encore prise en charge!")
+        } => {
+            let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/branches");
+            let resp = reqwest::get(&url).await?;
+            if !resp.status().is_success() {
+                return Err(
+                    anyhow::format_err!("Failed to list branches: {}", resp.status()).into(),
+                );
+            }
+            let v = resp.json::<Value>().await?;
+            let arr = v
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("Gitea should have responded with an array"))?;
+            Ok(arr
+                .iter()
+                .filter_map(|v| v["name"].as_str().map(|s| s.to_string()))
+                .collect())
         }
+
+        GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
+            "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
+        )),
     }
 }
 
@@ -206,7 +204,9 @@ pub async fn git_get_file(
             owner,
             repo,
         } => gitea::git_get_file(base_url, owner, repo, form_identification).await,
-        GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported("".into())),
+        GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
+            "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
+        )),
     }
 }
 
@@ -220,6 +220,8 @@ pub async fn list_yaml_forms(
             owner,
             repo,
         } => gitea::list_yaml_forms(base_url, owner, repo, branch_name).await,
-        GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported("".into())),
+        GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
+            "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
+        )),
     }
 }
