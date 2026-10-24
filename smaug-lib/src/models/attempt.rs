@@ -111,7 +111,7 @@ impl Attempt {
         )
     }
 
-    pub async fn render_script(&self) -> Result<String, ModelError> {
+    pub async fn render_script(&self, run_name: &str) -> Result<String, ModelError> {
         let form = self.get_form().await?;
         let outdir = self.outdir().display().to_string();
         // Add { user defined variables } as well as run-related mandatory/convenient variables: [attempt number, output directory (that will be $PWD), run number]
@@ -120,6 +120,7 @@ impl Attempt {
             self.attempt_number,
             &outdir,
             self.run_id,
+            run_name,
         );
         Ok(form.render_template(&ctx).await?)
     }

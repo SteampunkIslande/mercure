@@ -256,7 +256,8 @@ async fn run_script(
     let stdout_path = logs_dir.join(path::Path::new(&format!("{}.stdout", script_id)));
     let stderr_path = logs_dir.join(path::Path::new(&format!("{}.stderr", script_id)));
 
-    let rendered = attempt.render_script().await?;
+    let run = attempt.get_run(pool).await?;
+    let rendered = attempt.render_script(&run.run_name).await?;
     std::fs::create_dir_all(attempt.outdir())
         .with_context(|| format!("Impossible de créer le dossier outdir"))?;
     std::fs::write(&script_path, &rendered)?;

@@ -302,7 +302,7 @@ impl Form {
 
     // Define variable names (and types) that will be added at launch time
     // It automatically defines the list of reserved names as a const &'static [&'static str]
-    additional_vars!(attempt_number: u32, outdir: &str, run_id: i64);
+    additional_vars!(attempt_number: u32, outdir: &str, run_id: i64, run_name:&str);
 
     /// Resolve the raw jinja template source for this form.
     /// - `Shell`: inline `exec` string.
@@ -403,7 +403,7 @@ impl Form {
                 self.render_template(&ctx).await.map(|_| ())?;
             }
             Some(vars) => {
-                let ctx = self.jinja_context(vars, 0, "", 0);
+                let ctx = self.jinja_context(vars, 0, "", 0, "");
                 self.render_template(&ctx).await.map(|_| ())?;
             }
         }
