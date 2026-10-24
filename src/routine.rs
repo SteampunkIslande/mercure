@@ -1,13 +1,13 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use smaug::config::{SmaugConfig, get_smaug_config};
+use smaug::config::get_smaug_config;
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
 use smaug_lib::pipeline_exec::versionning;
 use std::io::Error as IoError;
-use std::path::{self, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
-use std::str::FromStr;
-use tokio::task::{JoinError as TokioJoinError, JoinHandle, JoinSet};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::task::{JoinError as TokioJoinError, JoinSet};
 
 use sqlx::SqlitePool;
 
@@ -20,7 +20,7 @@ use sqlx::Error;
 use smaug_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, interval};
 
 #[derive(Error, Debug)]
@@ -94,44 +94,50 @@ pub async fn run_routine_loop(
             }
 
             _ = interval.tick() => {
-                let mut runs_to_launch = find_run_to_launch(pool).await?;
+                match find_run_to_launch(pool).await{
 
-                while let Some(attempt) = runs_to_launch.pop() {
-                    let child_rx = child_shutdown_tx.subscribe();
+                    Ok(mut runs_to_launch) => {
+                        while let Some(attempt) = runs_to_launch.pop() {
+                            let child_rx = child_shutdown_tx.subscribe();
 
-                    // 1. Clone the pool handle. This is cheap (Arc clone under the hood).
-                    let pool_clone = pool.clone();
+                            // 1. Clone the pool handle. This is cheap (Arc clone under the hood).
+                            let pool_clone = pool.clone();
 
-                    // 2. Move the cloned handle into the spawned task
-                    join_set.spawn(async move {
-                        match analysis::start_run_analysis(attempt.run_id, &pool_clone).await {
-                            // OK: Tout va bien
-                            Ok(_) => {
-                                info!("Lancement de la tentative {} du run {}", attempt.attempt_number, attempt.run_id);
-                            },
-                            // Erreur au moment de start run: tenter de faire remonter cette erreur
-                            Err(e) => {
-                                // Impossible d'écrire l'erreur dans la base: très fâcheux, écrire dans stder en dernier recours
-                                if let Err(e) = analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool_clone).await {
-                                    error!("{}", e);
+                            // 2. Move the cloned handle into the spawned task
+                            join_set.spawn(async move {
+                                match analysis::start_run_analysis(attempt.run_id, &pool_clone).await {
+                                    // OK: Tout va bien
+                                    Ok(_) => {
+                                        info!("Lancement de la tentative {} du run {}", attempt.attempt_number, attempt.run_id);
+                                    },
+                                    // Erreur au moment de start run: tenter de faire remonter cette erreur
+                                    Err(e) => {
+                                        // Impossible d'écrire l'erreur dans la base: très fâcheux, écrire dans stder en dernier recours
+                                        if let Err(e) = analysis::fail_cannot_analyse_run(attempt.run_id, &e.to_string(), &pool_clone).await {
+                                            error!("{}", e);
+                                        }
+                                    }
                                 }
-                            }
+                                match run_script(&attempt, &pool_clone, child_rx).await {
+                                    Ok(()) => {
+                                        info!("Tentative {} du run {} terminée", attempt.attempt_number, attempt.attempt_number);
+                                        if let Err(e) = analysis::complete_success(attempt.run_id, &pool_clone).await {
+                                            error!("{}", e);
+                                        }
+                                    }
+                                    // D'abord on essaye d'écrire l'erreur dans la base de données, mais si la transition est invalide, on l'affiche dans stderr
+                                    Err(e) => {
+                                        if let Err(e) = analysis::complete_failure(attempt.run_id, &e.to_string(), &pool_clone).await {
+                                            error!("{}", e)
+                                        }
+                                    }
+                                }
+                            });
                         }
-                        match run_script(&attempt, &pool_clone, child_rx).await {
-                            Ok(()) => {
-                                info!("Tentative {} du run {} terminée", attempt.attempt_number, attempt.attempt_number);
-                                if let Err(e) = analysis::complete_success(attempt.run_id, &pool_clone).await {
-                                    error!("{}", e);
-                                }
-                            }
-                            // D'abord on essaye d'écrire l'erreur dans la base de données, mais si la transition est invalide, on l'affiche dans stderr
-                            Err(e) => {
-                                if let Err(e) = analysis::complete_failure(attempt.run_id, &e.to_string(), &pool_clone).await {
-                                    error!("{}", e)
-                                }
-                            }
-                        }
-                    });
+                    },
+                    Err(e) => {
+                        error!("Something serious: cannot run 'find runs to launch' {}", e);
+                    }
                 }
             }
         }
@@ -242,6 +248,62 @@ async fn send_sigint_then_kill(
         .context("Error harvesting the process after SIGKILL")
 }
 
+async fn tee_stream_to_file_and_db<R>(
+    stream: R,
+    file_path: &Path,
+    pool: SqlitePool,
+    run_id: i64,
+    stream_type: &'static str, // e.g., "stdout" or "stderr"
+) -> anyhow::Result<()>
+where
+    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    let mut file = tokio::fs::File::create(file_path).await?;
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+
+    // Channel buffer size dictates how many lines can queue up before we start dropping them
+    // or applying backpressure. `try_send` prevents the DB from stalling the file write.
+    let (tx, mut rx) = mpsc::channel::<String>(1000);
+
+    // Detached task for database insertion (can fail)
+    tokio::spawn(async move {
+        while let Some(log_line) = rx.recv().await {
+            if let Err(e) = dummy_db_insert(&pool, run_id, stream_type, &log_line).await {
+                warn!("Failed to write {} log to DB: {}", stream_type, e);
+            }
+        }
+    });
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).await?;
+        if bytes_read == 0 {
+            break; // EOF
+        }
+
+        // 1. Write log to file (Critical path - must succeed)
+        file.write_all(line.as_bytes()).await?;
+
+        // 2. Send to DB (Best effort). If the channel is full because the DB $
+        // is too slow, `try_send` fails but we ignore it to protect the file loop.
+        // It's fine since at least the log file is written to
+        let _ = tx.try_send(line.clone());
+    }
+
+    file.flush().await?;
+    Ok(())
+}
+
+async fn dummy_db_insert(
+    _pool: &SqlitePool,
+    _run_id: i64,
+    _stream: &str,
+    _line: &str,
+) -> anyhow::Result<()> {
+    Ok(()) // Placeholder
+}
+
 /// Cette fonction peut paniquer, ou retourner une erreur, les conséquences seront minimes
 ///
 /// Si elle panique, c'est juste une tâche tokio parmi d'autres, qui faisait partie du JoinSet global de la routine (le set qui stocke tous les jobs en cours)
@@ -251,145 +313,123 @@ async fn run_script(
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
     let (git_manager, scripts_dir, logs_dir) = {
-        let SmaugConfig {
-            scripts_dir,
-            logs_dir,
-            pipelines,
-            ..
-        } = get_smaug_config();
-        let scripts_dir = PathBuf::from_str(&scripts_dir).context("Le paramètre `scripts_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
-        if !scripts_dir.is_absolute() {
-            return Err(anyhow::format_err!(
-                "Le dossier `scripts_dir` est mal configuré, un chemin absolu est requis"
-            )
-            .into());
-        }
-        if !scripts_dir.exists() {
-            std::fs::create_dir_all(&scripts_dir)
-                .with_context(|| format!("Impossible de créer le dossier des scripts"))?;
-        }
+        let config = get_smaug_config();
 
-        let logs_dir = PathBuf::from_str(&logs_dir).context("Le paramètre `logs_dir` de la configuration actuelle ne peut pas être convertie en un chemin")?;
-        if !logs_dir.is_absolute() {
-            return Err(anyhow::format_err!(
-                "Le dossier `logs_dir` est mal configuré, un chemin absolu est requis"
-            )
-            .into());
-        }
-        if !logs_dir.exists() {
-            std::fs::create_dir_all(&logs_dir)
-                .with_context(|| format!("Impossible de créer le dossier des logs"))?;
-        }
-        (pipelines, scripts_dir, logs_dir)
+        let scripts_dir = PathBuf::from(&config.scripts_dir);
+        let logs_dir = PathBuf::from(&config.logs_dir);
+
+        ensure_absolute_dir(&scripts_dir, "scripts_dir").await?;
+        ensure_absolute_dir(&logs_dir, "logs_dir").await?;
+
+        (config.pipelines, scripts_dir, logs_dir)
     };
 
     let script_id = attempt.attempt_full_name();
-
-    let script_path = scripts_dir.join(path::Path::new(&format!("{}.sh", script_id)));
-    let stdout_path = logs_dir.join(path::Path::new(&format!("{}.stdout", script_id)));
-    let stderr_path = logs_dir.join(path::Path::new(&format!("{}.stderr", script_id)));
+    let script_path = scripts_dir.join(format!("{}.sh", script_id));
+    let stdout_path = logs_dir.join(format!("{}.stdout", script_id));
+    let stderr_path = logs_dir.join(format!("{}.stderr", script_id));
 
     let run = attempt.get_run(pool).await?;
     let rendered = attempt.render_script(&run.run_name).await?;
-    std::fs::create_dir_all(attempt.outdir())
-        .with_context(|| format!("Impossible de créer le dossier outdir"))?;
-    std::fs::write(&script_path, &rendered)?;
+
+    // Async FS operations
+    tokio::fs::create_dir_all(attempt.outdir())
+        .await
+        .context("Impossible de créer le dossier outdir")?;
+    tokio::fs::write(&script_path, &rendered)
+        .await
+        .context("Impossible d'écrire le script rendu")?;
 
     // Clones the whole repo into the working directory. Now, PWD of the rendered script contains a `pipelines` directory.
     versionning::git_clone_to(&attempt.outdir(), &attempt.form_identification, git_manager).await?;
 
-    let mut child = match Command::new("bash")
-        .arg("-l") // Important, pour que l'environnement d'exécution soit celui d'un shell login (reproductibilité si relancé avec le même utilisateur)
+    let mut child = Command::new("bash")
+        .arg("-l")
         .arg(&script_path)
-        .current_dir(attempt.outdir()) // Pour l'exécution du script, on se place dans outdir
+        .current_dir(attempt.outdir())
         .process_group(0)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return Err(anyhow::format_err!(
-                "Erreur de lancement pour la tentative {} du run {}. Erreur: `{}`",
-                attempt.attempt_number,
-                attempt.run_id,
-                e
+        .with_context(|| {
+            format!(
+                "Erreur de lancement pour la tentative {} du run {}",
+                attempt.attempt_number, attempt.run_id
             )
-            .into());
-        }
-    };
-    let mut stdout = child.stdout.take().context("Can't take stdout handle")?;
-    let mut stderr = child.stderr.take().context("Can't take stderr handle")?;
+        })
+        .map_err(RoutineError::from)?; // Assuming RoutineError implements From<anyhow::Error>
 
-    let stdout_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-        let mut file = tokio::fs::File::create(&stdout_path).await?;
-        tokio::io::copy(&mut stdout, &mut file).await?;
-        Ok(())
+    let stdout = child.stdout.take().context("Can't take stdout handle")?;
+    let stderr = child.stderr.take().context("Can't take stderr handle")?;
+
+    let pool_clone1 = pool.clone();
+    let run_id = attempt.run_id;
+
+    // Spawn multiplexers
+    let stdout_handle = tokio::spawn(async move {
+        tee_stream_to_file_and_db(stdout, &stdout_path, pool_clone1, run_id, "stdout").await
     });
 
-    let stderr_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-        let mut file = tokio::fs::File::create(&stderr_path).await?;
-        tokio::io::copy(&mut stderr, &mut file).await?;
-        Ok(())
+    let pool_clone2 = pool.clone();
+    let stderr_handle = tokio::spawn(async move {
+        tee_stream_to_file_and_db(stderr, &stderr_path, pool_clone2, run_id, "stderr").await
     });
 
     // Compétition entre la fin du script et le signal d'interruption
     tokio::select! {
         status_res = child.wait() => {
-            stdout_handle.await??;
-            stderr_handle.await??;
+            // Await logs to finish flushing
+            let _ = tokio::try_join!(stdout_handle, stderr_handle)?;
             // Le processus s'est terminé de lui-même
             match status_res {
                 Ok(status) if status.success() => {
                     analysis::complete_success(attempt.run_id, pool).await?;
                 }
                 Ok(status) => {
-                    analysis::complete_failure(
-                        attempt.run_id,
-                        &format!(
-                            "(exit code {})",
-                            &status
-                                .code()
-                                .map(|c| c.to_string())
-                                .unwrap_or("?".to_string())
-                        ),
-                        pool,
-                    )
-                    .await?;
+                    let code = status.code().map(|c| c.to_string()).unwrap_or_else(|| "?".to_string());
+                    analysis::complete_failure(attempt.run_id, &format!("(exit code {})", code), pool).await?;
                 }
-                Err(e) => {
-                    return Err(e.into());
-                }
+                Err(e) => return Err(e.into()),
             }
         }
 
         _ = shutdown_rx.recv() => {
             info!("La tentative {} du run {} a reçu un signal d'arrêt prématuré", attempt.attempt_number, attempt.run_id);
             let sigint_behavior: appstate::SigintBehavior = appstate::AppState::get(pool).await?;
+
             match sigint_behavior {
                 SigintBehavior::StopJobs => {
-                    info!("Le job en question va être arrêté de force par SIGINT (Ctrl+C), avec un délai de 5 secondes avant un SIGKILL.");
-                    match send_sigint_then_kill(&mut child, None).await {
-                        Ok(status) if status.success() => {
-                            info!("Sent SIGINT, and job exited with status sucess");
-                        }
-                        Ok(status) => {
-                            warn!("Sent SIGINT {}", status);
-                        }
-                        Err(e) => {
-                            eprintln!("Double oops: {}", e);
-                        }
-                }},
-                SigintBehavior::WaitForJobCompletion => {
-                    eprintln!("Waiting for job completion...");
-                    match child.wait().await {
-                        Ok(status) if status.success() => eprintln!("Le job s'est terminé avec succès"),
-                        Ok(status) => eprintln!("Le job s'est terminé avec le status: {}", status.code().unwrap_or(-1)),
-                        Err(e) => eprintln!("Erreur en attendant la fin du job: {}", e),
+                    info!("Le job va être arrêté par SIGINT, 5s avant SIGKILL.");
+                    if let Err(e) = send_sigint_then_kill(&mut child, None).await {
+                        eprintln!("Erreur lors de l'envoi du signal: {}", e);
                     }
                 }
+                SigintBehavior::WaitForJobCompletion => {
+                    eprintln!("Waiting for job completion...");
+                    let _ = child.wait().await;
+                }
             }
+
+            // Crucial: Wait for logs to finish capturing the shutdown process
+            let _ = tokio::try_join!(stdout_handle, stderr_handle)?;
         }
+    }
+
+    Ok(())
+}
+
+// Helper function to deduplicate directory validation
+async fn ensure_absolute_dir(path: &Path, name: &str) -> anyhow::Result<()> {
+    if !path.is_absolute() {
+        return Err(anyhow::anyhow!(
+            "Le dossier `{}` est mal configuré, un chemin absolu est requis",
+            name
+        ));
+    }
+    if !path.exists() {
+        tokio::fs::create_dir_all(path)
+            .await
+            .with_context(|| format!("Impossible de créer le dossier {}", name))?;
     }
     Ok(())
 }
