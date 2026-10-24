@@ -201,14 +201,14 @@ pub async fn get_all_branches(pipelines: &GitWebConfig) -> Result<Vec<String>, G
 
 pub async fn git_get_file(
     pipelines: &GitWebConfig,
-    form_identification: &FileIdentification,
+    file_identification: &FileIdentification,
 ) -> Result<String, GitCheckError> {
     match pipelines {
         GitWebConfig::GiteaV1 {
             base_url,
             owner,
             repo,
-        } => gitea::git_get_file(base_url, owner, repo, form_identification).await,
+        } => gitea::git_get_file(base_url, owner, repo, file_identification).await,
         GitWebConfig::GitlabV4 { .. } => Err(GitCheckError::Unsupported(
             "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
         )),

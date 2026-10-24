@@ -109,7 +109,7 @@ pub async fn run_routine_loop(
                     join_set.spawn(async move {
                         match analysis::start_run_analysis(attempt.run_id, &pool_clone).await {
                             // OK: Tout va bien
-                            Ok(()) => {
+                            Ok(_) => {
                                 info!("Lancement de la tentative {} du run {}", attempt.attempt_number, attempt.run_id);
                             },
                             // Erreur au moment de start run: tenter de faire remonter cette erreur
@@ -175,38 +175,42 @@ async fn send_sigint_then_kill(
     child: &mut Child,
     grace_time_seconds: Option<u64>,
 ) -> Result<ExitStatus> {
-    let grace_time = Duration::from_secs(grace_time_seconds.unwrap_or(5));
+    // 1. Check if the process has already exited to avoid unnecessary syscalls
+    if let Some(status) = child.try_wait().context("Failed to poll process status")? {
+        return Ok(status);
+    }
 
-    let pid = match child.id() {
-        Some(id) => id,
-        None => bail!("Le processus n'a pas de PID (il a probablement déjà été récolté)"),
-    };
+    let pid = child
+        .id()
+        .context("Process has no PID (likely already reaped)")?;
+    let nix_pid = Pid::from_raw(pid.try_into().context("Invalid PID magnitude")?);
 
-    let nix_pid = Pid::from_raw(pid.try_into().context("PID invalide")?);
+    // 2. Send SIGINT, but gracefully handle TOC-TOU (Process died just before we signaled it)
     if let Err(e) = kill(nix_pid, Signal::SIGINT) {
-        bail!("Impossible d'envoyer SIGINT au processus {}: {}", pid, e);
+        if e != nix::errno::Errno::ESRCH {
+            bail!("Failed to send SIGINT to process {}: {}", pid, e);
+        }
+        // If e == ESRCH, the process no longer exists.
+        // We do nothing here; the upcoming `child.wait()` will harvest the status instantly.
     }
 
-    // Première chance (SIGINT)...
-    match tokio::time::timeout(grace_time, child.wait()).await {
-        Ok(wait_result) => {
-            // Le timeout n'a pas expiré : tout va bien, on retourne le statut après un SIGINT
-            Ok(wait_result.context("Erreur lors de l'attente du processus")?)
-        }
-        Err(_) => {
-            // SIGINT n'a pas suffi après le grace_time: KILL (envoi de SIGKILL)
-            child
-                .kill()
-                .await
-                .context("Impossible d'envoyer SIGKILL au processus")?;
-
-            // On récupère le statut
-            Ok(child
-                .wait()
-                .await
-                .context("Erreur lors de la récolte du processus après SIGKILL")?)
-        }
+    // 3. Await completion with a timeout (First chance)
+    let grace_time = Duration::from_secs(grace_time_seconds.unwrap_or(5));
+    if let Ok(wait_result) = tokio::time::timeout(grace_time, child.wait()).await {
+        return wait_result.context("Error waiting for process after SIGINT");
     }
+
+    // 4. Timeout expired: send SIGKILL (tokio's kill() sends SIGKILL under the hood on Unix)
+    child
+        .kill()
+        .await
+        .context("Failed to send SIGKILL to the process")?;
+
+    // 5. Ensure we harvest the zombie process and return its final status
+    child
+        .wait()
+        .await
+        .context("Error harvesting the process after SIGKILL")
 }
 
 /// Cette fonction peut paniquer, ou retourner une erreur, les conséquences seront minimes
