@@ -295,7 +295,7 @@ async fn run_script(
         .with_context(|| format!("Impossible de créer le dossier outdir"))?;
     std::fs::write(&script_path, &rendered)?;
 
-    // clones the whole repo into the working directory
+    // Clones the whole repo into the working directory. Now, PWD of the rendered script contains a `pipelines` directory.
     versionning::git_clone_to(&attempt.outdir(), &attempt.form_identification, git_manager).await?;
 
     let mut child = match Command::new("bash")
@@ -318,19 +318,17 @@ async fn run_script(
             .into());
         }
     };
-    let stdout = child.stdout.take().ok_or(anyhow::format_err!("Fuck"))?;
-    let stderr = child.stderr.take().ok_or(anyhow::format_err!("Fuck"))?;
+    let mut stdout = child.stdout.take().context("Can't take stdout handle")?;
+    let mut stderr = child.stderr.take().context("Can't take stderr handle")?;
 
     let stdout_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         let mut file = tokio::fs::File::create(&stdout_path).await?;
-        let mut stdout = stdout;
         tokio::io::copy(&mut stdout, &mut file).await?;
         Ok(())
     });
 
     let stderr_handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         let mut file = tokio::fs::File::create(&stderr_path).await?;
-        let mut stderr = stderr;
         tokio::io::copy(&mut stderr, &mut file).await?;
         Ok(())
     });
