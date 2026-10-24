@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
-use nix::sys::signal::Signal;
 use smaug::config::{SmaugConfig, get_smaug_config};
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
 use smaug_lib::pipeline_exec::versionning;
@@ -23,8 +22,6 @@ use smaug_lib::models::Attempt;
 use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
-
-use nix::{sys::signal::kill, unistd::Pid};
 
 #[derive(Error, Debug)]
 enum RoutineError {
@@ -161,7 +158,7 @@ pub async fn run_routine_loop(
                 warn!("Un des jobs s'est terminé avec une erreur : {}", e);
             }
         }
-        println!("Tous les jobs ont été arrêtés. Fin de la routine.");
+        info!("Tous les jobs ont été arrêtés. Fin de la routine.");
     }
 
     Ok(())
@@ -175,7 +172,10 @@ async fn send_sigint_then_kill(
     child: &mut Child,
     grace_time_seconds: Option<u64>,
 ) -> Result<ExitStatus> {
-    // 1. Check if the process has already exited to avoid unnecessary syscalls
+    use nix::errno::Errno;
+    use nix::sys::signal::{Signal, kill, killpg};
+    use nix::unistd::{Pid, getpgid};
+
     if let Some(status) = child.try_wait().context("Failed to poll process status")? {
         return Ok(status);
     }
@@ -183,30 +183,59 @@ async fn send_sigint_then_kill(
     let pid = child
         .id()
         .context("Process has no PID (likely already reaped)")?;
-    let nix_pid = Pid::from_raw(pid.try_into().context("Invalid PID magnitude")?);
+    let pid_i32: i32 = pid.try_into().context("Invalid PID magnitude")?;
+    let nix_pid = Pid::from_raw(pid_i32);
 
-    // 2. Send SIGINT, but gracefully handle TOC-TOU (Process died just before we signaled it)
-    if let Err(e) = kill(nix_pid, Signal::SIGINT) {
-        if e != nix::errno::Errno::ESRCH {
-            bail!("Failed to send SIGINT to process {}: {}", pid, e);
+    // Determine if the child is a process group leader
+    let is_group_leader = match getpgid(Some(nix_pid)) {
+        Ok(pgid) => pgid == nix_pid,
+        Err(Errno::ESRCH) => {
+            // Process died before we could check its PGID.
+            // We set this to false, the subsequent signal will harmlessly fail with ESRCH.
+            false
         }
-        // If e == ESRCH, the process no longer exists.
-        // We do nothing here; the upcoming `child.wait()` will harvest the status instantly.
+        Err(e) => bail!("Failed to get process group ID for {}: {}", pid, e),
+    };
+
+    // 1. Send SIGINT
+    let sigint_result = if is_group_leader {
+        killpg(nix_pid, Signal::SIGINT)
+    } else {
+        kill(nix_pid, Signal::SIGINT)
+    };
+
+    if let Err(e) = sigint_result {
+        if e != Errno::ESRCH {
+            let target = if is_group_leader {
+                "process group"
+            } else {
+                "process"
+            };
+            bail!("Failed to send SIGINT to {} {}: {}", target, pid, e);
+        }
     }
 
-    // 3. Await completion with a timeout (First chance)
     let grace_time = Duration::from_secs(grace_time_seconds.unwrap_or(5));
     if let Ok(wait_result) = tokio::time::timeout(grace_time, child.wait()).await {
         return wait_result.context("Error waiting for process after SIGINT");
     }
 
-    // 4. Timeout expired: send SIGKILL (tokio's kill() sends SIGKILL under the hood on Unix)
-    child
-        .kill()
-        .await
-        .context("Failed to send SIGKILL to the process")?;
+    // 2. Timeout expired: send SIGKILL
+    if is_group_leader {
+        if let Err(e) = killpg(nix_pid, Signal::SIGKILL) {
+            if e != Errno::ESRCH {
+                bail!("Failed to send SIGKILL to process group {}: {}", pid, e);
+            }
+        }
+    } else {
+        // Standard fallback for single process
+        child
+            .kill()
+            .await
+            .context("Failed to send SIGKILL to the process")?;
+    }
 
-    // 5. Ensure we harvest the zombie process and return its final status
+    // 3. Harvest the process
     child
         .wait()
         .await
@@ -337,20 +366,22 @@ async fn run_script(
         }
 
         _ = shutdown_rx.recv() => {
-            eprintln!("Attention, la tentative {} du run {} a reçu un signal d'arrêt prématuré", attempt.attempt_number, attempt.run_id);
+            info!("La tentative {} du run {} a reçu un signal d'arrêt prématuré", attempt.attempt_number, attempt.run_id);
             let sigint_behavior: appstate::SigintBehavior = appstate::AppState::get(pool).await?;
             match sigint_behavior {
-                SigintBehavior::StopJobs => match send_sigint_then_kill(&mut child, None).await {
-                    Ok(status) if status.success() => {
-                        eprintln!("OK. On a envoyé SIGINT mais tout va bien, status 0.");
-                    }
-                    Ok(status) => {
-                        eprintln!("Ooops. Status: {}", status);
-                    }
-                    Err(e) => {
-                        eprintln!("Double oops: {}", e);
-                    }
-                },
+                SigintBehavior::StopJobs => {
+                    info!("Le job en question va être arrêté de force par SIGINT (Ctrl+C), avec un délai de 5 secondes avant un SIGKILL.");
+                    match send_sigint_then_kill(&mut child, None).await {
+                        Ok(status) if status.success() => {
+                            info!("Sent SIGINT, and job exited with status sucess");
+                        }
+                        Ok(status) => {
+                            warn!("Sent SIGINT {}", status);
+                        }
+                        Err(e) => {
+                            eprintln!("Double oops: {}", e);
+                        }
+                }},
                 SigintBehavior::WaitForJobCompletion => {
                     eprintln!("Waiting for job completion...");
                     match child.wait().await {
