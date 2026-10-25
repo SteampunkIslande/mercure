@@ -90,6 +90,26 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
     sqlx::query(
         r#"
+        CREATE TABLE IF NOT EXISTS RunProgress (
+            run_id INTEGER NOT NULL,
+            attempt_number INTEGER NOT NULL,
+            current_step_string TEXT,
+            current_progress INTEGER,
+            last_output_line TEXT,
+            done_jobs_count INTEGER,
+            slurm_job_name TEXT,
+            log_available BOOLEAN NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (run_id, attempt_number),
+            FOREIGN KEY (run_id) REFERENCES Runs(run_id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
         CREATE TABLE IF NOT EXISTS SequencerPrettyName (
             sequencer_name TEXT PRIMARY KEY,
             sequencer_pretty_name TEXT NOT NULL

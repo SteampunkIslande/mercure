@@ -5,6 +5,7 @@ use anyhow::bail;
 use clap::Parser;
 use include_dir::Dir;
 use include_dir::include_dir;
+use log::error;
 use log::info;
 use rocket::Build;
 use rocket::Config;
@@ -21,6 +22,7 @@ use rocket::{catch, catchers, routes};
 
 use anyhow::Result;
 use smaug_lib::config;
+use smaug_lib::pipeline_exec::SqueueCache;
 use smaug_lib::routes;
 use sqlx::SqlitePool;
 use tokio::sync::broadcast;
@@ -130,8 +132,10 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
                 routes::backend::list_runs_get,
                 routes::backend::check_samplesheet,
                 routes::backend::list_samples_from_samplesheet,
-                // Route renvoyant un EventStream
+                // Route renvoyant les informations de progression d'un run
                 routes::backend::watch,
+                // Route d'interrogation directe de squeue
+                routes::backend::get_squeue,
                 // Route pour rechercher des runs
                 routes::backend::search_run_get,
                 // Route pour traduire les noms des séquenceurs
@@ -147,6 +151,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         )
         .manage(pool)
         .manage(config)
+        .manage(SqueueCache::new(30))
         .attach(minijinja_fairing());
 
     #[cfg(debug_assertions)]
@@ -226,10 +231,10 @@ impl Web {
         let (web_res, routine_res) = tokio::join!(webapp, routine);
 
         if let Err(e) = web_res {
-            log::error!("Erreur de fermeture Rocket: {}", e);
+            error!("Erreur de fermeture Rocket: {}", e);
         }
         if let Err(e) = routine_res {
-            log::error!("Erreur de fermeture Routine: {}", e);
+            error!("Erreur de fermeture Routine: {}", e);
         }
 
         Ok(())

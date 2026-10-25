@@ -4,6 +4,7 @@ pub mod attempt;
 pub mod form;
 pub mod groups;
 pub mod hgrun;
+pub mod run_progress;
 pub mod user;
 
 use std::convert::Infallible;
@@ -14,6 +15,7 @@ pub use attempt::*;
 pub use form::*;
 pub use groups::*;
 pub use hgrun::*;
+pub use run_progress::*;
 pub use user::*;
 
 use crate::pipeline_exec::versionning;

@@ -1,102 +1,115 @@
 use anyhow::Result;
 use lazy_regex::Regex;
-use serde::Serialize;
-use serde_json::Value;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::Path;
 
-use reqwest::get;
+use crate::models::RunProgress;
 
-#[derive(Debug, Clone, Serialize, Default)]
-pub struct RTJobInfo {
-    pub current_step_string: Option<String>,
-    pub current_progress: Option<i64>,
-    pub pending_jobs_count: Option<i64>,
-    pub running_jobs_count: Option<i64>,
-    pub done_jobs_count: Option<i64>,
-    pub slurm_job_name: Option<String>,
+pub struct LogProgressParser {
+    state: RunProgress,
+    re_ansi: Regex,
+    re_step: Regex,
+    re_progress: Regex,
+    re_job_name: Regex,
+    re_legacy_job_name: Regex,
+    re_snakemake: Regex,
+    re_rsync: Regex,
 }
 
-/// Fonction asynchrone qui renvoie un flux de JobInfo en temps réel
-///
-/// Cette fonction surveille un fichier de log spécifique pour un job et un numéro de tentative donnés.
-///
-/// Pour que la lecture en temps réel fonctionne correctement,
-/// le fichier de log doit être écrit ligne par ligne avec un flush après chaque écriture (`stdbuf -oL snakemake`).
-///&) -> R
-/// Les informations renvoyées comprennent:
-/// - current_step_string: la dernière étape en cours. C'est le script launcher qui doit écrire une ligne "## STEP <nom_de_l_etape>" dans stdout.
-/// - current_progress: le pourcentage de progression dans l'étape actuelle. Issu de snakemake, format "X of Y steps (Z%) done".
-/// - pending_jobs_count, running_jobs_count, done_jobs_count: le nombre de jobs SLURM en attente, en cours d'exécution et terminés respectivement.
-pub async fn watch_log(
-    job_id: i64,
-    attempt_number: i64,
-    logs_folder: PathBuf,
-) -> Result<RTJobInfo> {
-    let file = File::open(&format!(
-        "{}/job-{:010}-{:010}.log",
-        logs_folder.display(),
-        job_id,
-        attempt_number
-    ))?;
-    let reader = BufReader::new(file).lines();
+impl LogProgressParser {
+    pub fn new(run_id: i64, attempt_number: u32) -> Self {
+        let mut state = RunProgress::new(run_id, attempt_number);
+        state.log_available = true;
 
-    let re_step = Regex::new(r"^##\s+STEP\s+(.+)$").unwrap();
-    let re_slurm_id = Regex::new(r"^SLURM\s+run\s+ID:\s+(.+)$").unwrap();
-    let re_progress = Regex::new(r"(\d+)\s+of\s+(\d+)\s+steps\s+\((1?\d{1,2})%\)\s+done").unwrap();
-
-    let mut last_step: Option<String> = None;
-    let mut last_slurm_id: Option<String> = None;
-    let mut last_progress: Option<i64> = None;
-
-    for line in reader {
-        let line = line?;
-        if let Some(cap) = re_step.captures(&line) {
-            last_step = Some(cap[1].trim().to_string());
-            last_slurm_id = None;
-            last_progress = None;
-            continue;
-        }
-        if let Some(cap) = re_slurm_id.captures(&line) {
-            last_slurm_id = Some(cap[1].trim().to_string());
-            continue;
-        }
-        if let Some(cap) = re_progress.captures(&line) {
-            let percent: i64 = cap[3].parse().unwrap_or(0);
-            let part: i64 = cap[1].parse().unwrap_or(0);
-            let total: i64 = cap[2].parse().unwrap_or(0);
-            last_progress = Some(percent);
-            if part == total {
-                // pipeline terminé: réinitialiser
-                last_slurm_id = None;
-            }
+        Self {
+            state,
+            re_ansi: Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]").unwrap(),
+            re_step: Regex::new(r"(?i)^##\s+(?:STEP|PHASE)\s+(.+?)\s*$").unwrap(),
+            re_progress: Regex::new(r"(?i)^##\s+PROGRESS\s+(\d{1,3})\s*%?\s*$").unwrap(),
+            re_job_name: Regex::new(r"(?i)^##\s+SLURM_JOB_NAME\s+(.+?)\s*$").unwrap(),
+            re_legacy_job_name: Regex::new(r"(?i)^SLURM\s+run\s+ID:\s+(.+?)\s*$").unwrap(),
+            re_snakemake: Regex::new(r"(?i)(\d+)\s+of\s+(\d+)\s+steps\s+\((\d{1,3})%\)\s+done")
+                .unwrap(),
+            re_rsync: Regex::new(r"(?i)^\s*[\d,.]+\s+(\d{1,3})%\s+.*(?:xfr#|to-chk|ir-chk)")
+                .unwrap(),
         }
     }
 
-    // Return SLURM statuses for current snakemake jobs (if any)
-    let status = if let Some(ref slurm_id) = last_slurm_id {
-        count_jobs_in_squeue(slurm_id).await
-    } else {
-        None
-    };
+    pub fn state(&self) -> &RunProgress {
+        &self.state
+    }
 
-    let (pending, running, done) = if let Some(s) = status {
-        (Some(s.0), Some(s.1), Some(s.2))
-    } else {
-        (None, None, None)
-    };
+    pub fn parse_line(&mut self, raw_line: &str) {
+        let stripped = self.re_ansi.replace_all(raw_line, "");
+        let line = stripped.trim();
 
-    Ok(RTJobInfo {
-        current_step_string: last_step.clone(),
-        current_progress: last_progress,
-        pending_jobs_count: pending,
-        running_jobs_count: running,
-        done_jobs_count: done,
-        slurm_job_name: last_slurm_id,
-    })
+        if line.is_empty() {
+            return;
+        }
+
+        if let Some(cap) = self.re_step.captures(line) {
+            self.state.current_step_string = Some(cap[1].trim().to_string());
+            self.state.current_progress = None;
+            self.state.done_jobs_count = None;
+            self.state.slurm_job_name = None;
+            return;
+        }
+
+        if let Some(cap) = self.re_progress.captures(line) {
+            self.state.current_progress = Some(cap[1].parse::<i64>().unwrap_or(0).clamp(0, 100));
+            return;
+        }
+
+        if let Some(cap) = self
+            .re_job_name
+            .captures(line)
+            .or_else(|| self.re_legacy_job_name.captures(line))
+        {
+            self.state.slurm_job_name = Some(cap[1].trim().to_string());
+            return;
+        }
+
+        if let Some(cap) = self.re_snakemake.captures(line) {
+            let done = cap[1].parse::<i64>().unwrap_or(0);
+            let total = cap[2].parse::<i64>().unwrap_or(0);
+            let percent = cap[3].parse::<i64>().unwrap_or(0).clamp(0, 100);
+
+            self.state.current_progress = Some(percent);
+            self.state.done_jobs_count = Some(done);
+
+            if total > 0 && done >= total {
+                self.state.slurm_job_name = None;
+            }
+
+            self.state.last_output_line = Some(truncate_line(line, 500));
+            return;
+        }
+
+        if let Some(cap) = self.re_rsync.captures(line) {
+            self.state.current_progress = Some(cap[1].parse::<i64>().unwrap_or(0).clamp(0, 100));
+            self.state.last_output_line = Some(truncate_line(line, 500));
+            return;
+        }
+
+        self.state.last_output_line = Some(truncate_line(line, 500));
+    }
+
+    pub fn parse_text(run_id: i64, attempt_number: u32, content: &str) -> RunProgress {
+        let mut parser = Self::new(run_id, attempt_number);
+        for raw_line in content.split(['\n', '\r']) {
+            parser.parse_line(raw_line);
+        }
+        parser.state
+    }
+}
+
+fn truncate_line(line: &str, max_chars: usize) -> String {
+    let mut truncated: String = line.chars().take(max_chars).collect();
+    if line.chars().count() > max_chars {
+        truncated.push('…');
+    }
+    truncated
 }
 
 pub async fn find_errors<T>(log_path: T) -> Result<Vec<String>>
@@ -117,40 +130,86 @@ where
     Ok(errors)
 }
 
-async fn count_jobs_in_squeue(slurm_id: &str) -> Option<(i64, i64, i64)> {
-    let json_data = Value::from_str(
-        &get(format!("http://127.0.0.1:8080/squeue?jobname={}", slurm_id))
-            .await
-            .ok()?
-            .text()
-            .await
-            .ok()?,
-    )
-    .ok()?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let mut status_count: HashMap<String, i64> = HashMap::new();
+    #[test]
+    fn parses_markers_and_snakemake_progress() {
+        let log = "## STEP Demultiplexage\n\
+                   rsync started\n\
+                   ## SLURM_JOB_NAME demux\n\
+                   2 of 10 steps (20%) done\n";
 
-    if json_data.is_object() {
-        status_count = json_data
-            .as_object()?
-            .iter()
-            .fold(status_count, |mut acc, (_, v)| {
-                acc.entry(
-                    v.get("STATE")
-                        .unwrap_or_default()
-                        .as_str()
-                        .unwrap_or_default()
-                        .into(),
-                )
-                .and_modify(|i| *i += 1)
-                .or_insert(1);
-                acc
-            });
+        let parsed = LogProgressParser::parse_text(1, 1, log);
+
+        assert!(parsed.log_available);
+        assert_eq!(
+            parsed.current_step_string.as_deref(),
+            Some("Demultiplexage")
+        );
+        assert_eq!(parsed.current_progress, Some(20));
+        assert_eq!(parsed.done_jobs_count, Some(2));
+        assert_eq!(parsed.slurm_job_name.as_deref(), Some("demux"));
+        assert_eq!(
+            parsed.last_output_line.as_deref(),
+            Some("2 of 10 steps (20%) done")
+        );
     }
 
-    Some((
-        *status_count.get("PENDING").unwrap_or(&0),
-        *status_count.get("RUNNING").unwrap_or(&0),
-        *status_count.get("DONE").unwrap_or(&0),
-    ))
+    #[test]
+    fn new_step_resets_phase_state() {
+        let log = "## STEP first\n\
+                   ## SLURM_JOB_NAME first-job\n\
+                   1 of 2 steps (50%) done\n\
+                   ## STEP second\n";
+
+        let parsed = LogProgressParser::parse_text(1, 1, log);
+
+        assert_eq!(parsed.current_step_string.as_deref(), Some("second"));
+        assert_eq!(parsed.current_progress, None);
+        assert_eq!(parsed.done_jobs_count, None);
+        assert_eq!(parsed.slurm_job_name, None);
+    }
+
+    #[test]
+    fn parses_explicit_progress_and_rsync_fallback() {
+        let log = "## STEP copy\n\
+                   ## PROGRESS 25\n\
+                   \x20 1,024  50%  2.00MB/s 0:00:01 (xfr#1, to-chk=1/2)\n";
+
+        let parsed = LogProgressParser::parse_text(1, 1, log);
+
+        assert_eq!(parsed.current_progress, Some(50));
+        assert!(
+            parsed
+                .last_output_line
+                .as_deref()
+                .unwrap()
+                .contains("xfr#1")
+        );
+    }
+
+    #[test]
+    fn completed_snakemake_clears_job_name() {
+        let log = "## STEP run\n\
+                   ## SLURM_JOB_NAME pipeline\n\
+                   10 of 10 steps (100%) done\n";
+
+        let parsed = LogProgressParser::parse_text(1, 1, log);
+
+        assert_eq!(parsed.current_progress, Some(100));
+        assert_eq!(parsed.done_jobs_count, Some(10));
+        assert_eq!(parsed.slurm_job_name, None);
+    }
+
+    #[test]
+    fn handles_carriage_return_progress_updates() {
+        let log = "## STEP run\n1 of 10 steps (10%) done\r2 of 10 steps (20%) done\r";
+
+        let parsed = LogProgressParser::parse_text(1, 1, log);
+
+        assert_eq!(parsed.current_progress, Some(20));
+        assert_eq!(parsed.done_jobs_count, Some(2));
+    }
 }

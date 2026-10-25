@@ -310,5 +310,15 @@ mod tests {
                 .render(ctx.clone())
                 .unwrap_or_else(|e| panic!("render {page}: {e}"));
         }
+
+        let running_page = env
+            .get_template("common/runningrun.html.j2")
+            .unwrap()
+            .render(ctx)
+            .unwrap();
+        assert!(running_page.contains("/smaug/api/watch/"));
+        assert!(running_page.contains("/smaug/api/squeue?job_name="));
+        assert!(running_page.contains("POLL_INTERVAL_MS"));
+        assert!(running_page.contains("onbeforeunload=\"stopPolling()\""));
     }
 }

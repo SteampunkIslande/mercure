@@ -13,6 +13,7 @@ mod passedit;
 mod prettify;
 mod runtime_config;
 mod samplesheet;
+mod squeue;
 mod submitrun;
 mod upload;
 
@@ -31,5 +32,6 @@ pub use passedit::*;
 pub use prettify::*;
 pub use runtime_config::*;
 pub use samplesheet::*;
+pub use squeue::*;
 pub use submitrun::*;
 pub use upload::*;

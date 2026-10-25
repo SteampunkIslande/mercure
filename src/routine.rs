@@ -2,7 +2,7 @@ use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
 use smaug::config::get_smaug_config;
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
-use smaug_lib::pipeline_exec::versionning;
+use smaug_lib::pipeline_exec::{LogProgressParser, versionning};
 use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -20,7 +20,7 @@ use sqlx::Error;
 use smaug_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, watch};
 use tokio::time::{Duration, interval};
 
 #[derive(Error, Debug)]
@@ -252,7 +252,8 @@ async fn tee_stream_to_file_and_db<R>(
     file_path: &Path,
     pool: SqlitePool,
     run_id: i64,
-    stream_type: &'static str, // e.g., "stdout" or "stderr"
+    attempt_number: u32,
+    stream_type: &'static str,
 ) -> anyhow::Result<()>
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,
@@ -261,46 +262,80 @@ where
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
 
-    // Channel buffer size dictates how many lines can queue up before we start dropping them
-    // or applying backpressure. `try_send` prevents the DB from stalling the file write.
-    let (tx, mut rx) = mpsc::channel::<String>(1000);
+    let mut progress = if stream_type == "stderr" {
+        let parser = LogProgressParser::new(run_id, attempt_number);
 
-    // Detached task for database insertion (can fail)
-    tokio::spawn(async move {
-        while let Some(log_line) = rx.recv().await {
-            if let Err(e) = dummy_db_insert(&pool, run_id, stream_type, &log_line).await {
-                warn!("Failed to write {} log to DB: {}", stream_type, e);
+        let initial_persisted = match parser.state().upsert(&pool).await {
+            Ok(()) => true,
+            Err(e) => {
+                warn!("Failed to initialize run progress: {}", e);
+                false
             }
-        }
-    });
+        };
+
+        let (progress_tx, mut progress_rx) = watch::channel(parser.state().clone());
+        let db_pool = pool.clone();
+        let db_handle = tokio::spawn(async move {
+            let mut persist_interval = interval(Duration::from_millis(500));
+            let mut last_persisted = if initial_persisted {
+                Some(progress_rx.borrow().clone())
+            } else {
+                None
+            };
+
+            loop {
+                tokio::select! {
+                    changed = progress_rx.changed() => {
+                        if changed.is_err() {
+                            break;
+                        }
+                    }
+                    _ = persist_interval.tick() => {
+                        let state = progress_rx.borrow().clone();
+                        if last_persisted.as_ref() != Some(&state) {
+                            match state.upsert(&db_pool).await {
+                                Ok(()) => last_persisted = Some(state),
+                                Err(e) => warn!("Failed to persist run progress: {}", e),
+                            }
+                        }
+                    }
+                }
+            }
+
+            let state = progress_rx.borrow().clone();
+            if let Err(e) = state.upsert(&db_pool).await {
+                warn!("Failed to persist final run progress: {}", e);
+            }
+        });
+
+        Some((parser, progress_tx, db_handle))
+    } else {
+        None
+    };
 
     loop {
         line.clear();
         let bytes_read = reader.read_line(&mut line).await?;
         if bytes_read == 0 {
-            break; // EOF
+            break;
         }
 
-        // 1. Write log to file (Critical path - must succeed)
         file.write_all(line.as_bytes()).await?;
 
-        // 2. Send to DB (Best effort). If the channel is full because the DB $
-        // is too slow, `try_send` fails but we ignore it to protect the file loop.
-        // It's fine since at least the log file is written to
-        let _ = tx.try_send(line.clone());
+        if let Some((parser, progress_tx, _)) = progress.as_mut() {
+            parser.parse_line(&line);
+            let _ = progress_tx.send(parser.state().clone());
+        }
     }
 
     file.flush().await?;
-    Ok(())
-}
 
-async fn dummy_db_insert(
-    _pool: &SqlitePool,
-    _run_id: i64,
-    _stream: &str,
-    _line: &str,
-) -> anyhow::Result<()> {
-    Ok(()) // Placeholder
+    if let Some((_parser, progress_tx, db_handle)) = progress {
+        drop(progress_tx);
+        let _ = db_handle.await;
+    }
+
+    Ok(())
 }
 
 /// Cette fonction peut paniquer, ou retourner une erreur, les conséquences seront minimes
@@ -363,15 +398,32 @@ async fn run_script(
 
     let pool_clone1 = pool.clone();
     let run_id = attempt.run_id;
+    let attempt_number = attempt.attempt_number;
 
     // Spawn multiplexers
     let stdout_handle = tokio::spawn(async move {
-        tee_stream_to_file_and_db(stdout, &stdout_path, pool_clone1, run_id, "stdout").await
+        tee_stream_to_file_and_db(
+            stdout,
+            &stdout_path,
+            pool_clone1,
+            run_id,
+            attempt_number,
+            "stdout",
+        )
+        .await
     });
 
     let pool_clone2 = pool.clone();
     let stderr_handle = tokio::spawn(async move {
-        tee_stream_to_file_and_db(stderr, &stderr_path, pool_clone2, run_id, "stderr").await
+        tee_stream_to_file_and_db(
+            stderr,
+            &stderr_path,
+            pool_clone2,
+            run_id,
+            attempt_number,
+            "stderr",
+        )
+        .await
     });
 
     // Compétition entre la fin du script et le signal d'interruption
