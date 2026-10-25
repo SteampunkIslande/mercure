@@ -16,39 +16,57 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.target }})
+    name: Build (${{ matrix.suffix }})
     runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
+        include:
+          # Rocky Linux 9 provides glibc 2.34
+          - container: "rockylinux:9"
+            target: "x86_64-unknown-linux-gnu"
+            suffix: "glibc-2.34"
+            deps: "dnf install -y gcc gcc-c++ curl git"
+          # Ubuntu 22.04 provides glibc 2.35
+          - container: "ubuntu:22.04"
+            target: "x86_64-unknown-linux-gnu"
+            suffix: "glibc-2.35"
+            deps: "apt-get update && apt-get install -y build-essential curl git"
+          # Ubuntu 24.04 provides glibc 2.39
+          - container: "ubuntu:24.04"
+            target: "x86_64-unknown-linux-gnu"
+            suffix: "glibc-2.39"
+            deps: "apt-get update && apt-get install -y build-essential curl git"
+          # Ubuntu latest is fine for Musl cross-compilation
+          - container: "ubuntu:latest"
+            target: "x86_64-unknown-linux-musl"
+            suffix: "musl"
+            deps: "apt-get update && apt-get install -y build-essential curl git musl-tools"
 
     steps:
+      - name: Install system dependencies
+        run: ${{ matrix.deps }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install musl dependencies
-        if: matrix.target == 'x86_64-unknown-linux-musl'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          rustup target add x86_64-unknown-linux-musl
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Configure Rust target
+        run: rustup target add ${{ matrix.target }}
 
       - name: Cache Cargo dependencies
         uses: swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}
+          key: ${{ matrix.suffix }}
 
       - name: Install mdbook
         run: cargo install mdbook
-      
+       
       - name: Build mdbook
         run: mdbook build documentation
 
@@ -57,14 +75,14 @@ jobs:
 
       - name: Rename binary
         run: |
-          # Remplace "smaug" par le nom exact de ton exécutable
-          cp target/${{ matrix.target }}/release/smaug target/${{ matrix.target }}/release/smaug-${{ matrix.target }}
+          # The resulting name will be e.g., smaug_x86_64_glibc-2.34
+          cp target/${{ matrix.target }}/release/smaug target/${{ matrix.target }}/release/smaug_x86_64_${{ matrix.suffix }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/smaug-${{ matrix.target }}
+          name: binary-${{ matrix.suffix }}
+          path: target/${{ matrix.target }}/release/smaug_x86_64_${{ matrix.suffix }}
 
   release:
     name: Create GitHub Release
