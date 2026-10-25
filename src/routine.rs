@@ -124,15 +124,10 @@ pub async fn run_routine_loop(
                                 match run_script(&attempt, &pool_clone, child_rx).await {
                                     Ok(()) => {
                                         info!("Tentative {} du run {} terminée", attempt.attempt_number, attempt.attempt_number);
-                                        if let Err(e) = analysis::complete_success(attempt.run_id, &pool_clone).await {
-                                            error!("{}", e);
-                                        }
                                     }
-                                    // D'abord on essaye d'écrire l'erreur dans la base de données, mais si la transition est invalide, on l'affiche dans stderr
+                                    // C'est run_script qui s'est chargée de mettre à jour la base de données
                                     Err(e) => {
-                                        if let Err(e) = analysis::complete_failure(attempt.run_id, &e.to_string(), &pool_clone).await {
-                                            error!("{}", e)
-                                        }
+                                        error!("{}", e);
                                     }
                                 }
                             });
@@ -167,8 +162,9 @@ pub async fn run_routine_loop(
                 warn!("Un des jobs s'est terminé avec une erreur : {}", e);
             }
         }
-        info!("Tous les jobs ont été arrêtés. Fin de la routine.");
+        info!("Tous les jobs ont été arrêtés.");
     }
+    info!("Fin de la routine");
 
     Ok(())
 }
@@ -403,8 +399,17 @@ async fn run_script(
             match sigint_behavior {
                 SigintBehavior::StopJobs => {
                     info!("Le job va être arrêté par SIGINT, 5s avant SIGKILL.");
-                    if let Err(e) = send_sigint_then_kill(&mut child, None).await {
-                        eprintln!("Erreur lors de l'envoi du signal: {}", e);
+                    match send_sigint_then_kill(&mut child, None).await {
+                        Ok(status) if status.success() => {
+                            analysis::complete_success(attempt.run_id, pool).await?;
+                        }
+                        Ok(status) => {
+                            analysis::complete_failure(attempt.run_id, &format!("(exit code {})", status.code().map(|s|s.to_string()).unwrap_or("Unknown".into())), pool).await?;
+                        }
+                        Err(e)=> {
+                            eprintln!("Erreur lors de l'envoi du signal: {}", e);
+                            analysis::complete_failure(attempt.run_id, &format!("erreur {e}"), pool).await?;
+                        }
                     }
                 }
                 SigintBehavior::WaitForJobCompletion => {
