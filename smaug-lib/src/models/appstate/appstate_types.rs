@@ -42,6 +42,10 @@ macro_rules! config_item_generator {
             }
         }
 
+        impl std::default::Default for $name {
+            fn default() -> Self { Self::$default }
+        }
+
         impl crate::models::appstate::ConfigItem for $name {
             const DB_KEY: &'static str = $db_key;
             const DESCRIPTION: &'static str = $desc;

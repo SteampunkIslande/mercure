@@ -94,6 +94,9 @@ pub async fn run_routine_loop(
             }
 
             _ = interval.tick() => {
+                if !matches!(appstate::AppState::get(pool).await.unwrap_or_default(), appstate::ActiveRoutine::RoutineOn) {
+                    continue;
+                }
                 match find_run_to_launch(pool).await{
 
                     Ok(mut runs_to_launch) => {

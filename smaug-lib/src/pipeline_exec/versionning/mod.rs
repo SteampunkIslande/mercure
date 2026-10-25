@@ -1,5 +1,6 @@
 mod gitea;
 use crate::{config::GitWebConfig, models::FileIdentification};
+use anyhow::Context;
 use serde::Deserialize;
 use serde_json::Value;
 use std::{path::Path, time::Duration};
@@ -57,6 +58,11 @@ pub async fn git_clone_to(
     };
 
     let repo_path = path.join(&repo_name);
+    if repo_path.exists() {
+        tokio::fs::remove_dir_all(&repo_path)
+            .await
+            .context("Impossible de supprimer le dossier pipelines de la tentative précédente")?;
+    }
     info!("Cloning {} into {}", clone_url, repo_path.display());
 
     let mut clone_child = Command::new("git")
