@@ -2,7 +2,7 @@ use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
 use smaug::config::get_smaug_config;
 use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
-use smaug_lib::pipeline_exec::{LogProgressParser, versionning};
+use smaug_lib::pipeline_exec::{LogProgressParser, RunProgressCache, versionning};
 use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
@@ -20,7 +20,7 @@ use sqlx::Error;
 use smaug_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
 
 #[derive(Error, Debug)]
@@ -77,6 +77,7 @@ enum RoutineError {
 
 pub async fn run_routine_loop(
     pool: &SqlitePool,
+    progress_cache: RunProgressCache,
     mut routine_shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<()> {
     // Canal pour prévenir les processus enfants démarrés par la routine
@@ -105,6 +106,7 @@ pub async fn run_routine_loop(
 
                             // 1. Clone the pool handle. This is cheap (Arc clone under the hood).
                             let pool_clone = pool.clone();
+                            let progress_cache_clone = progress_cache.clone();
 
                             // 2. Move the cloned handle into the spawned task
                             join_set.spawn(async move {
@@ -121,7 +123,7 @@ pub async fn run_routine_loop(
                                         }
                                     }
                                 }
-                                match run_script(&attempt, &pool_clone, child_rx).await {
+                                match run_script(&attempt, &pool_clone, progress_cache_clone, child_rx).await {
                                     Ok(()) => {
                                         info!("Tentative {} du run {} terminée", attempt.attempt_number, attempt.attempt_number);
                                     }
@@ -247,10 +249,10 @@ async fn send_sigint_then_kill(
         .context("Error harvesting the process after SIGKILL")
 }
 
-async fn tee_stream_to_file_and_db<R>(
+async fn tee_stream_to_file_and_cache<R>(
     stream: R,
     file_path: &Path,
-    pool: SqlitePool,
+    progress_cache: RunProgressCache,
     run_id: i64,
     attempt_number: u32,
     stream_type: &'static str,
@@ -262,53 +264,10 @@ where
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
 
-    let mut progress = if stream_type == "stderr" {
+    let mut parser = if stream_type == "stderr" {
         let parser = LogProgressParser::new(run_id, attempt_number);
-
-        let initial_persisted = match parser.state().upsert(&pool).await {
-            Ok(()) => true,
-            Err(e) => {
-                warn!("Failed to initialize run progress: {}", e);
-                false
-            }
-        };
-
-        let (progress_tx, mut progress_rx) = watch::channel(parser.state().clone());
-        let db_pool = pool.clone();
-        let db_handle = tokio::spawn(async move {
-            let mut persist_interval = interval(Duration::from_millis(500));
-            let mut last_persisted = if initial_persisted {
-                Some(progress_rx.borrow().clone())
-            } else {
-                None
-            };
-
-            loop {
-                tokio::select! {
-                    changed = progress_rx.changed() => {
-                        if changed.is_err() {
-                            break;
-                        }
-                    }
-                    _ = persist_interval.tick() => {
-                        let state = progress_rx.borrow().clone();
-                        if last_persisted.as_ref() != Some(&state) {
-                            match state.upsert(&db_pool).await {
-                                Ok(()) => last_persisted = Some(state),
-                                Err(e) => warn!("Failed to persist run progress: {}", e),
-                            }
-                        }
-                    }
-                }
-            }
-
-            let state = progress_rx.borrow().clone();
-            if let Err(e) = state.upsert(&db_pool).await {
-                warn!("Failed to persist final run progress: {}", e);
-            }
-        });
-
-        Some((parser, progress_tx, db_handle))
+        progress_cache.upsert(parser.state().clone()).await;
+        Some(parser)
     } else {
         None
     };
@@ -322,19 +281,13 @@ where
 
         file.write_all(line.as_bytes()).await?;
 
-        if let Some((parser, progress_tx, _)) = progress.as_mut() {
+        if let Some(parser) = parser.as_mut() {
             parser.parse_line(&line);
-            let _ = progress_tx.send(parser.state().clone());
+            progress_cache.upsert(parser.state().clone()).await;
         }
     }
 
     file.flush().await?;
-
-    if let Some((_parser, progress_tx, db_handle)) = progress {
-        drop(progress_tx);
-        let _ = db_handle.await;
-    }
-
     Ok(())
 }
 
@@ -344,6 +297,7 @@ where
 async fn run_script(
     attempt: &Attempt,
     pool: &SqlitePool,
+    progress_cache: RunProgressCache,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), RoutineError> {
     let (git_manager, scripts_dir, logs_dir) = {
@@ -396,16 +350,17 @@ async fn run_script(
     let stdout = child.stdout.take().context("Can't take stdout handle")?;
     let stderr = child.stderr.take().context("Can't take stderr handle")?;
 
-    let pool_clone1 = pool.clone();
     let run_id = attempt.run_id;
     let attempt_number = attempt.attempt_number;
+    let progress_cache_stdout = progress_cache.clone();
+    let progress_cache_stderr = progress_cache;
 
     // Spawn multiplexers
     let stdout_handle = tokio::spawn(async move {
-        tee_stream_to_file_and_db(
+        tee_stream_to_file_and_cache(
             stdout,
             &stdout_path,
-            pool_clone1,
+            progress_cache_stdout,
             run_id,
             attempt_number,
             "stdout",
@@ -413,12 +368,11 @@ async fn run_script(
         .await
     });
 
-    let pool_clone2 = pool.clone();
     let stderr_handle = tokio::spawn(async move {
-        tee_stream_to_file_and_db(
+        tee_stream_to_file_and_cache(
             stderr,
             &stderr_path,
-            pool_clone2,
+            progress_cache_stderr,
             run_id,
             attempt_number,
             "stderr",

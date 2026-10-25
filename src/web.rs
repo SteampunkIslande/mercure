@@ -22,7 +22,7 @@ use rocket::{catch, catchers, routes};
 
 use anyhow::Result;
 use smaug_lib::config;
-use smaug_lib::pipeline_exec::SqueueCache;
+use smaug_lib::pipeline_exec::{RunProgressCache, SqueueCache};
 use smaug_lib::routes;
 use sqlx::SqlitePool;
 use tokio::sync::broadcast;
@@ -46,7 +46,12 @@ pub fn doc_redirect() -> Redirect {
     Redirect::permanent("/smaug/documentation/index.html")
 }
 
-async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> Rocket<Build> {
+async fn rocket(
+    pool: SqlitePool,
+    progress_cache: RunProgressCache,
+    host: Option<Ipv4Addr>,
+    port: Option<u16>,
+) -> Rocket<Build> {
     let config = config::get_smaug_config();
 
     let shutdown_config = Shutdown {
@@ -151,6 +156,7 @@ async fn rocket(pool: SqlitePool, host: Option<Ipv4Addr>, port: Option<u16>) -> 
         )
         .manage(pool)
         .manage(config)
+        .manage(progress_cache)
         .manage(SqueueCache::new(30))
         .attach(minijinja_fairing());
 
@@ -186,7 +192,8 @@ pub struct Web {
 
 impl Web {
     pub async fn run(self, pool: SqlitePool) -> Result<()> {
-        let rocket_app = match rocket(pool.clone(), self.ip, self.port)
+        let progress_cache = RunProgressCache::new();
+        let rocket_app = match rocket(pool.clone(), progress_cache.clone(), self.ip, self.port)
             .await
             .ignite()
             .await
@@ -222,7 +229,7 @@ impl Web {
         });
 
         // Démarrage de la routine (exécution des jobs)
-        let routine = run_routine_loop(&pool, routine_shutdown_rx);
+        let routine = run_routine_loop(&pool, progress_cache, routine_shutdown_rx);
 
         // Démarrage de l'application web
         let webapp = rocket_app.launch();
