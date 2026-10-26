@@ -8,6 +8,7 @@ use serde_json::Value;
 use std::{path::Path, time::Duration};
 
 use std::path::PathBuf;
+use std::process::Stdio;
 use tokio::process::Command;
 
 /// A struct holding everything relevant about a file in a git repository
@@ -57,6 +58,7 @@ pub async fn git_clone_to(
     };
 
     let repo_path = path.join(&repo_name);
+    // Clear previous pipelines dir, it may have been checked out at another revision (usually an older one)
     if repo_path.exists() {
         tokio::fs::remove_dir_all(&repo_path)
             .await
@@ -67,81 +69,92 @@ pub async fn git_clone_to(
                 )
             })?;
     }
-    log::info!("Cloning {} into {}", clone_url, repo_path.display());
 
-    let mut clone_child = Command::new("git")
-        .arg("clone")
-        .arg(&clone_url)
-        .arg(&repo_name)
-        .current_dir(path)
-        .spawn()
-        .with_context(|| format!("Impossible de lancer `git clone {clone_url}`"))?;
+    log::debug!("Cloning {} into {}", clone_url, repo_path.display());
 
-    match tokio::time::timeout(Duration::from_secs(30), clone_child.wait()).await {
-        Ok(Ok(status)) if status.success() => log::info!("Git clone successful."),
-        Ok(Ok(status)) => {
+    let clone_result = tokio::time::timeout(
+        Duration::from_secs(30),
+        Command::new("git")
+            .arg("clone")
+            .arg(&clone_url)
+            .arg(&repo_name)
+            .current_dir(path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output(),
+    )
+    .await;
+
+    let clone_output = match clone_result {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => {
             return Err(GitCheckError::CommandFailed(format!(
-                "Clone failed: {}",
-                status
+                "`git clone {clone_url}` failed to execute: {e}"
             )));
         }
-        Ok(Err(e)) => {
-            return Err(e).with_context(|| {
-                format!("Erreur en attendant la fin de `git clone {clone_url}`")
-            })?;
-        }
         Err(_) => {
-            let _ = clone_child.kill().await;
-            // Try to clean up if repo was partially created
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
-            return Err(GitCheckError::CommandFailed("Clone timeout".into()));
+            return Err(GitCheckError::CommandFailed(format!(
+                "`git clone {clone_url}` timed out"
+            )));
         }
+    };
+
+    if !clone_output.status.success() {
+        let _ = tokio::fs::remove_dir_all(&repo_path).await;
+        return Err(GitCheckError::CommandFailed(format!(
+            "Clone failed:\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&clone_output.stdout),
+            String::from_utf8_lossy(&clone_output.stderr)
+        )));
     }
 
-    log::info!("Checking out '{}' in {}", checkout, repo_path.display());
+    log::debug!("Checking out '{}' in {}", checkout, repo_path.display());
 
-    let mut checkout_child = Command::new("git")
-        .arg("checkout")
-        .arg(&checkout)
-        .current_dir(&repo_path) // Fixed: Must run inside the cloned repository
-        .spawn()
-        .with_context(|| {
-            format!(
-                "Impossible de lancer `git checkout {checkout}` dans {}",
-                repo_path.display()
-            )
-        })?;
+    let checkout_result = tokio::time::timeout(
+        Duration::from_secs(5),
+        Command::new("git")
+            .arg("checkout")
+            .arg(&checkout)
+            .current_dir(&repo_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output(),
+    )
+    .await;
 
-    match tokio::time::timeout(Duration::from_secs(5), checkout_child.wait()).await {
-        Ok(Ok(status)) if status.success() => log::info!("Git checkout successful."),
-        Ok(Ok(status)) => {
-            let _ = tokio::fs::remove_dir_all(&repo_path).await;
-            return Err(GitCheckError::CommandFailed(format!(
-                "Checkout failed: {}",
-                status
-            )));
-        }
+    let checkout_output = match checkout_result {
+        Ok(Ok(output)) => output,
         Ok(Err(e)) => {
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
-            return Err(e).with_context(|| {
-                format!("Erreur en attendant la fin de `git checkout {checkout}`")
-            })?;
+            return Err(GitCheckError::CommandFailed(format!(
+                "`git checkout {checkout}` failed to execute: {e}"
+            )));
         }
         Err(_) => {
-            let _ = checkout_child.kill().await;
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
-            return Err(GitCheckError::CommandFailed("Checkout timeout".into()));
+            return Err(GitCheckError::CommandFailed(format!(
+                "`git checkout {checkout}` timed out"
+            )));
         }
+    };
+
+    if !checkout_output.status.success() {
+        let _ = tokio::fs::remove_dir_all(&repo_path).await;
+        return Err(GitCheckError::CommandFailed(format!(
+            "Checkout failed:\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&checkout_output.stdout),
+            String::from_utf8_lossy(&checkout_output.stderr)
+        )));
     }
 
     let git_dir = repo_path.join(".git");
-    log::info!("Removing {:?}", git_dir);
+    log::debug!("Removing {:?}", git_dir);
 
     tokio::fs::remove_dir_all(&git_dir)
         .await
         .with_context(|| format!("Impossible de supprimer le dossier {}", git_dir.display()))?;
 
-    log::info!("Successfully prepped repository at {:?}", repo_path);
     Ok(())
 }
 

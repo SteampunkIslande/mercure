@@ -25,7 +25,7 @@ pub async fn run_routine_loop(
     let (child_shutdown_tx, _) = broadcast::channel(1);
     let mut join_set = JoinSet::new();
 
-    let mut interval = interval(Duration::from_secs(2));
+    let mut interval = interval(Duration::from_secs(10));
 
     loop {
         tokio::select! {
