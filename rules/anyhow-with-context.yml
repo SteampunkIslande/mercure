@@ -3,5 +3,5 @@ message: Use `.with_context(|| ...)` for `format!` to avoid unnecessary heap all
 severity: warning
 language: rust
 rule:
-  pattern: $BASE.context(format!($$$ARGS))
-fix: $BASE.with_context(|| format!($$$ARGS))
+  pattern: $BASE.context(format!($FMT, $$$ARGS))
+fix: $BASE.with_context(|| format!($FMT, $$$ARGS))

@@ -1,0 +1,14 @@
+id: format-static-to-context
+message: Use `.context("...")` instead of `.context(format!("..."))` for static strings.
+severity: info
+language: rust
+rule:
+  all:
+    - pattern: $BASE.context(format!($FMT))
+    - not:
+        has:
+          pattern: format!($$$, $$$)
+constraints:
+  FMT:
+    regex: '^"[^{}]*"$'
+fix: $BASE.context($FMT)

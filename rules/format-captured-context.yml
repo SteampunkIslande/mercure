@@ -1,0 +1,14 @@
+id: use-with-context-for-captured-format
+message: Use `.with_context(|| ...)` for `format!` to avoid unnecessary heap allocations on the success path.
+severity: warning
+language: rust
+rule:
+  all:
+    - pattern: $BASE.context(format!($FMT))
+    - not:
+        has:
+          pattern: format!($$$, $$$)
+constraints:
+  FMT:
+    regex: '^".*\{.*$'
+fix: $BASE.with_context(|| format!($FMT))
