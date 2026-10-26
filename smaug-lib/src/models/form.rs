@@ -283,14 +283,18 @@ impl Form {
 
         let content = versionning::git_get_file(&pipelines, &form_identification)
             .await
-            .context(format!(
-                "Impossible de récupérer le formulaire {}",
+            .with_context(|| {
+                format!(
+                    "Impossible de récupérer le formulaire {}",
+                    form_identification.path().display()
+                )
+            })?;
+        let mut form: Form = yaml_serde::from_str(&content).with_context(|| {
+            format!(
+                "Le formulaire {} n'est pas un YAML valide",
                 form_identification.path().display()
-            ))?;
-        let mut form: Form = yaml_serde::from_str(&content).context(format!(
-            "Le formulaire {} n'est pas un YAML valide",
-            form_identification.path().display()
-        ))?;
+            )
+        })?;
         form.form_identification = form_identification;
         // Check validity of this form by making sure there are no syntax error in the template definition
         form.check_validity(None)

@@ -36,10 +36,12 @@ pub async fn show_run_get(
         } else {
             let current_user_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
                 .await
-                .context(format!(
-                    "Impossible d'obtenir les groupes de {} (vous)",
-                    auth.user.username
-                ))?
+                .with_context(|| {
+                    format!(
+                        "Impossible d'obtenir les groupes de {} (vous)",
+                        auth.user.username
+                    )
+                })?
                 .iter()
                 .map(|grp| grp.id)
                 .collect();

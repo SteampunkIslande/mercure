@@ -117,7 +117,7 @@ impl Attempt {
     pub async fn get_run(&self, pool: &SqlitePool) -> Result<Run> {
         Run::get_run_from_id(self.run_id, pool)
             .await
-            .context(format!("Impossible de lire le run {}", self.run_id))
+            .with_context(|| format!("Impossible de lire le run {}", self.run_id))
     }
 
     pub async fn get_form(&self) -> Result<Form> {
@@ -168,9 +168,9 @@ impl Attempt {
         .bind(run_id)
         .fetch_one(pool)
         .await
-        .context(format!(
-            "Impossible de lire la tentative {attempt_number} du run {run_id}"
-        ))?;
+        .with_context(|| {
+            format!("Impossible de lire la tentative {attempt_number} du run {run_id}")
+        })?;
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars: HashMap<String, String> =
@@ -239,9 +239,7 @@ impl Attempt {
         .bind(run_id)
         .fetch_all(pool)
         .await
-        .context(format!(
-            "Impossible de lister les tentatives du run {run_id}"
-        ))?;
+        .with_context(|| format!("Impossible de lister les tentatives du run {run_id}"))?;
 
         Ok(rows
             .into_iter()
@@ -272,17 +270,19 @@ impl Attempt {
     pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
         let run = Run::get_run_from_id(run_id, pool)
             .await
-            .context(format!("Impossible de lire le run {run_id}"))?;
+            .with_context(|| format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(r#"UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?"#)
             .bind("Running")
             .bind(run_id)
             .bind(run.attempt_count)
             .execute(pool)
             .await
-            .context(format!(
-                "Impossible de démarrer la tentative {} du run {run_id}",
-                run.attempt_count
-            ))?;
+            .with_context(|| {
+                format!(
+                    "Impossible de démarrer la tentative {} du run {run_id}",
+                    run.attempt_count
+                )
+            })?;
         Ok(())
     }
 
@@ -290,7 +290,7 @@ impl Attempt {
     pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
         let run = Run::get_run_from_id(run_id, pool)
             .await
-            .context(format!("Impossible de lire le run {run_id}"))?;
+            .with_context(|| format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -301,10 +301,12 @@ impl Attempt {
         .bind(run.attempt_count)
         .execute(pool)
         .await
-        .context(format!(
-            "Impossible de terminer avec succès la tentative {} du run {run_id}",
-            run.attempt_count
-        ))?;
+        .with_context(|| {
+            format!(
+                "Impossible de terminer avec succès la tentative {} du run {run_id}",
+                run.attempt_count
+            )
+        })?;
         Ok(())
     }
 
@@ -316,7 +318,7 @@ impl Attempt {
     ) -> Result<()> {
         let run = Run::get_run_from_id(run_id, pool)
             .await
-            .context(format!("Impossible de lire le run {run_id}"))?;
+            .with_context(|| format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -327,10 +329,12 @@ impl Attempt {
         .bind(run.attempt_count)
         .execute(pool)
         .await
-        .context(format!(
-            "Impossible de marquer en échec la tentative {} du run {run_id}",
-            run.attempt_count
-        ))?;
+        .with_context(|| {
+            format!(
+                "Impossible de marquer en échec la tentative {} du run {run_id}",
+                run.attempt_count
+            )
+        })?;
         Ok(())
     }
 
@@ -351,9 +355,9 @@ impl Attempt {
         .bind(run_id)
         .execute(pool)
         .await
-        .context(format!(
-            "Impossible de commenter la tentative {attempt_number} du run {run_id}"
-        ))?;
+        .with_context(|| {
+            format!("Impossible de commenter la tentative {attempt_number} du run {run_id}")
+        })?;
         Ok(())
     }
 }

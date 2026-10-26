@@ -272,9 +272,10 @@ async fn run_script(
     let stderr_path = logs_dir.join(format!("{}.stderr", script_id));
 
     let run = attempt.get_run(pool).await?;
-    let rendered = attempt.render_script(&run.run_name).await.context(format!(
-        "Impossible de rendre le script de la tentative {script_id}"
-    ))?;
+    let rendered = attempt
+        .render_script(&run.run_name)
+        .await
+        .with_context(|| format!("Impossible de rendre le script de la tentative {script_id}"))?;
 
     // Async FS operations
     tokio::fs::create_dir_all(attempt.outdir())
@@ -295,10 +296,12 @@ async fn run_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context(format!(
-            "Erreur de lancement pour la tentative {} du run {}",
-            attempt.attempt_number, attempt.run_id
-        ))?;
+        .with_context(|| {
+            format!(
+                "Erreur de lancement pour la tentative {} du run {}",
+                attempt.attempt_number, attempt.run_id
+            )
+        })?;
 
     let stdout = child.stdout.take().context("Can't take stdout handle")?;
     let stderr = child.stderr.take().context("Can't take stderr handle")?;

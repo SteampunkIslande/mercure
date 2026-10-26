@@ -1,3 +1,4 @@
+use anyhow::Context;
 use rocket::{State, get, serde::json::Json};
 use serde_json::json;
 use sqlx::SqlitePool;
@@ -43,8 +44,8 @@ pub async fn newgroup_get(
         Err(e) if is_unique_violation(&e) => {
             Err(anyhow::Error::new(AuthError::DuplicateGroup(group_name.to_string())).into())
         }
-        Err(e) => Err(e
-            .context(format!("Impossible d'ajouter le groupe `{group_name}`"))
-            .into()),
+        Err(e) => {
+            Err(e).with_context(|| format!("Impossible d'ajouter le groupe `{group_name}`"))?
+        }
     }
 }
