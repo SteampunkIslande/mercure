@@ -1,9 +1,8 @@
+use anyhow::{Context, Result};
 use rocket::FromForm;
 use serde::{Deserialize, Serialize};
 use sqlx;
 use sqlx::{Row, SqlitePool};
-
-use crate::models::ModelError;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, FromForm)]
 pub struct Group {
@@ -13,10 +12,11 @@ pub struct Group {
 
 impl Group {
     /// Retrieves all groups from the database with their IDs and names
-    pub async fn get_groups_with_ids(pool: &SqlitePool) -> Result<Vec<Group>, ModelError> {
+    pub async fn get_groups_with_ids(pool: &SqlitePool) -> Result<Vec<Group>> {
         let rows = sqlx::query("SELECT group_id, group_name FROM Groups")
             .fetch_all(pool)
-            .await?;
+            .await
+            .context("Impossible de lister les groupes")?;
 
         let groups = rows
             .into_iter()
@@ -31,19 +31,15 @@ impl Group {
         Ok(groups)
     }
 
-    pub async fn group_name_from_id(pool: &SqlitePool, id: i64) -> Result<String, ModelError> {
-        Ok(
-            sqlx::query_scalar("SELECT group_name FROM Groups WHERE group_id = ?")
-                .bind(id)
-                .fetch_one(pool)
-                .await?,
-        )
+    pub async fn group_name_from_id(pool: &SqlitePool, id: i64) -> Result<String> {
+        sqlx::query_scalar("SELECT group_name FROM Groups WHERE group_id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .with_context(|| format!("Impossible de lire le nom du groupe {id}"))
     }
 
-    pub async fn get_user_groups(
-        pool: &SqlitePool,
-        user_id: i64,
-    ) -> Result<Vec<Group>, ModelError> {
+    pub async fn get_user_groups(pool: &SqlitePool, user_id: i64) -> Result<Vec<Group>> {
         Ok(sqlx::query(
             r#"SELECT g.group_name, gh.group_id, gh.user_id
 FROM Groups g
@@ -52,7 +48,8 @@ WHERE gh.user_id = ?; "#,
         )
         .bind(user_id)
         .fetch_all(pool)
-        .await?
+        .await
+        .with_context(|| format!("Impossible de lister les groupes de l'utilisateur {user_id}"))?
         .into_iter()
         .filter_map(|row| {
             Some(Group {
@@ -68,26 +65,38 @@ WHERE gh.user_id = ?; "#,
         user_id: i64,
         to_remove: Vec<Group>,
         to_add: Vec<Group>,
-    ) -> Result<(), ModelError> {
+    ) -> Result<()> {
         for g in to_remove {
             sqlx::query(r#"DELETE FROM GroupHasUser WHERE group_id = ? AND user_id = ? "#)
                 .bind(g.id)
                 .bind(user_id)
                 .execute(pool)
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Impossible de retirer l'utilisateur {user_id} du groupe {} ({})",
+                        g.name, g.id
+                    )
+                })?;
         }
         for g in to_add {
             sqlx::query(r#"INSERT INTO GroupHasUser (group_id,user_id) VALUES (?,?)"#)
                 .bind(g.id)
                 .bind(user_id)
                 .execute(pool)
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Impossible d'ajouter l'utilisateur {user_id} au groupe {} ({})",
+                        g.name, g.id
+                    )
+                })?;
         }
         Ok(())
     }
 
     /// Adds a new group to the database and returns its ID
-    pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64, ModelError> {
+    pub async fn add_group(pool: &SqlitePool, group_name: &str) -> Result<i64> {
         let row = sqlx::query(
             r#"
             INSERT INTO Groups (group_name)
@@ -97,7 +106,8 @@ WHERE gh.user_id = ?; "#,
         )
         .bind(group_name)
         .fetch_one(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible d'ajouter le groupe `{group_name}`"))?;
 
         let group_id: i64 = row.try_get("group_id")?;
         Ok(group_id)

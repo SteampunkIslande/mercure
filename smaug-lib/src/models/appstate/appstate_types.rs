@@ -30,14 +30,15 @@ macro_rules! config_item_generator {
         }
 
         impl std::str::FromStr for $name {
-            type Err = crate::models::ModelError;
+            type Err = anyhow::Error;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     $( stringify!($variant) => Ok(Self::$variant), )*
                     _ => Err(crate::models::ModelError::InvalidInput(format!(
                         "Invalid {} '{}'. Allowed: {}",
                         stringify!($name), s, [$(stringify!($variant)),*].join(", ")
-                    ))),
+                    ))
+                    .into()),
                 }
             }
         }
@@ -77,7 +78,7 @@ macro_rules! config_item_generator {
         }
 
         impl std::str::FromStr for $name {
-            type Err = crate::models::ModelError;
+            type Err = anyhow::Error;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 Ok(Self(s.to_string()))
             }
@@ -140,7 +141,7 @@ macro_rules! define_app_configs {
             /// Parses a raw string through the item's strongly-typed `FromStr`
             /// implementation, rejecting invalid values and returning the
             /// canonical string form that should be persisted.
-            pub fn parse_value(&self, raw: &str) -> Result<String, crate::models::ModelError> {
+            pub fn parse_value(&self, raw: &str) -> anyhow::Result<String> {
                 match self {
                     $( Self::$name => Ok(<$name as std::str::FromStr>::from_str(raw)?.to_string()), )*
                 }
@@ -154,7 +155,7 @@ macro_rules! define_app_configs {
         }
 
         impl std::str::FromStr for AppStateConfigKey {
-            type Err = crate::models::ModelError;
+            type Err = anyhow::Error;
 
             fn from_str(raw: &str) -> Result<Self, Self::Err> {
                 Self::all()
@@ -162,7 +163,9 @@ macro_rules! define_app_configs {
                     .copied()
                     .find(|key| key.as_str() == raw)
                     .ok_or_else(|| {
-                        crate::models::ModelError::InvalidInput(format!("Unknown config key '{raw}'"))
+                        anyhow::Error::from(crate::models::ModelError::InvalidInput(format!(
+                            "Unknown config key '{raw}'"
+                        )))
                     })
             }
         }

@@ -6,3 +6,4 @@ pub mod pipeline_exec;
 pub mod routes;
 pub mod templates;
 pub mod utils;
+pub use utils::SamplesheetError;

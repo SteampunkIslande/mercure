@@ -1,7 +1,7 @@
 use rocket::{State, post, serde::json::Json};
 use sqlx::SqlitePool;
 
-use crate::auth::Authenticated;
+use crate::auth::{AuthError, Authenticated};
 use crate::models::User;
 use crate::{models::PasswordUpdate, routes::ApiResponse};
 
@@ -10,17 +10,12 @@ pub async fn password_edit_post(
     auth: Authenticated,
     pool: &State<SqlitePool>,
     data: Json<PasswordUpdate<'_>>,
-) -> Json<ApiResponse<String>> {
+) -> Result<Json<ApiResponse<String>>, AuthError> {
     if auth.user.id != data.0.user_id && !auth.user.is_admin {
-        return Json(ApiResponse::error(
-            "Seuls les administrateurs peuvent modifier le mot de passe d'un autre utilisateur"
-                .to_string(),
-        ));
+        return Err(AuthError::AdminsOnly);
     }
-    match User::update_password(data.0, pool).await {
-        Ok(()) => Json(ApiResponse::success(String::from(
-            "Mot de passe mis à jour avec succès",
-        ))),
-        Err(e) => Json(ApiResponse::error(format!("{}", e))),
-    }
+    User::update_password(data.0, pool).await?;
+    Ok(Json(ApiResponse::success(String::from(
+        "Mot de passe mis à jour avec succès",
+    ))))
 }

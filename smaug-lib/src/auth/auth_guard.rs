@@ -12,26 +12,21 @@ pub struct Authenticated {
 async fn user_from_cookie(request: &Request<'_>) -> Result<User, AuthError> {
     let cookies = request.cookies();
 
-    let pool = match request.rocket().state::<SqlitePool>() {
-        None => {
-            return Err(AuthError::DatabaseError(
-                "Could not find managed sqlite pool".to_string(),
-            ));
-        }
-        Some(pool) => pool,
-    };
+    let pool = request
+        .rocket()
+        .state::<SqlitePool>()
+        .ok_or_else(|| anyhow::anyhow!("Could not find managed sqlite pool"))?;
 
-    match cookies.get_private("user_id") {
-        Some(cookie) => {
-            let user_id: i64 = cookie.value().parse().map_err(|err| {
-                AuthError::TokenError(format!("Could not parse int from cookie: {}", err))
-            })?;
-            Ok(User::find_by_id(user_id, pool).await?)
-        }
-        None => Err(AuthError::TokenError(
-            "Could not find cookie with key `user_id`".to_string(),
-        )),
-    }
+    let cookie = cookies
+        .get_private("user_id")
+        .ok_or_else(|| anyhow::Error::msg("Could not find cookie with key `user_id`"))?;
+
+    let user_id: i64 = cookie
+        .value()
+        .parse()
+        .map_err(|err| anyhow::Error::msg(format!("Could not parse int from cookie: {err}")))?;
+
+    Ok(User::find_by_id(user_id, pool).await?)
 }
 
 #[rocket::async_trait]

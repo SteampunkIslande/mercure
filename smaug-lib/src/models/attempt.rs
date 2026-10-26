@@ -1,6 +1,7 @@
 use crate::config::get_smaug_config;
 use crate::models::{FileIdentification, Form};
-use crate::models::{ModelError, Run, RunStatus};
+use crate::models::{Run, RunStatus};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::Row;
@@ -10,10 +11,24 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use time::OffsetDateTime;
 
+/// Errors of an attempt that callers may want to recognise.
+///
+/// The attempt functions return `anyhow::Result`; the only error kept here is the
+/// one a caller can act upon.///
+/// These types are the *named* errors of the layer; the functions themselves
+/// return `anyhow::Result`. The `InternalError` variant only exists to give the
+/// edge errors (FrontendError / AuthError) a single `#[from] anyhow::Error`
+/// conversion point; it is not produced by the model layer itself.
 #[derive(wherror::Error, Debug)]
 pub enum AttemptError {
     #[error("Aucun run n'est attaché à cette tentative")]
     NoRunAttached,
+    #[error("{location}: {source}")]
+    InternalError {
+        #[from]
+        source: anyhow::Error,
+        location: &'static std::panic::Location<'static>,
+    },
 }
 
 /// Created every time we attempt to analyze an HgRun.
@@ -43,15 +58,20 @@ impl Attempt {
         run_id: i64,
         current_commit_hash: &str,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
-        let run: Run = Run::get_run_from_id(run_id, pool).await?;
+    ) -> Result<()> {
+        let run: Run = Run::get_run_from_id(run_id, pool)
+            .await
+            .with_context(|| format!("Impossible de lire le run {run_id}"))?;
 
         let FileIdentification::GitBranchAndPath { file_path, .. } = run.form_identification else {
-            return Err(anyhow::format_err!("Une nouvelle tentative ne peut être créée qu'à partir d'un formulaire défini par une branche et un chemin.").into());
+            anyhow::bail!(
+                "Une nouvelle tentative ne peut être créée qu'à partir d'un formulaire défini par une branche et un chemin."
+            );
         };
 
         let attempt_date = OffsetDateTime::now_utc();
-        let user_defined_vars = serde_json::to_string(&run.user_defined_vars)?;
+        let user_defined_vars = serde_json::to_string(&run.user_defined_vars)
+            .context("Impossible de sérialiser les variables du run")?;
 
         sqlx::query(
             r#"
@@ -61,13 +81,19 @@ impl Attempt {
         )
         .bind(run.run_id)
         .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
-        .bind(&attempt_date)
-        .bind(&user_defined_vars)
-        .bind(&current_commit_hash)
-        .bind(&file_path.display().to_string())
+        .bind(attempt_date)
+        .bind(user_defined_vars)
+        .bind(current_commit_hash)
+        .bind(file_path.display().to_string())
         .bind(run.status.to_string())
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "Impossible d'insérer la tentative {} du run {run_id}",
+                run.attempt_count
+            )
+        })?;
 
         Ok(())
     }
@@ -76,10 +102,10 @@ impl Attempt {
     ///
     /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
     /// Pratique pour l'API, uniformise l'environnement jinja2.
-    pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt, ModelError> {
+    pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt> {
         Ok(Attempt {
             attempt_number: run.attempt_count + 1,
-            run_id: run.run_id.ok_or(AttemptError::NoRunAttached)?,
+            run_id: run.run_id.context(AttemptError::NoRunAttached)?,
             attempt_date: OffsetDateTime::now_utc(),
             user_defined_vars: run.user_defined_vars.clone(),
             form_identification: run.form_identification.clone(),
@@ -88,11 +114,13 @@ impl Attempt {
         })
     }
 
-    pub async fn get_run(&self, pool: &SqlitePool) -> Result<Run, ModelError> {
-        Ok(Run::get_run_from_id(self.run_id, pool).await?)
+    pub async fn get_run(&self, pool: &SqlitePool) -> Result<Run> {
+        Run::get_run_from_id(self.run_id, pool)
+            .await
+            .context(format!("Impossible de lire le run {}", self.run_id))
     }
 
-    pub async fn get_form(&self) -> Result<Form, ModelError> {
+    pub async fn get_form(&self) -> Result<Form> {
         Form::get_form(self.form_identification.clone()).await
     }
 
@@ -111,7 +139,7 @@ impl Attempt {
         )
     }
 
-    pub async fn render_script(&self, run_name: &str) -> Result<String, ModelError> {
+    pub async fn render_script(&self, run_name: &str) -> Result<String> {
         let form = self.get_form().await?;
         let outdir = self.outdir().display().to_string();
         // Add { user defined variables } as well as run-related mandatory/convenient variables: [attempt number, output directory (that will be $PWD), run number]
@@ -122,7 +150,7 @@ impl Attempt {
             self.run_id,
             run_name,
         );
-        Ok(form.render_template(&ctx).await?)
+        form.render_template(&ctx).await
     }
 
     /// Récupère un HgAttempt à partir de son attempt_number et run_id
@@ -130,7 +158,7 @@ impl Attempt {
         attempt_number: u32,
         run_id: i64,
         pool: &SqlitePool,
-    ) -> Result<Self, ModelError> {
+    ) -> Result<Self> {
         let row = sqlx::query(
             r#"
             SELECT * FROM Attempts WHERE attempt_number = ? AND run_id = ?
@@ -139,23 +167,30 @@ impl Attempt {
         .bind(attempt_number)
         .bind(run_id)
         .fetch_one(pool)
-        .await?;
+        .await
+        .context(format!(
+            "Impossible de lire la tentative {attempt_number} du run {run_id}"
+        ))?;
 
         // Désérialiser les variables définies par l'utilisateur
         let user_defined_vars: HashMap<String, String> =
-            serde_json::from_str(row.try_get("user_defined_vars")?)?;
+            serde_json::from_str(row.try_get("user_defined_vars")?)
+                .context("Impossible de désérialiser les variables de la tentative")?;
 
-        let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())?;
+        let status = RunStatus::from_str(row.try_get::<String, _>("status")?.as_str())
+            .map_err(anyhow::Error::from)
+            .context("Statut de tentative invalide")?;
 
         // Construire l'instance HgAttempt
         let attempt = Attempt {
             attempt_number,
-            run_id: run_id,
+            run_id,
             attempt_date: row.try_get("attempt_date")?,
             user_defined_vars,
             form_identification: FileIdentification::GitCommit {
                 commit_hash: row.try_get("commit_hash")?,
-                file_path: PathBuf::from_str(row.try_get("form_path")?)?,
+                file_path: PathBuf::from_str(row.try_get("form_path")?)
+                    .context("Chemin de formulaire invalide")?,
             },
             status,
             comment: row.try_get("comment")?,
@@ -164,14 +199,15 @@ impl Attempt {
         Ok(attempt)
     }
 
-    pub async fn get_pending_runs(pool: &SqlitePool) -> Result<Vec<Self>, ModelError> {
+    pub async fn get_pending_runs(pool: &SqlitePool) -> Result<Vec<Self>> {
         let rows = sqlx::query(
             r#"
             SELECT * FROM Attempts WHERE status = 'Pending' ORDER BY attempt_number DESC
             "#,
         )
         .fetch_all(pool)
-        .await?;
+        .await
+        .context("Impossible de lister les tentatives en attente")?;
 
         Ok(rows
             .into_iter()
@@ -194,10 +230,7 @@ impl Attempt {
     }
 
     /// Récupère toutes les tentatives pour un run_id
-    pub async fn list_attempts_for_run(
-        run_id: i64,
-        pool: &SqlitePool,
-    ) -> Result<Vec<Self>, ModelError> {
+    pub async fn list_attempts_for_run(run_id: i64, pool: &SqlitePool) -> Result<Vec<Self>> {
         let rows = sqlx::query(
             r#"
             SELECT * FROM Attempts WHERE run_id = ? ORDER BY attempt_number DESC
@@ -205,7 +238,10 @@ impl Attempt {
         )
         .bind(run_id)
         .fetch_all(pool)
-        .await?;
+        .await
+        .context(format!(
+            "Impossible de lister les tentatives du run {run_id}"
+        ))?;
 
         Ok(rows
             .into_iter()
@@ -233,20 +269,28 @@ impl Attempt {
             .collect())
     }
 
-    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        let run = Run::get_run_from_id(run_id, pool).await?;
+    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
+        let run = Run::get_run_from_id(run_id, pool)
+            .await
+            .context(format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(r#"UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?"#)
             .bind("Running")
             .bind(run_id)
             .bind(run.attempt_count)
             .execute(pool)
-            .await?;
+            .await
+            .context(format!(
+                "Impossible de démarrer la tentative {} du run {run_id}",
+                run.attempt_count
+            ))?;
         Ok(())
     }
 
     /// La tentative `attempt_number` s'est terminée avec succès.
-    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
-        let run = Run::get_run_from_id(run_id, pool).await?;
+    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
+        let run = Run::get_run_from_id(run_id, pool)
+            .await
+            .context(format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -256,7 +300,11 @@ impl Attempt {
         .bind(run_id)
         .bind(run.attempt_count)
         .execute(pool)
-        .await?;
+        .await
+        .context(format!(
+            "Impossible de terminer avec succès la tentative {} du run {run_id}",
+            run.attempt_count
+        ))?;
         Ok(())
     }
 
@@ -265,8 +313,10 @@ impl Attempt {
         run_id: i64,
         reason: &str,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
-        let run = Run::get_run_from_id(run_id, pool).await?;
+    ) -> Result<()> {
+        let run = Run::get_run_from_id(run_id, pool)
+            .await
+            .context(format!("Impossible de lire le run {run_id}"))?;
         sqlx::query(
             r#"
             UPDATE Attempts SET status = ? WHERE run_id = ? AND attempt_number = ?
@@ -276,7 +326,11 @@ impl Attempt {
         .bind(run_id)
         .bind(run.attempt_count)
         .execute(pool)
-        .await?;
+        .await
+        .context(format!(
+            "Impossible de marquer en échec la tentative {} du run {run_id}",
+            run.attempt_count
+        ))?;
         Ok(())
     }
 
@@ -286,7 +340,7 @@ impl Attempt {
         attempt_number: u32,
         new_comment: &str,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
+    ) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE Attempts SET comment = ? WHERE attempt_number = ? AND run_id = ?
@@ -296,7 +350,10 @@ impl Attempt {
         .bind(attempt_number)
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .context(format!(
+            "Impossible de commenter la tentative {attempt_number} du run {run_id}"
+        ))?;
         Ok(())
     }
 }

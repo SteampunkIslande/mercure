@@ -28,34 +28,38 @@ pub async fn show_run_get(
 
     let run: Run = Run::get_run_from_id(run_id, pool)
         .await
-        .context(format!("Impossible d'obtenir le run {}", run_id))?;
+        .with_context(|| format!("Impossible d'obtenir le run {}", run_id))?;
 
-    let can_see_run =
-        {
-            if auth.user.is_admin {
-                true
-            } else {
-                let current_user_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
+    let can_see_run = {
+        if auth.user.is_admin {
+            true
+        } else {
+            let current_user_groups: HashSet<i64> = Group::get_user_groups(pool, auth.user.id)
+                .await
+                .context(format!(
+                    "Impossible d'obtenir les groupes de {} (vous)",
+                    auth.user.username
+                ))?
+                .iter()
+                .map(|grp| grp.id)
+                .collect();
+            let run_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
                     .await
-                    .context(format!(
-                        "Impossible d'obtenir les groupes de {} (vous)",
-                        auth.user.username
-                    ))?
+                    .with_context(|| {
+                        format!(
+                            "Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)",
+                            run.user_id
+                        )
+                    })?
                     .iter()
                     .map(|grp| grp.id)
                     .collect();
-                let run_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
-                .await
-                .context(format!(
-                    "Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)",
-                    run.get_user(pool).await?.username
-                ))?.iter().map(|grp| grp.id).collect();
-                // If there is a common group between the groups the form was declared for, the user that declared the run, and the authenticated user's groups, then you can see/edit the run
-                intersection::hash_set::intersection([current_user_groups, run_user_groups])
-                    .is_empty()
-                    .not()
-            }
-        };
+            // If there is a common group between the groups the form was declared for, the user that declared the run, and the authenticated user's groups, then you can see/edit the run
+            intersection::hash_set::intersection([current_user_groups, run_user_groups])
+                .is_empty()
+                .not()
+        }
+    };
 
     if can_see_run {
         // Récupérer l'historique des tentatives pour la navigation
@@ -74,9 +78,9 @@ pub async fn show_run_get(
         // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let attempt = Attempt::get_hypothetic_attempt(&run)?;
-            let form = &run.get_form().await.context(
-                "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible",
-            )?;
+            let form = &run.get_form().await.with_context(|| {
+                "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible"
+            })?;
 
             Ok(Template::render(
                 "common/idlerun",
@@ -96,10 +100,12 @@ pub async fn show_run_get(
             // On cherche la tentative demandée
             let attempt = Attempt::get_attempt_from_number(attempt_number, run_id, pool)
                 .await
-                .context(format!(
-                    "Impossible d'obtenir la tentative {} pour le run {}",
-                    attempt_number, run_id
-                ))?;
+                .with_context(|| {
+                    format!(
+                        "Impossible d'obtenir la tentative {} pour le run {}",
+                        attempt_number, run_id
+                    )
+                })?;
 
             let attempt_form = attempt.get_form().await?;
 
@@ -157,9 +163,10 @@ pub async fn show_run_get(
                         fail_reason=> fail_reason,
                     },
                 )),
-                RunStatus::Idle => Err(FrontendError::LogicalError(
-                    "Une tentative ne peut pas être en état 'A valider'".to_string(),
-                )),
+                RunStatus::Idle => Err(anyhow::anyhow!(
+                    "Une tentative ne peut pas être en état 'A valider'"
+                )
+                .into()),
             }
         }
     } else {

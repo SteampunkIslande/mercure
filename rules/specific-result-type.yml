@@ -1,0 +1,26 @@
+id: specific-result-type
+language: rust
+message: >-
+  [1/3] Specific result: the error type of these functions belongs to their
+  contract, so they keep returning it instead of anyhow::Result. Their helpers
+  return anyhow::Result; intermediate failures are raised with explicit messages
+  and carried by the unique `#[from] anyhow::Error` variant of the type.
+severity: info
+rule:
+  kind: function_item
+  all:
+    - has:
+        field: name
+        regex: ^(from_str|from_value|check_validity|get_hypothetic_attempt|parse_value)$
+    - has:
+        field: return_type
+        kind: generic_type
+        has:
+          kind: type_identifier
+          regex: ^Result$
+note: |-
+  Examples in this repository:
+    - RunStatus::from_str             -> Result<Self, RunDefinitionError>
+    - Form::check_validity            -> Result<(), FormDefinitionError>
+    - Attempt::get_hypothetic_attempt -> Result<Attempt> (AttemptError through anyhow)
+    - AppStateConfigKey::parse_value  -> anyhow::Result<String> (ModelError inside)

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use diacritics::remove_diacritics;
 
 use time::format_description::StaticFormatDescription;
@@ -15,7 +14,15 @@ fn clean_string(input: &str) -> String {
     remove_diacritics(&no_whitespace)
 }
 
-pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String> {
+/// Errors of a samplesheet that the caller can act upon: the input is simply not a
+/// valid Illumina samplesheet. Everything else is a bug and would be a panic.
+#[derive(Debug, wherror::Error)]
+pub enum SamplesheetError {
+    #[error("{0}")]
+    InvalidSamplesheet(String),
+}
+
+pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), SamplesheetError> {
     // Séparer en lignes en gardant l'ordre
     let lines: Vec<&str> = input.lines().collect();
     let mut cleaned_lines: Vec<String> = Vec::new();
@@ -62,7 +69,11 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
 
             let header_line = match header_line_opt {
                 Some(h) => h,
-                None => return Err("Aucune ligne d'en-tête trouvée après [Data]".to_string()),
+                None => {
+                    return Err(SamplesheetError::InvalidSamplesheet(
+                        "Aucune ligne d'en-tête trouvée après [Data]".to_string(),
+                    ));
+                }
             };
 
             column_names = header_line.split(',').map(|s| s.to_string()).collect();
@@ -77,8 +88,10 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
             sample_col_index = column_names.iter().position(|col| col == "Sample_ID");
 
             if sample_col_index.is_none() {
-                return Err("Impossible d'extraire la liste des échantillons: aucune colonne 'sample' trouvée"
-                    .to_string());
+                return Err(SamplesheetError::InvalidSamplesheet(
+                    "Impossible d'extraire la liste des échantillons: aucune colonne 'sample' trouvée"
+                        .to_string(),
+                ));
             }
 
             // Passer à la ligne suivant l'en-tête pour lire les données
@@ -98,10 +111,10 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
 
             let values: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
             if values.len() != column_names.len() {
-                return Err(format!(
+                return Err(SamplesheetError::InvalidSamplesheet(format!(
                     "Le nombre de colonnes diffère à la ligne {}",
                     i + 1
-                ));
+                )));
             }
 
             // Construire une ligne nettoyée en respectant le nombre de colonnes (pad si nécessaire)
@@ -132,9 +145,9 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), String>
     }
 
     if samples.is_empty() {
-        return Err(
+        return Err(SamplesheetError::InvalidSamplesheet(
             "Impossible d'extraire la liste des échantillons: aucune valeur trouvée".to_string(),
-        );
+        ));
     }
 
     let cleaned = cleaned_lines.join("\n");

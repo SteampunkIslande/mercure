@@ -1,0 +1,20 @@
+id: edge-attribute-from
+language: rust
+message: >-
+  [3/3] Edge error: `#[from]` on anyhow::Error is the single conversion of the
+  edge error. Nothing else is `#[from]`-ed in FrontendError / AuthError: specific
+  errors (ModelError, RunDefinitionError, ...) travel *inside* the anyhow::Error
+  and are recovered with `downcast` in the Responder.
+severity: error
+rule:
+  kind: attribute_item
+  pattern: "#[from]"
+  not:
+    inside:
+      stopBy: end
+      kind: enum_variant
+      has:
+        field: name
+        regex: ^(AnyhowError|InternalError)$
+note: |-
+  See the other side of the contract with `rules/edge-from-anyhow.yml`.

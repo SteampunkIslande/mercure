@@ -1,3 +1,4 @@
+use anyhow::Context;
 use rocket::State;
 use rocket::http::{Cookie, CookieJar};
 use rocket::post;
@@ -23,7 +24,7 @@ pub async fn login_post(
 ) -> Result<Redirect, AuthError> {
     let mut user = User::find_by_usermail(&login.usermail, pool)
         .await?
-        .ok_or(AuthError::UnknownUser)?;
+        .context(AuthError::UnknownUser)?;
 
     if !user.verify_password(&login.password).await {
         return Err(AuthError::InvalidCredentials);

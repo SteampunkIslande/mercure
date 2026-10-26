@@ -15,16 +15,19 @@ pub struct FileCheckForm<'r> {
     pub file_name: &'r str,
 }
 
+/// Errors of the samplesheet itself are reported to the user in the `check` field
+/// ("perfect", "fixable", "invalid") over HTTP 200; only an unreadable file is a
+/// `Failure` payload.
 #[rocket::post("/samplesheet/listsamples", data = "<form>")]
 pub async fn list_samples_from_samplesheet(
     form: Form<FileCheckForm<'_>>,
 ) -> Json<ApiResponse<Value>> {
     let samplesheet_content = match read_to_string(form.file_name) {
-        Ok(s) => s,
-        Err(e) => {
-            return Json(ApiResponse::error(e.to_string()));
-        }
+        Ok(content) => content,
+        Err(e) => return Json(ApiResponse::error(e.to_string())),
     };
+
+    // An invalid samplesheet is a *value* reported to the user, not a failure.
     match correct_samplesheet(&samplesheet_content) {
         Ok((sample_names, _)) => Json(ApiResponse::success(json!({"sample_names":sample_names}))),
         Err(e) => Json(ApiResponse::success(
@@ -36,10 +39,8 @@ pub async fn list_samples_from_samplesheet(
 #[rocket::post("/samplesheet/check", data = "<form>")]
 pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiResponse<Value>> {
     let samplesheet_content = match read_to_string(form.file_name) {
-        Ok(s) => s,
-        Err(e) => {
-            return Json(ApiResponse::error(e.to_string()));
-        }
+        Ok(content) => content,
+        Err(e) => return Json(ApiResponse::error(e.to_string())),
     };
     let config = get_smaug_config();
     // Get upload directory
@@ -57,61 +58,69 @@ pub async fn check_samplesheet(form: Form<FileCheckForm<'_>>) -> Json<ApiRespons
 
     match correct_samplesheet(&samplesheet_content) {
         Ok((sample_names, fix)) => {
+            let unique_sample_count = sample_names
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<HashSet<&str>>()
+                .len();
+
             if fix == samplesheet_content {
                 Json(ApiResponse::success(json!(
                 {
-                    "message":r#"<div class="success-msg" style="animation:none;"><span class="material-icons icon-align" style="color:green;">check</span>La samplesheet est parfaitement valide.</div>"#,
+                    "message": r#"<div class="success-msg" style="animation:none;"><span class="material-icons icon-align" style="color:green;">check</span>La samplesheet est parfaitement valide.</div>"#,
 
-                    "check":"perfect",
+                    "check": "perfect",
 
-                    "sample_names":sample_names,
+                    "sample_names": sample_names,
 
-                    "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
+                    "unique_sample_count": unique_sample_count,
 
-                    "file_name":form.file_name
+                    "file_name": form.file_name
                 })))
             } else {
-                match std::fs::File::create(form.file_name)
+                // A write failure does not lose the analysis: the samplesheet stays
+                // "fixable" and the user is told to upload it again.
+                let message = match std::fs::File::create(form.file_name)
                     .and_then(|mut f| f.write(fix.as_bytes()))
                 {
-                    Ok(_) => Json(ApiResponse::success(json!(
-                    {
-                        "message":format!(r#"<div class="warning-msg" style="animation:none;"><span class="material-icons icon-align" style="color:orange;">warning</span>La samplesheet a été corrigée car elle contenait une ou des erreur(s), veuillez tracer l'incident. La samplesheet modifiée est disponible à <a href="/uploads/{}" download>cette adresse</a></div>"#, samplesheet_rel_path.to_string_lossy()),
+                    Ok(_) => format!(
+                        r#"<div class="warning-msg" style="animation:none;"><span class="material-icons icon-align" style="color:orange;">warning</span>La samplesheet a été corrigée car elle contenait une ou des erreur(s), veuillez tracer l'incident. La samplesheet modifiée est disponible à <a href="/uploads/{}" download>cette adresse</a></div>"#,
+                        samplesheet_rel_path.to_string_lossy()
+                    ),
+                    Err(e) => {
+                        log::warn!(
+                            "Impossible d'enregistrer la samplesheet corrigée {}: {e}",
+                            form.file_name
+                        );
+                        r#"<div class="error-msg" style="animation:none;"><span class="material-icons icon-align" style="color:red;">error</span>La samplesheet aurait pu être corrigée, mais l'enregistrement de la copie corrigée a échoué. Veuillez charger le fichier à nouveau.</div>"#.to_string()
+                    }
+                };
 
-                        "check":"fixable",
+                Json(ApiResponse::success(json!(
+                {
+                    "message": message,
 
-                        "sample_names":sample_names,
+                    "check": "fixable",
 
-                        "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
+                    "sample_names": sample_names,
 
-                        "file_name":form.file_name
-                    }))),
-                    Err(_) => Json(ApiResponse::success(json!(
-                    {
-                        "message":r#"<div class="error-msg" style="animation:none;"><span class="material-icons icon-align" style="color:red;">error</span>La samplesheet aurait pu être corrigée, mais l'enregistrement de la copie corrigée a échoué. Veuillez charger le fichier à nouveau.</div>"#,
+                    "unique_sample_count": unique_sample_count,
 
-                        "check":"fixable",
-
-                        "sample_names":sample_names,
-
-                        "unique_sample_count": sample_names.iter().map(|s|s.as_str()).collect::<HashSet<&str>>().len(),
-
-                        "file_name":form.file_name
-                    }))),
-                }
+                    "file_name": form.file_name
+                })))
             }
         }
         Err(e) => Json(ApiResponse::success(json!(
         {
-            "message":format!(r#"<div class="error-msg" style="animation:none;"><span class="material-icons icon-align" style="color:red;">error</span>La samplesheet n'est pas une samplesheet Illumina valide. Erreur:<br>{}"#,e),
+            "message": format!(r#"<div class="error-msg" style="animation:none;"><span class="material-icons icon-align" style="color:red;">error</span>La samplesheet n'est pas une samplesheet Illumina valide. Erreur:<br>{}"#, e),
 
-            "check":"invalid",
+            "check": "invalid",
 
-            "sample_names":[],
+            "sample_names": [],
 
             "unique_sample_count": 0,
 
-            "file_name":form.file_name
+            "file_name": form.file_name
         }))),
     }
 }

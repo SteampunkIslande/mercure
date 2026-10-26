@@ -1,14 +1,16 @@
+use crate::auth::Authenticated;
+use crate::models::User;
+use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
-use crate::{auth::Authenticated, models::User};
 use rocket::{State, get};
 use sqlx::SqlitePool;
 
 #[get("/dashboard")]
-pub async fn admin_dashboard_get(auth: Authenticated) -> Option<Template> {
+pub async fn admin_dashboard_get(auth: Authenticated) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        return Some(Template::render("errors/admin_only", context! {}));
+        return Err(FrontendError::AdminsOnly);
     }
-    Some(Template::render(
+    Ok(Template::render(
         "admin/dashboard",
         context! {user=>auth.user},
     ))
@@ -20,12 +22,12 @@ pub async fn password_edit_get(
     auth: Authenticated,
     pool: &State<SqlitePool>,
     user_id: i64,
-) -> Option<Template> {
+) -> Result<Template, FrontendError> {
     if user_id != auth.user.id && !auth.user.is_admin {
-        return Some(Template::render("errors/admin_only", context! {}));
+        return Err(FrontendError::AdminsOnly);
     }
-    let edited_user = User::find_by_id(user_id, pool).await.ok()?;
-    Some(Template::render(
+    let edited_user = User::find_by_id(user_id, pool).await?;
+    Ok(Template::render(
         "admin/passedit",
         context! {auth_user=> auth.user, edited_user=>edited_user},
     ))
@@ -33,9 +35,9 @@ pub async fn password_edit_get(
 
 /// Route to show the admin a page to register new user.
 #[get("/register")]
-pub async fn register_get(auth: Authenticated) -> Option<Template> {
+pub async fn register_get(auth: Authenticated) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        return Some(Template::render("errors/admin_only", context! {}));
+        return Err(FrontendError::AdminsOnly);
     }
-    Some(Template::render("admin/register", context! {}))
+    Ok(Template::render("admin/register", context! {}))
 }

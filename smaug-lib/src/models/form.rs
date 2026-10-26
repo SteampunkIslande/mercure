@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use log::warn;
 use minijinja::Environment;
 use minijinja::{UndefinedBehavior, Value};
@@ -11,11 +11,7 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 
 use crate::config::get_smaug_config;
-use crate::{
-    config::SmaugConfig,
-    models::{ModelError, groups},
-    pipeline_exec::{GitCheckError, versionning},
-};
+use crate::{config::SmaugConfig, models::groups, pipeline_exec::versionning};
 
 macro_rules! additional_vars {
     (
@@ -45,44 +41,29 @@ macro_rules! additional_vars {
     };
 }
 
+/// Errors of a form definition that callers may want to recognise: they are the
+/// validation errors shown to the user when a form does not fit a run.
+///
+/// Form functions return `anyhow::Result`; every other failure (git, I/O,
+/// yaml, jinja, database, …) travels as an `anyhow::Error` with context.///
+/// These types are the *named* errors of the layer; the functions themselves
+/// return `anyhow::Result`. The `InternalError` variant only exists to give the
+/// edge errors (FrontendError / AuthError) a single `#[from] anyhow::Error`
+/// conversion point; it is not produced by the model layer itself.
 #[derive(wherror::Error, Debug)]
 pub enum FormDefinitionError {
-    #[error("{location}: {source}")]
-    SerdeError {
-        #[from]
-        source: yaml_serde::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    IOError {
-        #[from]
-        source: std::io::Error,
-        location: &'static std::panic::Location<'static>,
-    },
     #[error("La variable `{}` apparaît en plusieurs exemplaires",.0)]
     DuplicateVarError(String),
     #[error("Les variables suivantes sont requises:{}",.0)]
     MissingVar(String),
     #[error("Erreur de formulaire: {0}")]
     InvalidData(String),
-    #[error("{location}: {source}")]
-    MinijinjaError {
-        #[from]
-        source: minijinja::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    AnyHowError {
-        #[from]
-        source: anyhow::Error,
-        location: &'static std::panic::Location<'static>,
-    },
     #[error("Nom de variable réservé: {}",.0)]
     ReservedVarName(String),
     #[error("{location}: {source}")]
-    GitCheckError {
+    InternalError {
         #[from]
-        source: GitCheckError,
+        source: anyhow::Error,
         location: &'static std::panic::Location<'static>,
     },
 }
@@ -231,12 +212,12 @@ impl Form {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<Form>, ModelError>` - A vector of all valid forms
+    /// - `Result<Vec<Form>>` - A vector of all valid forms
     ///
     /// # Errors
     ///
     /// A lot of things can go wrong here, but you'll know when something goes wrong!
-    pub async fn get_all_form_defs(config: &SmaugConfig) -> Result<Vec<Form>, ModelError> {
+    pub async fn get_all_form_defs(config: &SmaugConfig) -> Result<Vec<Form>> {
         let SmaugConfig { pipelines, .. } = config;
         let all_branches = versionning::get_all_branches(pipelines)
             .await
@@ -245,10 +226,18 @@ impl Form {
         let mut all_forms: Vec<Form> = Vec::new();
 
         for branch_name in all_branches.into_iter() {
-            // 1. List yaml files on this branch
-            let items = versionning::list_yaml_forms(&pipelines, &branch_name)
-                .await
-                .unwrap_or_default();
+            // 1. List yaml files on this branch. A deleted or unreachable branch must
+            // not discard every other branch's forms: log it and keep going.
+            let items = match versionning::list_yaml_forms(&pipelines, &branch_name).await {
+                Ok(items) => items,
+                Err(e) => {
+                    warn!(
+                        "Impossible de lister les formulaires de la branche {}: {}",
+                        branch_name, e
+                    );
+                    continue;
+                }
+            };
             // For each form in given branch
             for dir_item in items {
                 let form_identification = FileIdentification::GitBranchAndPath {
@@ -289,14 +278,24 @@ impl Form {
         Ok(all_forms)
     }
 
-    pub async fn get_form(form_identification: FileIdentification) -> Result<Form, ModelError> {
+    pub async fn get_form(form_identification: FileIdentification) -> Result<Form> {
         let SmaugConfig { pipelines, .. } = crate::config::get_smaug_config();
 
-        let content = versionning::git_get_file(&pipelines, &form_identification).await?;
-        let mut form: Form = yaml_serde::from_str(&content)?;
+        let content = versionning::git_get_file(&pipelines, &form_identification)
+            .await
+            .context(format!(
+                "Impossible de récupérer le formulaire {}",
+                form_identification.path().display()
+            ))?;
+        let mut form: Form = yaml_serde::from_str(&content).context(format!(
+            "Le formulaire {} n'est pas un YAML valide",
+            form_identification.path().display()
+        ))?;
         form.form_identification = form_identification;
         // Check validity of this form by making sure there are no syntax error in the template definition
-        form.check_validity(None).await?;
+        form.check_validity(None)
+            .await
+            .context("Le formulaire est invalide")?;
         Ok(form)
     }
 
@@ -309,7 +308,7 @@ impl Form {
     /// - `Script`: file fetched from the repo. `script_name` is relative to the
     ///   repo root (no `..` traversal allowed) and resolved at the same
     ///   ref/commit as `self.form_identification`.
-    pub async fn template_source(&self) -> Result<String, FormDefinitionError> {
+    pub async fn template_source(&self) -> Result<String> {
         match &self.exec_type {
             FormExecType::Shell { exec } => Ok(exec.clone()),
             FormExecType::Script { script_name } => {
@@ -324,7 +323,8 @@ impl Form {
                     return Err(FormDefinitionError::InvalidData(format!(
                         "script_name `{}` doit être relatif à la racine du dépôt, sans `..`",
                         script_name.display()
-                    )));
+                    ))
+                    .into());
                 }
                 let SmaugConfig { pipelines, .. } = get_smaug_config();
                 let script_ident = match &self.form_identification {
@@ -343,21 +343,19 @@ impl Form {
                     FileIdentification::None => {
                         return Err(FormDefinitionError::InvalidData(
                             "Identification du formulaire invalide".into(),
-                        ));
+                        )
+                        .into());
                     }
                 };
-                Ok(versionning::git_get_file(&pipelines, &script_ident)
+                versionning::git_get_file(&pipelines, &script_ident)
                     .await
-                    .context("Impossible de lire le fichier de script")?)
+                    .context("Impossible de lire le fichier de script")
             }
         }
     }
 
     /// Render the template with the given context, returning the final script.
-    pub async fn render_template(
-        &self,
-        context: &impl Serialize,
-    ) -> Result<String, FormDefinitionError> {
+    pub async fn render_template(&self, context: &impl Serialize) -> Result<String> {
         let template = self.template_source().await?;
         let mut env = Environment::new();
         env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
@@ -365,11 +363,10 @@ impl Form {
             Ok(s) => Ok(s),
             Err(e) => match e.kind() {
                 minijinja::ErrorKind::UndefinedError => Err(FormDefinitionError::MissingVar(
-                    Self::list_missing_vars(&template, context)?
-                        .join(", ")
-                        .to_string(),
-                )),
-                _ => Err(e.into()),
+                    Self::list_missing_vars(&template, context)?.join(", "),
+                )
+                .into()),
+                _ => Err(e).context("Impossible de rendre le template du formulaire"),
             },
         }
     }
@@ -381,10 +378,7 @@ impl Form {
     ///   template with every declared var set to `""` plus injected vars.
     /// - `Some(vars)`: submission-time check. Renders with the provided user
     ///   vars plus injected placeholders.
-    pub async fn check_validity(
-        &self,
-        variables: Option<&HashMap<String, String>>,
-    ) -> Result<(), FormDefinitionError> {
+    pub async fn check_validity(&self, variables: Option<&HashMap<String, String>>) -> Result<()> {
         match variables {
             None => {
                 if let Some(v) = self
@@ -392,7 +386,7 @@ impl Form {
                     .iter()
                     .find(|v| Self::INJECTED_VARS.contains(&v.name.as_str()))
                 {
-                    return Err(FormDefinitionError::ReservedVarName(v.name.to_string()));
+                    return Err(FormDefinitionError::ReservedVarName(v.name.to_string()).into());
                 }
                 let ctx: HashMap<&str, &str> = self
                     .variables
@@ -494,18 +488,17 @@ impl CachedForm {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<FormDef>, ModelError>` - On success, the whole cache (which is equal to
-    ///   the `FormDef`s found in the repository)
+    /// - `Result<Vec<CachedForm>>` - On success, the whole cache (which is equal to
+    ///   the `CachedForm`s found in the repository)
     ///
     /// # Errors
     ///
     /// Returns an error in case of database or git repository issues.
-    pub async fn refresh_cache(
-        pool: &SqlitePool,
-        config: &SmaugConfig,
-    ) -> Result<Vec<Self>, ModelError> {
+    pub async fn refresh_cache(pool: &SqlitePool, config: &SmaugConfig) -> Result<Vec<Self>> {
         let all_forms = Form::get_all_form_defs(config).await?;
-        Self::rebuild_cache_from_forms(pool, all_forms).await
+        Self::rebuild_cache_from_forms(pool, all_forms)
+            .await
+            .context("Impossible de reconstruire le cache des formulaires")
     }
 
     /// Synchronously rebuilds `FormDefs` and `FormDefHasGroup` from an
@@ -513,20 +506,26 @@ impl CachedForm {
     pub(crate) async fn rebuild_cache_from_forms(
         pool: &SqlitePool,
         all_forms: Vec<Form>,
-    ) -> Result<Vec<Self>, ModelError> {
+    ) -> Result<Vec<Self>> {
         let all_groups = groups::Group::get_groups_with_ids(pool).await?;
 
-        let mut tx = pool.begin().await?;
+        let mut tx = pool
+            .begin()
+            .await
+            .context("Impossible d'ouvrir la transaction de reconstruction du cache")?;
 
         sqlx::query("DELETE FROM FormDefHasGroup")
             .execute(&mut *tx)
-            .await?;
+            .await
+            .context("Impossible de vider la table FormDefHasGroup")?;
         sqlx::query("DELETE FROM FormDefs")
             .execute(&mut *tx)
-            .await?;
+            .await
+            .context("Impossible de vider la table FormDefs")?;
         sqlx::query("DELETE from sqlite_sequence where name='FormDefs'")
             .execute(&mut *tx)
-            .await?;
+            .await
+            .context("Impossible de réinitialiser les IDs des formulaires")?;
 
         let mut cached = Vec::new();
         for form in all_forms {
@@ -552,7 +551,8 @@ impl CachedForm {
             .bind(&name)
             .bind(&description)
             .fetch_one(&mut *tx)
-            .await?
+            .await
+            .with_context(|| format!("Impossible d'insérer le formulaire {branch}/{file_path:?}"))?
             .try_get("form_def_id")?;
 
             if let Some(groups) = groups {
@@ -565,7 +565,13 @@ impl CachedForm {
                             .bind(form_def_id)
                             .bind(group.id)
                             .execute(&mut *tx)
-                            .await?;
+                            .await
+                            .with_context(|| {
+                                format!(
+                                    "Impossible d'associer le formulaire {branch}/{file_path:?} au groupe {}",
+                                    group.name
+                                )
+                            })?;
                         }
                         None => log::warn!(
                             "Le formulaire {}/{} attend le groupe {}, qui n'existe pas en base",
@@ -585,20 +591,23 @@ impl CachedForm {
             });
         }
 
-        tx.commit().await?;
+        tx.commit()
+            .await
+            .context("Impossible de valider la reconstruction du cache")?;
 
         Ok(cached)
     }
 
     /// All the cached `FormDef`s (from the database only, no HTTP request)
-    pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Self>, ModelError> {
+    pub async fn get_all(pool: &SqlitePool) -> Result<Vec<Self>> {
         Ok(sqlx::query(
             r#"
             SELECT form_def_id, branch, file_path, name, description FROM FormDefs ORDER BY branch, file_path
             "#,
         )
         .fetch_all(pool)
-        .await?
+        .await
+        .context("Impossible de lister les formulaires en cache")?
         .iter()
         .filter_map(form_def_from_row)
         .collect())
@@ -616,7 +625,7 @@ impl CachedForm {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<(String, String)>, ModelError>` - The list of visible (branch, file_path) pairs
+    /// - `Result<Vec<(String, String)>>` - The list of visible (branch, file_path) pairs
     ///
     /// # Errors
     ///
@@ -624,7 +633,7 @@ impl CachedForm {
     pub async fn visible_form_pairs(
         pool: &SqlitePool,
         groups: Vec<groups::Group>,
-    ) -> Result<Vec<(String, String)>, ModelError> {
+    ) -> Result<Vec<(String, String)>> {
         let group_ids: Vec<i64> = groups.into_iter().map(|g| g.id).collect();
 
         if group_ids.is_empty() {
@@ -651,7 +660,8 @@ impl CachedForm {
 
         Ok(query
             .fetch_all(pool)
-            .await?
+            .await
+            .context("Impossible de lister les formulaires visibles pour ces groupes")?
             .into_iter()
             .filter_map(|row| Some((row.try_get("branch").ok()?, row.try_get("file_path").ok()?)))
             .collect())
@@ -672,7 +682,7 @@ impl CachedForm {
     ///
     /// # Returns
     ///
-    /// - `Result<Vec<i64>, ModelError>` - On success, the list of group ids that are associated with this form
+    /// - `Result<Vec<i64>>` - On success, the list of group ids that are associated with this form
     ///
     /// # Errors
     ///
@@ -681,7 +691,7 @@ impl CachedForm {
         pool: &SqlitePool,
         branch: &str,
         form_path: &str,
-    ) -> Result<Vec<i64>, ModelError> {
+    ) -> Result<Vec<i64>> {
         Ok(sqlx::query(
             r#"
             SELECT fhg.group_id
@@ -693,7 +703,10 @@ impl CachedForm {
         .bind(branch)
         .bind(form_path)
         .fetch_all(pool)
-        .await?
+        .await
+        .with_context(|| {
+            format!("Impossible de lire les groupes du formulaire {branch}/{form_path}")
+        })?
         .into_iter()
         .filter_map(|row| row.try_get("group_id").ok())
         .collect())
@@ -712,8 +725,8 @@ impl CachedForm {
     ///
     /// # Returns
     ///
-    /// - `Result<(Vec<FormDef>, Vec<FormDef>), ModelError>` - (form defs with an assigned group,
-    ///   form defs with no assigned group) as a result.
+    /// - `Result<Vec<CachedForm>>` - form defs visible to the given group (or the
+    ///   form defs with no assigned group when `group_id` is `None`).
     ///
     /// # Errors
     ///
@@ -721,25 +734,25 @@ impl CachedForm {
     pub async fn get_form_defs_for_group(
         pool: &SqlitePool,
         group_id: Option<i64>,
-    ) -> Result<Vec<CachedForm>, ModelError> {
+    ) -> Result<Vec<CachedForm>> {
         let forms = match group_id {
-            Some(group_id) => {
-                sqlx::query(
-                    r#"
+            Some(group_id) => sqlx::query(
+                r#"
                 SELECT fd.form_def_id, fd.branch, fd.file_path, name, description
                 FROM FormDefs fd
                 JOIN FormDefHasGroup fhg ON fhg.form_def_id = fd.form_def_id
                 WHERE fhg.group_id = ?
                 ORDER BY fd.branch, fd.file_path
                 "#,
-                )
-                .bind(group_id)
-                .fetch_all(pool)
-                .await?
-            }
-            None => {
-                sqlx::query(
-                    r#"
+            )
+            .bind(group_id)
+            .fetch_all(pool)
+            .await
+            .with_context(|| {
+                format!("Impossible de lister les formulaires du groupe {group_id}")
+            })?,
+            None => sqlx::query(
+                r#"
                 SELECT fd.form_def_id, fd.branch, fd.file_path, name, description
 FROM FormDefs fd
 WHERE NOT EXISTS (
@@ -748,10 +761,10 @@ WHERE NOT EXISTS (
     WHERE fhg.form_def_id = fd.form_def_id
 )
 ORDER BY fd.branch, fd.file_path"#,
-                )
-                .fetch_all(pool)
-                .await?
-            }
+            )
+            .fetch_all(pool)
+            .await
+            .context("Impossible de lister les formulaires sans groupe")?,
         };
 
         Ok(forms.iter().filter_map(form_def_from_row).collect())
@@ -1176,8 +1189,8 @@ mod form_def_cache_tests {
         let Err(e) = simple_form.render_template(&ctx).await else {
             panic!("Should be an error")
         };
-        match e {
-            FormDefinitionError::MissingVar(v) if v.as_str() == "c" => {}
+        match e.downcast::<FormDefinitionError>() {
+            Ok(FormDefinitionError::MissingVar(v)) if v.as_str() == "c" => {}
             _ => {
                 panic!(r#"Expected FormDefinitionError::MissingVar("c")"#)
             }
@@ -1197,9 +1210,9 @@ mod form_def_cache_tests {
         else {
             panic!("Should be an error")
         };
-        match e {
-            FormDefinitionError::MissingVar(v) if v.as_str() == "a, b, c" => {}
-            FormDefinitionError::MissingVar(v) => {
+        match e.downcast::<FormDefinitionError>() {
+            Ok(FormDefinitionError::MissingVar(v)) if v.as_str() == "a, b, c" => {}
+            Ok(FormDefinitionError::MissingVar(v)) => {
                 panic!("Got: {}", v)
             }
             _ => {

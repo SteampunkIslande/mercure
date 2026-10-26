@@ -1,0 +1,16 @@
+id: use-anyhow-context
+message: Use `.context()` instead of `.with_context()` when not lazily evaluating expensive formatting.
+severity: info
+language: rust
+rule:
+  all:
+    - any:
+        # Matches closures with curly braces: .with_context(|| { ... })
+        - pattern: $BASE.with_context(|| { $MSG })
+        # Matches direct closures: .with_context(|| ...)
+        - pattern: $BASE.with_context(|| $MSG)
+    - not:
+        has:
+          # Ignores the match if a format! macro is found anywhere inside it
+          pattern: format!($$$)
+fix: $BASE.context($MSG)

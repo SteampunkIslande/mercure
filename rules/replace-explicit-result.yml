@@ -1,0 +1,24 @@
+id: replace-explicit-result
+language: rust
+message: >-
+  [2/3] Middle function: explicit `Result<T, E>` must become `anyhow::Result<T>`
+  (also catches `std::result::Result` and already-anyhow aliases). The apply
+  command rewrites the remaining explicit ones:
+    ast-grep scan --rule rules/replace-explicit-result.yml smaug-lib/src src --rewrite
+severity: warning
+rule:
+  kind: generic_type
+  pattern:
+    context: "type _X = Result<$T, $E>;"
+    selector: generic_type
+  not:
+    has:
+      field: type_arguments
+      has:
+        stopBy: end
+        kind: type_identifier
+        regex: ^(anyhow|Self|S|D|Status)$
+note: |-
+  Applies to the model, the routes (back-end handlers) and the binary. The
+  "specific" functions flagged by `specific-result-type` are the exceptions:
+  their error type stays (see that rule's note).

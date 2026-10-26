@@ -13,10 +13,7 @@ pub async fn edit_groups_for_user(
     user_id: i64,
 ) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        return Ok(Template::render(
-            "errors/admin_only",
-            context! {user_name=>auth.user.username},
-        ));
+        return Err(FrontendError::AdminsOnly);
     }
     let user = User::find_by_id(user_id, pool)
         .await

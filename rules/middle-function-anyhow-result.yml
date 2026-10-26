@@ -1,0 +1,31 @@
+id: middle-function-anyhow-result
+language: rust
+message: >-
+  [2/3] Middle function: it returns anyhow::Result. `?` is the conversion point,
+  so each fallible step carries `.with_context(...)` (picked up by wherror when
+  the error reaches an edge error) naming the operation that failed.
+severity: info
+rule:
+  kind: function_item
+  all:
+    - has:
+        field: return_type
+        kind: generic_type
+        has:
+          kind: type_identifier
+          regex: ^Result$
+    # The bodies of the two `Responder` impls (the HTML page of FrontendError and
+    # the JSON error of AuthError) sit on the edge: they keep the trait's own
+    # error type, which is exactly why every route can `?` into them.
+    - not:
+        inside:
+          stopBy: end
+          kind: impl_item
+          has:
+            regex: ^Responder
+note: |-
+  Applies to models, request guards, pipeline helpers, back-end handlers and the
+  binary. See also `rules/specific-result-type.yml` (contract errors kept) and
+  `rules/edge-from-anyhow.yml` (the single `#[from] anyhow::Error` of the edge
+  errors). `impl FromRequest for Authenticated` is covered by the same regex: its
+  only function (`from_request`) returns the trait's `Outcome`, never a `Result`.

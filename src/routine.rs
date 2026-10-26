@@ -1,79 +1,20 @@
 use anyhow::{Context, Result, bail};
 use log::{error, info, warn};
 use smaug::config::get_smaug_config;
-use smaug::models::{ModelError, SigintBehavior, analysis, appstate};
+use smaug::models::{SigintBehavior, analysis, appstate};
 use smaug_lib::pipeline_exec::{LogProgressParser, RunProgressCache, versionning};
-use std::io::Error as IoError;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::task::{JoinError as TokioJoinError, JoinSet};
+use tokio::task::JoinSet;
 
 use sqlx::SqlitePool;
-
-use wherror::Error;
-
-use regex::Error as RegexError;
-use smaug_lib::models::AnalysisStateMachineError;
-use sqlx::Error;
 
 use smaug_lib::models::Attempt;
 
 use tokio::process::{Child, Command};
 use tokio::sync::broadcast;
 use tokio::time::{Duration, interval};
-
-#[derive(Error, Debug)]
-enum RoutineError {
-    #[error("{location}: {source}")]
-    Sqlx {
-        #[from]
-        source: Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    AnalysisStateMachine {
-        #[from]
-        source: AnalysisStateMachineError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    Model {
-        #[from]
-        source: ModelError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    IO {
-        #[from]
-        source: IoError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    TokioJoin {
-        #[from]
-        source: TokioJoinError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    InvalidRegex {
-        #[from]
-        source: RegexError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    AnyhowError {
-        #[from]
-        source: anyhow::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    GitCheckError {
-        #[from]
-        source: versionning::GitCheckError,
-        location: &'static std::panic::Location<'static>,
-    },
-}
 
 pub async fn run_routine_loop(
     pool: &SqlitePool,
@@ -99,7 +40,6 @@ pub async fn run_routine_loop(
                     continue;
                 }
                 match find_run_to_launch(pool).await{
-
                     Ok(mut runs_to_launch) => {
                         while let Some(attempt) = runs_to_launch.pop() {
                             let child_rx = child_shutdown_tx.subscribe();
@@ -171,8 +111,10 @@ pub async fn run_routine_loop(
     Ok(())
 }
 
-async fn find_run_to_launch(pool: &SqlitePool) -> Result<Vec<Attempt>, RoutineError> {
-    Ok(Attempt::get_pending_runs(pool).await?)
+async fn find_run_to_launch(pool: &SqlitePool) -> Result<Vec<Attempt>> {
+    Attempt::get_pending_runs(pool)
+        .await
+        .context("Impossible de récupérer les tentatives à lancer")
 }
 
 async fn send_sigint_then_kill(
@@ -256,11 +198,16 @@ async fn tee_stream_to_file_and_cache<R>(
     run_id: i64,
     attempt_number: u32,
     stream_type: &'static str,
-) -> anyhow::Result<()>
+) -> Result<()>
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,
 {
-    let mut file = tokio::fs::File::create(file_path).await?;
+    let mut file = tokio::fs::File::create(file_path).await.with_context(|| {
+        format!(
+            "Impossible de créer le fichier de log {}",
+            file_path.display()
+        )
+    })?;
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
 
@@ -274,12 +221,17 @@ where
 
     loop {
         line.clear();
-        let bytes_read = reader.read_line(&mut line).await?;
+        let bytes_read = reader
+            .read_line(&mut line)
+            .await
+            .with_context(|| format!("Impossible de lire la sortie {}", stream_type))?;
         if bytes_read == 0 {
             break;
         }
 
-        file.write_all(line.as_bytes()).await?;
+        file.write_all(line.as_bytes())
+            .await
+            .with_context(|| format!("Impossible d'écrire dans {}", file_path.display()))?;
 
         if let Some(parser) = parser.as_mut() {
             parser.parse_line(&line);
@@ -287,7 +239,9 @@ where
         }
     }
 
-    file.flush().await?;
+    file.flush()
+        .await
+        .with_context(|| format!("Impossible de vider le tampon de {}", file_path.display()))?;
     Ok(())
 }
 
@@ -299,7 +253,7 @@ async fn run_script(
     pool: &SqlitePool,
     progress_cache: RunProgressCache,
     mut shutdown_rx: broadcast::Receiver<()>,
-) -> Result<(), RoutineError> {
+) -> Result<()> {
     let (git_manager, scripts_dir, logs_dir) = {
         let config = get_smaug_config();
 
@@ -318,7 +272,9 @@ async fn run_script(
     let stderr_path = logs_dir.join(format!("{}.stderr", script_id));
 
     let run = attempt.get_run(pool).await?;
-    let rendered = attempt.render_script(&run.run_name).await?;
+    let rendered = attempt.render_script(&run.run_name).await.context(format!(
+        "Impossible de rendre le script de la tentative {script_id}"
+    ))?;
 
     // Async FS operations
     tokio::fs::create_dir_all(attempt.outdir())
@@ -339,13 +295,10 @@ async fn run_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .with_context(|| {
-            format!(
-                "Erreur de lancement pour la tentative {} du run {}",
-                attempt.attempt_number, attempt.run_id
-            )
-        })
-        .map_err(RoutineError::from)?; // Assuming RoutineError implements From<anyhow::Error>
+        .context(format!(
+            "Erreur de lancement pour la tentative {} du run {}",
+            attempt.attempt_number, attempt.run_id
+        ))?;
 
     let stdout = child.stdout.take().context("Can't take stdout handle")?;
     let stderr = child.stderr.take().context("Can't take stderr handle")?;
@@ -394,7 +347,7 @@ async fn run_script(
                     let code = status.code().map(|c| c.to_string()).unwrap_or_else(|| "?".to_string());
                     analysis::complete_failure(attempt.run_id, &format!("(exit code {})", code), pool).await?;
                 }
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e).context("Erreur en attendant la fin du script"),
             }
         }
 
@@ -433,7 +386,7 @@ async fn run_script(
 }
 
 // Helper function to deduplicate directory validation
-async fn ensure_absolute_dir(path: &Path, name: &str) -> anyhow::Result<()> {
+async fn ensure_absolute_dir(path: &Path, name: &str) -> Result<()> {
     if !path.is_absolute() {
         return Err(anyhow::anyhow!(
             "Le dossier `{}` est mal configuré, un chemin absolu est requis",

@@ -4,9 +4,8 @@ use crate::models::Form;
 use crate::models::Group;
 use crate::models::User;
 
-use crate::models::ModelError;
 use crate::utils::format_french_date;
-use anyhow::Context;
+use anyhow::{Context, Result};
 use rocket::form::FromFormField;
 use rocket::form::ValueField;
 use serde::{Deserialize, Serialize};
@@ -21,6 +20,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use time::{OffsetDateTime, UtcOffset};
 
+/// Errors that callers may want to recognise when describing a run.
+///
+/// Run functions return `anyhow::Result`; a bad status or a refused edition are
+/// *user* errors, so they keep a name.///
+/// These types are the *named* errors of the layer; the functions themselves
+/// return `anyhow::Result`. The `InternalError` variant only exists to give the
+/// edge errors (FrontendError / AuthError) a single `#[from] anyhow::Error`
+/// conversion point; it is not produced by the model layer itself.
 #[derive(Debug, wherror::Error)]
 pub enum RunDefinitionError {
     #[error("Le run est dans un statut invalide")]
@@ -30,19 +37,7 @@ pub enum RunDefinitionError {
     #[error("RunID manquant!")]
     MissingRunID,
     #[error("{location}: {source}")]
-    SqlxError {
-        #[from]
-        source: sqlx::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    SerdeJsonError {
-        #[from]
-        source: serde_json::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    AnyHowError {
+    InternalError {
         #[from]
         source: anyhow::Error,
         location: &'static std::panic::Location<'static>,
@@ -103,7 +98,7 @@ impl FromStr for RunStatus {
             "Running" => Ok(RunStatus::Running),
             "Success" => Ok(RunStatus::Success),
             s if s.starts_with("Failure:") => Ok(RunStatus::Failure(s[8..].to_string())),
-            _ => Err(RunDefinitionError::InvalidRunStatusError.into()),
+            _ => Err(RunDefinitionError::InvalidRunStatusError),
         }
     }
 }
@@ -140,18 +135,20 @@ pub struct Run {
 
 impl Run {
     /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
-    pub async fn new_run(mut run_submission: Run, pool: &SqlitePool) -> Result<i64, ModelError> {
+    pub async fn new_run(mut run_submission: Run, pool: &SqlitePool) -> Result<i64> {
         // Date de création (peu importe ce que l'utilisateur avait soumis)
         run_submission.creation_date = Some(OffsetDateTime::now_utc());
 
-        let user_defined_vars_str = serde_json::to_string(&run_submission.user_defined_vars)?;
+        let user_defined_vars_str = serde_json::to_string(&run_submission.user_defined_vars)
+            .context("Impossible de sérialiser les variables du run")?;
 
         // Insérer dans la table Runs
         let form = run_submission.get_form().await?;
         // S'assurer que le formulaire est bien rempli (les vars injectées
         // `outdir`/`attempt_number` sont ajoutées à l'exécution)
         form.check_validity(Some(&run_submission.user_defined_vars))
-            .await?;
+            .await
+            .context("Le formulaire soumis est invalide")?;
 
         match run_submission.form_identification {
             FileIdentification::GitBranchAndPath { branch, file_path } => {
@@ -171,12 +168,20 @@ impl Run {
                 .bind(&user_defined_vars_str)
                 .bind(&file_path.to_string_lossy())
                 .fetch_one(pool)
-                .await?
+                .await
+                .with_context(|| {
+                    format!(
+                        "Impossible d'insérer le run `{}` de l'utilisateur {}",
+                        run_submission.run_name, run_submission.user_id
+                    )
+                })?
                 .try_get("run_id")?;
 
                 Ok(run_id)
             }
-            _ => Err(anyhow::format_err!("Impossible de créer un nouveau run sans faire référence à une branche et un nom de fichier").into()),
+            _ => anyhow::bail!(
+                "Impossible de créer un nouveau run sans faire référence à une branche et un nom de fichier"
+            ),
         }
     }
 
@@ -185,17 +190,22 @@ impl Run {
         run_id: i64,
         user_defined_vars: HashMap<String, String>,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
-        let user_defined_vars_str = serde_json::to_string(&user_defined_vars)?;
+    ) -> Result<()> {
+        let user_defined_vars_str = serde_json::to_string(&user_defined_vars)
+            .context("Impossible de sérialiser les variables du run")?;
 
-        let run: Run = Self::get_run_from_id(run_id, pool).await?;
+        let run: Run = Self::get_run_from_id(run_id, pool)
+            .await
+            .with_context(|| format!("Impossible de lire le run {run_id}"))?;
         if !matches!(run.status, RunStatus::Idle) {
             return Err(RunDefinitionError::UneditableRun.into());
         }
 
         let form = run.get_form().await?;
         // S'assurer que le formulaire est bien rempli
-        form.check_validity(Some(&user_defined_vars)).await?;
+        form.check_validity(Some(&user_defined_vars))
+            .await
+            .context("Le formulaire édité est invalide")?;
 
         sqlx::query(
             r#"
@@ -205,7 +215,8 @@ impl Run {
         .bind(&user_defined_vars_str)
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de mettre à jour les variables du run {run_id}"))?;
 
         Ok(())
     }
@@ -318,7 +329,7 @@ impl Run {
         page: Option<i64>,
         title: &str,
         filters: RunFilters<'_>,
-    ) -> Result<Value, ModelError> {
+    ) -> Result<Value> {
         let limit = page_size.unwrap_or(5).max(1);
         let current_page = page.unwrap_or(1).max(1);
         let offset = (current_page - 1) * limit;
@@ -399,9 +410,18 @@ impl Run {
             base_query = base_query.bind(bind);
         }
 
-        let total_count: i64 = count_query.fetch_one(pool).await?.try_get("total")?;
+        let total_count: i64 = count_query
+            .fetch_one(pool)
+            .await
+            .context("Impossible de compter les runs visibles")?
+            .try_get("total")?;
 
-        let rows = base_query.bind(limit).bind(offset).fetch_all(pool).await?;
+        let rows = base_query
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+            .context("Impossible de lister les runs visibles")?;
 
         let mut table = Vec::with_capacity(rows.len());
         for row in &rows {
@@ -449,7 +469,7 @@ impl Run {
         page: Option<i64>,
         status: Option<RunStatus>,
         groups: Option<Vec<Group>>,
-    ) -> Result<Value, ModelError> {
+    ) -> Result<Value> {
         let title = if groups.is_none() {
             "Liste des runs (tous les groupes)"
         } else {
@@ -509,7 +529,7 @@ impl Run {
         date_to: Option<&str>,
         run_name_search: Option<&str>,
         groups: Option<Vec<Group>>,
-    ) -> Result<Value, ModelError> {
+    ) -> Result<Value> {
         let title = if groups.is_none() {
             "Résultats de la recherche (tous les groupes)"
         } else {
@@ -533,10 +553,7 @@ impl Run {
     }
 
     /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
-    pub async fn get_run_from_id(
-        run_id: i64,
-        pool: &SqlitePool,
-    ) -> Result<Self, RunDefinitionError> {
+    pub async fn get_run_from_id(run_id: i64, pool: &SqlitePool) -> Result<Self> {
         let row = sqlx::query(
             r#"
             SELECT * FROM Runs WHERE run_id = ?
@@ -544,7 +561,8 @@ impl Run {
         )
         .bind(run_id)
         .fetch_one(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de lire le run {run_id}"))?;
 
         let run_name = row.try_get("run_name")?;
         let creation_date = row.try_get("creation_date")?;
@@ -567,7 +585,9 @@ impl Run {
             serde_json::from_str(row.try_get("user_defined_vars")?)?;
 
         // Parser le statut
-        let status: RunStatus = RunStatus::from_str(row.try_get("status")?)?;
+        let status: RunStatus = RunStatus::from_str(row.try_get("status")?)
+            .map_err(anyhow::Error::from)
+            .with_context(|| format!("Statut invalide pour le run {run_id}"))?;
         // Nombre de tentatives
         let attempt_count = row.try_get("attempt_count")?;
         // Le nom de la branche à utiliser pour l'exécution
@@ -598,12 +618,14 @@ impl Run {
         Ok(hgrun)
     }
 
-    pub async fn get_form(&self) -> Result<Form, ModelError> {
+    pub async fn get_form(&self) -> Result<Form> {
         Form::get_form(self.form_identification.clone()).await
     }
 
-    pub async fn get_user(&self, pool: &SqlitePool) -> Result<User, ModelError> {
-        Ok(User::find_by_id(self.user_id, pool).await?)
+    pub async fn get_user(&self, pool: &SqlitePool) -> Result<User> {
+        User::find_by_id(self.user_id, pool)
+            .await
+            .with_context(|| format!("Impossible de lire l'utilisateur {}", self.user_id))
     }
 
     /// Valide le formulaire pour ce run : Idle -> Pending
@@ -611,7 +633,7 @@ impl Run {
     /// Cette fonction ne modifie que la table HgRun.
     ///
     /// Il est de la responsabilité de l'appelant de mettre à jour la table Attempts **après** cette fonction.
-    pub(super) async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<()> {
         // Incrémenter le nombre de tentatives
         sqlx::query(
             r#"
@@ -621,13 +643,14 @@ impl Run {
         .bind(RunStatus::Pending.to_string())
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de passer le run {run_id} en attente"))?;
 
         Ok(())
     }
 
     /// Démarre le run : Pending -> Running (appelé par la routine de surveillance)
-    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
         // Mettre à jour le statut à Running
         sqlx::query(
             r#"
@@ -637,13 +660,14 @@ impl Run {
         .bind(RunStatus::Running.to_string())
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de démarrer le run {run_id}"))?;
 
         Ok(())
     }
 
     /// Termine le run avec succès : Running -> Success
-    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
         // Mettre à jour le statut à Success
         sqlx::query(
             r#"
@@ -653,7 +677,8 @@ impl Run {
         .bind(RunStatus::Success.to_string())
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de terminer avec succès le run {run_id}"))?;
 
         Ok(())
     }
@@ -663,7 +688,7 @@ impl Run {
         run_id: i64,
         reason: &str,
         pool: &SqlitePool,
-    ) -> Result<(), ModelError> {
+    ) -> Result<()> {
         // Mettre à jour le statut à Failure
         sqlx::query(
             r#"
@@ -673,13 +698,14 @@ impl Run {
         .bind(RunStatus::Failure(reason.to_string()).to_string())
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de marquer le run {run_id} en échec"))?;
 
         Ok(())
     }
 
     /// Relance le run : Success/Failure -> Idle
-    pub(super) async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub(super) async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
         // Mettre à jour le statut à Idle
         sqlx::query(
             r#"
@@ -689,7 +715,8 @@ impl Run {
         .bind("Idle")
         .bind(run_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de relancer le run {run_id}"))?;
 
         Ok(())
     }

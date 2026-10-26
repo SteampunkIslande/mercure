@@ -18,72 +18,27 @@ pub use hgrun::*;
 pub use run_progress::*;
 pub use user::*;
 
-use crate::pipeline_exec::versionning;
-
+/// Errors that belong to the model layer as a whole.
+///
+/// The model layer is the "middle" of the application: its functions return
+/// `anyhow::Result`. The few errors listed here are only raised when a caller
+/// *knows how to name* the failure, and are therefore reusable inside an
+/// `anyhow::Error` chain (that is what lets the edge `Responder`s map them to a
+/// specific HTTP status).///
+/// These types are the *named* errors of the layer; the functions themselves
+/// return `anyhow::Result`. The `InternalError` variant only exists to give the
+/// edge errors (FrontendError / AuthError) a single `#[from] anyhow::Error`
+/// conversion point; it is not produced by the model layer itself.
 #[derive(Debug, wherror::Error)]
 pub enum ModelError {
-    #[error("Form serde error from/to json in file {location}: {source}")]
-    SerdeJsonError {
-        #[from]
-        source: serde_json::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("Form serde error from/to yaml in file {location}: {source}")]
-    SerdeYamlError {
-        #[from]
-        source: yaml_serde::Error,
-        location: &'static std::panic::Location<'static>,
-    },
+    #[error("Entrée invalide: {0}")]
+    InvalidInput(String),
     #[error("{location}: {source}")]
-    DatabaseError {
-        #[from]
-        source: sqlx::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    RunDefinitionError {
-        #[from]
-        source: hgrun::RunDefinitionError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    GitCheckError {
-        #[from]
-        source: versionning::GitCheckError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    IOError {
-        #[from]
-        source: std::io::Error,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    AttemptError {
-        #[from]
-        source: attempt::AttemptError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    BcryptError {
-        #[from]
-        source: bcrypt::BcryptError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {source}")]
-    FormError {
-        #[from]
-        source: form::FormDefinitionError,
-        location: &'static std::panic::Location<'static>,
-    },
-    #[error("{location}: {}",source.chain().map(|e|e.to_string()).collect::<Vec<_>>().join("<br>"))]
-    AnyHowError {
+    InternalError {
         #[from]
         source: anyhow::Error,
         location: &'static std::panic::Location<'static>,
     },
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
 }
 
 impl From<Infallible> for ModelError {

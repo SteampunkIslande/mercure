@@ -1,0 +1,47 @@
+id: edge-from-anyhow
+language: rust
+message: >-
+  [3/3] Edge error: what the application exposes (FrontendError for HTML pages,
+  AuthError for the JSON API, and the specific error types of the model layer)
+  has exactly one `#[from]` variant, and it is `anyhow::Error`. wherror adds the
+  `location` field and fills it from the call site of `.into()`, so the variant
+  declaration must stay intact when edge variants are added or removed. The
+  responders read `{location}` (file:line) and `downcast` the anyhow chain to
+  choose the HTTP status / page.
+severity: info
+rule:
+  kind: enum_variant
+  all:
+    - has:
+        field: name
+        regex: ^(AnyhowError|InternalError)$
+    - has:
+        stopBy: end
+        kind: field_declaration
+        has:
+          field: name
+          regex: ^source$
+    - has:
+        stopBy: end
+        kind: field_declaration
+        has:
+          field: name
+          regex: ^location$
+    - has:
+        stopBy: end
+        kind: field_declaration
+        has:
+          kind: scoped_type_identifier
+    - has:
+        stopBy: end
+        kind: field_declaration
+        has:
+          kind: reference_type
+          has:
+            kind: generic_type
+note: |-
+  Found on: FrontendError (routes/front_end/mod.rs), AuthError (auth/mod.rs) and
+  the model errors ModelError, RunDefinitionError, FormDefinitionError,
+  AnalysisStateMachineError, AttemptError, GitCheckError.
+    - FrontendError -> Template::render("common/error")
+    - AuthError     -> ApiResponse JSON

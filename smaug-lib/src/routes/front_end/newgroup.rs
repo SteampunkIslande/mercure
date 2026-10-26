@@ -8,7 +8,7 @@ use crate::auth::Authenticated;
 #[get("/groups/new")]
 pub async fn new_group(auth: Authenticated) -> Result<Template, FrontendError> {
     if !auth.user.is_admin {
-        Ok(Template::render("errors/admin_only", context! {}))
+        Err(FrontendError::AdminsOnly)
     } else {
         Ok(Template::render("admin/new_group", context! {}))
     }

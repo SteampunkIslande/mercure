@@ -1,15 +1,17 @@
+use anyhow::{Context, Result};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::time::Duration;
 
-pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
+pub async fn create_pool(database_url: &str) -> Result<SqlitePool> {
     SqlitePoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(3))
         .connect(database_url)
         .await
+        .with_context(|| format!("Impossible de se connecter à la base `{database_url}`"))
 }
 
-pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+pub async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS Users (
@@ -24,7 +26,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -35,7 +38,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -49,7 +53,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -68,7 +73,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -86,7 +92,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -97,7 +104,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -112,7 +120,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     sqlx::query(
         r#"
@@ -126,7 +135,8 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     // A general-purpose table to share state accross the app (such as disabling new run executions)
     sqlx::query(
@@ -138,12 +148,13 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         "#,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Impossible d'exécuter une migration")?;
 
     Ok(())
 }
 
-pub async fn init_db_from_url(url: &str) -> Result<SqlitePool, sqlx::Error> {
+pub async fn init_db_from_url(url: &str) -> Result<SqlitePool> {
     let pool = create_pool(url).await?;
     run_migrations(&pool).await?;
     Ok(pool)

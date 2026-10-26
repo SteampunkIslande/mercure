@@ -3,11 +3,9 @@ use std::str::FromStr;
 use rocket::serde::Serialize;
 use serde::ser::SerializeSeq;
 
-use crate::models::ModelError;
-
 /// Core trait for all configuration items (both Enums and Dates)
 pub trait ConfigItem:
-    Sized + FromStr<Err = ModelError> + std::fmt::Display + Send + Sync + 'static
+    Sized + FromStr<Err = anyhow::Error> + std::fmt::Display + Send + Sync + 'static
 {
     const DB_KEY: &'static str;
     const DESCRIPTION: &'static str;

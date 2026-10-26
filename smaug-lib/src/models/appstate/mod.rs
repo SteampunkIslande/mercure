@@ -5,7 +5,7 @@
 //! - `AppStateConfigKey` - Registry enum for all config keys
 //! - `ConfigItem` - Trait for strongly-typed config values
 //! - `ValueInput` - Enum for HTML input rendering (Combo, Date)
-//! - `SigintBehavior`, `ActiveRoutine`, `AppShutdownDate` - Concrete config types
+//! - `SigintBehavior`, `ActiveRoutine` - Concrete config types
 
 mod appstate_impl;
 mod appstate_macros;
@@ -33,11 +33,5 @@ define_app_configs! {
         description: "Permet l'exécution immédiate de tous les runs...",
         default: RoutineOn,
         variants: [RoutineOff, RoutineOn],
-    },
-
-    pub date AppShutdownDate {
-        db_key: "app_shutdown_date",
-        description: "Date prévisionnelle d'arrêt de service de l'application",
-        default: "2025-12-31",
     }
 }

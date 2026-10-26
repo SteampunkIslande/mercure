@@ -1,14 +1,15 @@
 use hmac::{Hmac, Mac};
-use log::error;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
+use rocket::serde::json::Json;
 use rocket::{State, get, post};
 use sha2::Sha256;
 use sqlx::SqlitePool;
 
-use crate::auth::Authenticated;
+use crate::auth::{AuthError, Authenticated};
 use crate::config::SmaugConfig;
 use crate::models::form;
+use crate::routes::ApiResponse;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -35,21 +36,16 @@ impl<'r> FromRequest<'r> for GiteaSignature<'r> {
 ///
 /// # Returns
 ///
-/// - `(Status, String)` - A tuple of HTTP Status with a custom message
-async fn update_cache(pool: &State<SqlitePool>, config: &State<SmaugConfig>) -> (Status, String) {
-    match form::CachedForm::refresh_cache(pool, config).await {
-        Ok(v) => (
-            Status::Ok,
-            format!(
-                "Le cache a été mis à jour avec succès ({} formulaires)",
-                v.len()
-            ),
-        ),
-        Err(e) => {
-            error!("{e}");
-            (Status::InternalServerError, e.to_string())
-        }
-    }
+/// - `ApiResponse<String>` - The number of forms in the refreshed cache, or the error
+async fn update_cache(
+    pool: &State<SqlitePool>,
+    config: &State<SmaugConfig>,
+) -> Result<Json<ApiResponse<String>>, AuthError> {
+    let v = form::CachedForm::refresh_cache(pool, config).await?;
+    Ok(Json(ApiResponse::success(format!(
+        "Le cache a été mis à jour avec succès ({} formulaires)",
+        v.len()
+    ))))
 }
 
 #[get("/update/cache/forms")]
@@ -57,12 +53,11 @@ pub async fn update_cache_get(
     auth: Authenticated,
     pool: &State<SqlitePool>,
     config: &State<SmaugConfig>,
-) -> (Status, String) {
+) -> Result<Json<ApiResponse<String>>, AuthError> {
     if !auth.user.is_admin {
-        (Status::Unauthorized, "Only admins can update forms!".into())
-    } else {
-        update_cache(pool, config).await
+        return Err(AuthError::AdminsOnly);
     }
+    update_cache(pool, config).await
 }
 
 #[post("/update/cache/forms/gitea", data = "<body>")]
@@ -71,32 +66,23 @@ pub async fn gitea_webhook_update_form_cache(
     config: &State<SmaugConfig>,
     pool: &State<SqlitePool>,
     body: Vec<u8>,
-) -> (Status, String) {
+) -> Result<Json<ApiResponse<String>>, AuthError> {
     let webhook_secret: &str = config.webhook_secret.as_str();
 
-    // Decode the incoming hex signature into raw bytes
-    let Ok(sig_bytes) = hex::decode(signature.0) else {
-        return (
-            Status::BadRequest,
-            "Invalid hex formatting in signature header.".into(),
-        );
-    };
+    // Decode the incoming hex signature into raw bytes. A malformed header is a
+    // client error: answer 400 (InvalidSignature) so Gitea does not retry it.
+    let sig_bytes = hex::decode(signature.0).map_err(|_| AuthError::InvalidSignature)?;
 
     // Initialize the HMAC hasher with your secret
-    let Ok(mut mac) = HmacSha256::new_from_slice(webhook_secret.as_bytes()) else {
-        return (
-            Status::InternalServerError,
-            "Cannot create HMAC hasher from secret".into(),
-        );
-    };
+    let mut mac = HmacSha256::new_from_slice(webhook_secret.as_bytes())
+        .map_err(|e| anyhow::anyhow!("Cannot create HMAC hasher from secret: {e}"))?;
 
     // Hash the raw request body
     mac.update(&body);
 
     // Verify the signature using constant-time equality
-    if mac.verify_slice(&sig_bytes).is_ok() {
-        update_cache(pool, config).await
-    } else {
-        (Status::Unauthorized, "Nope, Unauthorized".into())
-    }
+    mac.verify_slice(&sig_bytes)
+        .map_err(|_| AuthError::InvalidCredentials)?;
+
+    update_cache(pool, config).await
 }

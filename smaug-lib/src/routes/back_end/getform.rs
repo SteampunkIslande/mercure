@@ -2,7 +2,7 @@ use rocket::{State, get, serde::json::Json};
 use serde_json::json;
 use sqlx::SqlitePool;
 
-use crate::auth::Authenticated;
+use crate::auth::{AuthError, Authenticated};
 use crate::models::CachedForm;
 use crate::routes::ApiResponse;
 
@@ -10,11 +10,11 @@ use crate::routes::ApiResponse;
 /// repository). The cache is rebuilt by `POST /smaug/api/update/cache`
 /// (see `forms_cache.rs`).
 #[get("/forms/all")]
-pub async fn get_all_forms(pool: &State<SqlitePool>) -> Json<ApiResponse<Vec<CachedForm>>> {
-    match CachedForm::get_all(pool).await {
-        Ok(alldefs) => Json(ApiResponse::success(alldefs)),
-        Err(e) => Json(ApiResponse::error(format!("{e}"))),
-    }
+pub async fn get_all_forms(
+    pool: &State<SqlitePool>,
+) -> Result<Json<ApiResponse<Vec<CachedForm>>>, AuthError> {
+    let alldefs = CachedForm::get_all(pool).await?;
+    Ok(Json(ApiResponse::success(alldefs)))
 }
 
 /// Lists cached FormDefs (with their `form_def_id`, `branch`, `file_path`) visible
@@ -24,24 +24,22 @@ pub async fn get_all_forms_for_group(
     pool: &State<SqlitePool>,
     group_id: Option<i64>,
     auth: Authenticated,
-) -> Json<ApiResponse<serde_json::Value>> {
-    match CachedForm::get_form_defs_for_group(pool, group_id).await {
-        Ok(forms) => Json(ApiResponse::success(match group_id {
-            Some(_) => {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AuthError> {
+    let forms = CachedForm::get_form_defs_for_group(pool, group_id).await?;
+    Ok(Json(ApiResponse::success(match group_id {
+        Some(_) => {
+            json!({
+                "with_group": forms,
+            })
+        }
+        None => {
+            if auth.user.is_admin {
                 json!({
-                    "with_group": forms,
+                    "without_group": forms,
                 })
+            } else {
+                json!({"without_groups": []})
             }
-            None => {
-                if auth.user.is_admin {
-                    json!({
-                        "without_group": forms,
-                    })
-                } else {
-                    json!({"without_groups": []})
-                }
-            }
-        })),
-        Err(e) => Json(ApiResponse::error(format!("{e}"))),
-    }
+        }
+    })))
 }

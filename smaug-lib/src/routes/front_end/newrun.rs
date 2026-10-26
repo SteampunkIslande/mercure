@@ -16,7 +16,9 @@ pub async fn new_run_get(
 ) -> Result<Template, FrontendError> {
     let form = Form::get_form(FileIdentification::GitBranchAndPath {
         branch: branch.to_string(),
-        file_path: file_path.to_path_buf(true)?,
+        file_path: file_path
+            .to_path_buf(true)
+            .map_err(|e| anyhow::anyhow!("Chemin de formulaire invalide: {e:?}"))?,
     })
     .await?;
     let variables: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();

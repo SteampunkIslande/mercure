@@ -6,7 +6,6 @@ use rocket::State;
 use rocket::get;
 use sqlx::SqlitePool;
 
-use crate::models::ModelError;
 use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
 
@@ -22,8 +21,11 @@ pub async fn edit_run_get(
 ) -> Result<Template, FrontendError> {
     let mut run: Run = Run::get_run_from_id(run_id, pool)
         .await
-        .map_err(ModelError::from)?;
-    let form = run.get_form().await?;
+        .with_context(|| format!("Impossible de lire le run {run_id}"))?;
+    let form = run
+        .get_form()
+        .await
+        .with_context(|| format!("Impossible de lire le formulaire du run {run_id}"))?;
     let variables_html: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
 
     let variable_names: HashSet<&str> = form.variables.iter().map(|v| v.name.as_str()).collect();
@@ -49,12 +51,14 @@ pub async fn edit_run_get(
                 .iter()
                 .map(|grp| grp.id)
                 .collect();
+            let run_user_name = run.get_user(pool).await?.username;
             let run_user_groups: HashSet<i64> = Group::get_user_groups(pool, run.user_id)
                 .await
-                .context(format!(
-                    "Impossible d'obtenir les groupes de {} (l'utilisateur qui a déclaré le run)",
-                    run.get_user(pool).await?.username
-                ))?
+                .with_context(|| {
+                    format!(
+                        "Impossible d'obtenir les groupes de {run_user_name} (l'utilisateur qui a déclaré le run)"
+                    )
+                })?
                 .iter()
                 .map(|grp| grp.id)
                 .collect();

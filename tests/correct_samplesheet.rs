@@ -31,7 +31,7 @@ fn invalid_samplesheet_missing_sample_id() {
     let input = fs::read_to_string("tests/samples/invalid.csv").unwrap();
     let res = correct_samplesheet(&input);
     assert!(res.is_err());
-    let err = res.err().unwrap();
+    let err = res.err().unwrap().to_string();
     // L'erreur attendue contient une mention évidente en français
     assert!(err.to_lowercase().contains("aucune") || err.to_lowercase().contains("impossible"));
 }

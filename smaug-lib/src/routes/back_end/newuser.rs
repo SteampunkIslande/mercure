@@ -17,12 +17,10 @@ pub async fn register_post(
 ) -> Result<Json<ApiResponse<User>>, AuthError> {
     // Ensure user is admin
     if !auth.user.is_admin {
-        return Ok(Json(ApiResponse::error("Accès non autorisé")));
+        return Err(AuthError::AdminsOnly);
     }
     if user.password.is_empty() {
-        return Ok(Json(ApiResponse::error(
-            "Le mot de passe ne peut pas être vide!",
-        )));
+        return Err(AuthError::NoPassword);
     }
 
     // Make sure the user doesn't already exist

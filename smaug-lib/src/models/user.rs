@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use bcrypt::{DEFAULT_COST, hash, verify};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -5,7 +6,6 @@ use sqlx::{FromRow, SqlitePool};
 use time::OffsetDateTime;
 
 use crate::auth::AuthError;
-use crate::models::ModelError;
 
 #[derive(Debug, Serialize, Deserialize, Clone, FromRow)]
 pub struct User {
@@ -48,8 +48,9 @@ pub struct PasswordUpdate<'a> {
 }
 
 impl User {
-    pub async fn create(new_user: NewUser, pool: &SqlitePool) -> Result<User, ModelError> {
-        let password_hash = hash(new_user.password.as_bytes(), DEFAULT_COST)?;
+    pub async fn create(new_user: NewUser, pool: &SqlitePool) -> Result<User> {
+        let password_hash = hash(new_user.password.as_bytes(), DEFAULT_COST)
+            .context("Impossible de hacher le mot de passe")?;
 
         let now = OffsetDateTime::now_utc();
 
@@ -65,7 +66,8 @@ impl User {
         .bind(&password_hash)
         .bind(now)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de créer l'utilisateur `{}`", new_user.usermail))?;
 
         // Récupérer l'utilisateur créé
         let user = sqlx::query_as::<_, User>(
@@ -76,18 +78,25 @@ impl User {
         )
         .bind(&new_user.usermail)
         .fetch_one(pool)
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "Impossible de relire l'utilisateur `{}` juste après sa création",
+                new_user.usermail
+            )
+        })?;
 
         Ok(user)
     }
 
-    pub async fn list_users(pool: &SqlitePool) -> Result<Vec<User>, ModelError> {
-        Ok(sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
+    pub async fn list_users(pool: &SqlitePool) -> Result<Vec<User>> {
+        sqlx::query_as::<_, User>(r#"SELECT * FROM Users"#)
             .fetch_all(pool)
-            .await?)
+            .await
+            .context("Impossible de lister les utilisateurs")
     }
 
-    pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<User, ModelError> {
+    pub async fn find_by_id(id: i64, pool: &SqlitePool) -> Result<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
@@ -96,15 +105,13 @@ impl User {
         )
         .bind(id)
         .fetch_one(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de trouver l'utilisateur {id}"))?;
 
         Ok(user)
     }
 
-    pub async fn find_by_usermail(
-        usermail: &str,
-        pool: &SqlitePool,
-    ) -> Result<Option<User>, ModelError> {
+    pub async fn find_by_usermail(usermail: &str, pool: &SqlitePool) -> Result<Option<User>> {
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
@@ -113,7 +120,8 @@ impl User {
         )
         .bind(usermail)
         .fetch_optional(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de chercher l'utilisateur `{usermail}`"))?;
 
         Ok(user)
     }
@@ -126,7 +134,7 @@ impl User {
         pool: &SqlitePool,
         new_password_hash: &str,
         user_id: i64,
-    ) -> Result<(), ModelError> {
+    ) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE Users
@@ -137,7 +145,8 @@ impl User {
         .bind(new_password_hash)
         .bind(user_id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| format!("Impossible de mettre à jour le mot de passe de {user_id}"))?;
         Ok(())
     }
 
@@ -148,7 +157,8 @@ impl User {
         // Administrator is updating password
         if password_update.old_password.is_none() {
             // No need to check, this comes from an administrator
-            let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
+            let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)
+                .context("Impossible de hacher le nouveau mot de passe")?;
             return Ok(Self::actually_update_password(
                 pool,
                 &new_password_hash,
@@ -160,16 +170,26 @@ impl User {
             sqlx::query("SELECT password_hash FROM Users WHERE id = ?")
                 .bind(password_update.user_id)
                 .fetch_one(pool)
-                .await?
-                .try_get("password_hash")?;
-        let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Impossible de lire le mot de passe de l'utilisateur {}",
+                        password_update.user_id
+                    )
+                })?
+                .try_get("password_hash")
+                .context("Colonne `password_hash` illisible")?;
+        let new_password_hash = hash(password_update.new_password.as_bytes(), DEFAULT_COST)
+            .context("Impossible de hacher le nouveau mot de passe")?;
         if !verify(
             password_update
                 .old_password
-                .ok_or(AuthError::NoPassword)?
+                .context(AuthError::NoPassword)?
                 .as_bytes(),
             &correct_old_password_hash,
-        )? {
+        )
+        .context("Impossible de vérifier l'ancien mot de passe")?
+        {
             return Err(AuthError::InvalidCredentials);
         }
         Ok(
@@ -178,7 +198,7 @@ impl User {
         )
     }
 
-    pub async fn update_last_login(&mut self, pool: &SqlitePool) -> Result<(), ModelError> {
+    pub async fn update_last_login(&mut self, pool: &SqlitePool) -> Result<()> {
         let now = OffsetDateTime::now_utc();
         self.last_login = Some(now);
 
@@ -190,7 +210,13 @@ impl User {
         .bind(now)
         .bind(self.id)
         .execute(pool)
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "Impossible de mettre à jour la date de dernière connexion de {}",
+                self.id
+            )
+        })?;
 
         Ok(())
     }

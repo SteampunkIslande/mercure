@@ -2,7 +2,7 @@ use rocket::{State, get, post, serde::json::Json};
 use sqlx::SqlitePool;
 
 use crate::{
-    auth::Authenticated,
+    auth::{AuthError, Authenticated},
     models::{AppState, AppStateConfigKey, appstate::ValueInput},
     routes::ApiResponse,
 };
@@ -25,24 +25,22 @@ pub struct ConfigEntry {
 pub async fn runtime_config_get(
     pool: &State<SqlitePool>,
     auth: Authenticated,
-) -> Json<ApiResponse<Vec<ConfigEntry>>> {
+) -> Result<Json<ApiResponse<Vec<ConfigEntry>>>, AuthError> {
     if !auth.user.is_admin {
-        return Json(ApiResponse::error("Admins only!"));
+        return Err(AuthError::AdminsOnly);
     }
 
     let mut entries = Vec::with_capacity(AppStateConfigKey::all().len());
     for key in AppStateConfigKey::all() {
-        match AppState::get_str(*key, pool).await {
-            Ok(value) => entries.push(ConfigEntry {
-                key: *key,
-                value,
-                value_input: key.value_input(),
-                description: key.description(),
-            }),
-            Err(e) => return Json(ApiResponse::error(e.to_string())),
-        }
+        let value = AppState::get_str(*key, pool).await?;
+        entries.push(ConfigEntry {
+            key: *key,
+            value,
+            value_input: key.value_input(),
+            description: key.description(),
+        });
     }
-    Json(ApiResponse::success(entries))
+    Ok(Json(ApiResponse::success(entries)))
 }
 
 #[post("/config/set", data = "<request>")]
@@ -50,19 +48,19 @@ pub async fn runtime_config_set(
     pool: &State<SqlitePool>,
     auth: Authenticated,
     request: Json<ConfigSetRequest>,
-) -> Json<ApiResponse<ConfigEntry>> {
+) -> Result<Json<ApiResponse<ConfigEntry>>, AuthError> {
     if !auth.user.is_admin {
-        return Json(ApiResponse::error("Admins only!"));
+        return Err(AuthError::AdminsOnly);
     }
     let key = request.key;
     let value = &request.value;
-    match AppState::set_by_key(key, value, pool).await {
-        Ok(_) => Json(ApiResponse::success(ConfigEntry {
-            key,
-            value: value.clone(),
-            value_input: key.value_input(),
-            description: key.description(),
-        })),
-        Err(e) => Json(ApiResponse::error(e.to_string())),
-    }
+    // `parse_value` rejects unknown values with `ModelError::InvalidInput`, which
+    // the edge maps to 400 instead of a generic 500.
+    AppState::set_by_key(key, value, pool).await?;
+    Ok(Json(ApiResponse::success(ConfigEntry {
+        key,
+        value: value.clone(),
+        value_input: key.value_input(),
+        description: key.description(),
+    })))
 }

@@ -1,0 +1,28 @@
+# ast-grep ruleset describing the error-handling refactor:
+#
+#   1. specific result   - a function exposing an error type keeps that type (and
+#                          passes the explicit unit constructions through it),
+#   2. middle functions  - everything in between returns anyhow::Result,
+#   3. edges             - what the app exposes (web pages, API, CLI) is converted
+#                          into FrontendError / AuthError, whose unique #[from]
+#                          variant is anyhow::Error, with wherror's location.
+#
+# Run from the repository root:
+#
+#   ast-grep scan                    # everything (scans the whole repository)
+#   ast-grep scan -r rules/          # same, restricted to the rules directory
+#   ast-grep scan --rule rules/<id>.yml <path>   # a single rule, a single path
+#
+# `ast-grep scan --rule ... <path> --rewrite` applies the fix.
+#
+# Where each rule is expected to fire (after the refactor):
+#   specific-result-type            -> 3   (RunStatus::from_str, Form::check_validity,
+#                                          Attempt::get_hypothetic_attempt)
+#   middle-function-anyhow-result   -> 120 (every `-> anyhow::Result<...>` function
+#                                          outside the two Responder impls)
+#   replace-explicit-result         -> 46  (only occurrences that must NOT be
+#                                          converted: edge/specific errors, serde impls)
+#   edge-from-anyhow                -> 8   (FrontendError, AuthError + 6 model errors)
+#   edge-attribute-from             -> 0   (no other `#[from]` on an edge error)
+ruleDirs:
+  - rules

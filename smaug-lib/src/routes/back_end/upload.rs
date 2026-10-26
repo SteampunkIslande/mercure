@@ -4,6 +4,7 @@ use rocket::fs::TempFile;
 use rocket::serde::json::Json;
 use std::path::PathBuf;
 
+use crate::auth::AuthError;
 use crate::config::SmaugConfig;
 use crate::routes::ApiResponse;
 
@@ -17,13 +18,15 @@ pub struct UploadForm<'r> {
 pub async fn upload_post(
     mut form: Form<UploadForm<'_>>,
     config: &State<SmaugConfig>,
-) -> Json<ApiResponse<String>> {
+) -> Result<Json<ApiResponse<String>>, AuthError> {
     // Get upload directory
     let upload_dir = PathBuf::from(&config.upload_dir);
 
     // If the upload dir doesn't exist, this is an error (admin should have created it!)
     if !upload_dir.exists() {
-        return Json(ApiResponse::error("Le dossier d'upload n'existe pas !"));
+        return Ok(Json(ApiResponse::error(
+            "Le dossier d'upload n'existe pas !",
+        )));
     }
 
     // Generate a unique filename. Alphabetical order is also creation time order.
@@ -36,10 +39,10 @@ pub async fn upload_post(
 
     // Persist the file
     if (form.file.move_copy_to(&filepath).await).is_err() {
-        return Json(ApiResponse::error("Failed to save file"));
+        return Ok(Json(ApiResponse::error("Failed to save file")));
     }
 
     // Return the path
     let path_str = filepath.display().to_string();
-    Json(ApiResponse::success(path_str))
+    Ok(Json(ApiResponse::success(path_str)))
 }

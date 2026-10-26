@@ -1,0 +1,7 @@
+id: use-with-context-for-format
+message: Use `.with_context(|| ...)` for `format!` to avoid unnecessary heap allocations on the success path.
+severity: warning
+language: rust
+rule:
+  pattern: $BASE.context(format!($$$ARGS))
+fix: $BASE.with_context(|| format!($$$ARGS))

@@ -1,13 +1,12 @@
+mod error;
 mod gitea;
 use crate::{config::GitWebConfig, models::FileIdentification};
 use anyhow::Context;
+pub use error::GitCheckError;
 use serde::Deserialize;
 use serde_json::Value;
 use std::{path::Path, time::Duration};
-mod error;
-pub use error::GitCheckError;
 
-use log::{error, info};
 use std::path::PathBuf;
 use tokio::process::Command;
 
@@ -38,8 +37,9 @@ pub async fn git_clone_to(
         FileIdentification::GitBranchAndPath { branch, .. } => branch.to_string(),
         FileIdentification::GitCommit { commit_hash, .. } => commit_hash.to_string(),
         FileIdentification::None => {
-            error!("Clone aborted: No branch or commit provided.");
-            return Err(GitCheckError::NoSuchBranch("(none)".to_string()));
+            return Err(GitCheckError::Unsupported(
+                "Impossible de cloner un dépôt sans branche ni commit".into(),
+            ));
         }
     };
 
@@ -50,7 +50,6 @@ pub async fn git_clone_to(
             repo,
         } => (format!("{base_url}/{owner}/{repo}.git"), repo),
         GitWebConfig::GitlabV4 { .. } => {
-            error!("Clone aborted: Gitlab V4 API is not yet supported.");
             return Err(GitCheckError::Unsupported(
                 "L'API Gitlab V4 n'est pas encore prise en charge!".into(),
             ));
@@ -61,9 +60,14 @@ pub async fn git_clone_to(
     if repo_path.exists() {
         tokio::fs::remove_dir_all(&repo_path)
             .await
-            .context("Impossible de supprimer le dossier pipelines de la tentative précédente")?;
+            .with_context(|| {
+                format!(
+                    "Impossible de supprimer le dossier pipelines de la tentative précédente ({})",
+                    repo_path.display()
+                )
+            })?;
     }
-    info!("Cloning {} into {}", clone_url, repo_path.display());
+    log::info!("Cloning {} into {}", clone_url, repo_path.display());
 
     let mut clone_child = Command::new("git")
         .arg("clone")
@@ -71,26 +75,22 @@ pub async fn git_clone_to(
         .arg(&repo_name)
         .current_dir(path)
         .spawn()
-        .map_err(|e| {
-            error!("Failed to spawn git clone process: {}", e);
-            GitCheckError::CommandFailed(e.to_string())
-        })?;
+        .with_context(|| format!("Impossible de lancer `git clone {clone_url}`"))?;
 
     match tokio::time::timeout(Duration::from_secs(30), clone_child.wait()).await {
-        Ok(Ok(status)) if status.success() => info!("Git clone successful."),
+        Ok(Ok(status)) if status.success() => log::info!("Git clone successful."),
         Ok(Ok(status)) => {
-            error!("Git clone failed with exit status: {}", status);
             return Err(GitCheckError::CommandFailed(format!(
                 "Clone failed: {}",
                 status
             )));
         }
         Ok(Err(e)) => {
-            error!("Failed to wait for git clone process: {}", e);
-            return Err(GitCheckError::CommandFailed(e.to_string()));
+            return Err(e).with_context(|| {
+                format!("Erreur en attendant la fin de `git clone {clone_url}`")
+            })?;
         }
         Err(_) => {
-            error!("Git clone timed out after 30 seconds.");
             let _ = clone_child.kill().await;
             // Try to clean up if repo was partially created
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
@@ -98,22 +98,23 @@ pub async fn git_clone_to(
         }
     }
 
-    info!("Checking out '{}' in {}", checkout, repo_path.display());
+    log::info!("Checking out '{}' in {}", checkout, repo_path.display());
 
     let mut checkout_child = Command::new("git")
         .arg("checkout")
         .arg(&checkout)
         .current_dir(&repo_path) // Fixed: Must run inside the cloned repository
         .spawn()
-        .map_err(|e| {
-            error!("Failed to spawn git checkout process: {}", e);
-            GitCheckError::CommandFailed(e.to_string())
+        .with_context(|| {
+            format!(
+                "Impossible de lancer `git checkout {checkout}` dans {}",
+                repo_path.display()
+            )
         })?;
 
     match tokio::time::timeout(Duration::from_secs(5), checkout_child.wait()).await {
-        Ok(Ok(status)) if status.success() => info!("Git checkout successful."),
+        Ok(Ok(status)) if status.success() => log::info!("Git checkout successful."),
         Ok(Ok(status)) => {
-            error!("Git checkout failed with exit status: {}", status);
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed(format!(
                 "Checkout failed: {}",
@@ -121,12 +122,12 @@ pub async fn git_clone_to(
             )));
         }
         Ok(Err(e)) => {
-            error!("Failed to wait for git checkout process: {}", e);
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
-            return Err(GitCheckError::CommandFailed(e.to_string()));
+            return Err(e).with_context(|| {
+                format!("Erreur en attendant la fin de `git checkout {checkout}`")
+            })?;
         }
         Err(_) => {
-            error!("Git checkout timed out after 5 seconds.");
             let _ = checkout_child.kill().await;
             let _ = tokio::fs::remove_dir_all(&repo_path).await;
             return Err(GitCheckError::CommandFailed("Checkout timeout".into()));
@@ -134,18 +135,17 @@ pub async fn git_clone_to(
     }
 
     let git_dir = repo_path.join(".git");
-    info!("Removing {:?}", git_dir);
+    log::info!("Removing {:?}", git_dir);
 
-    if let Err(e) = tokio::fs::remove_dir_all(&git_dir).await {
-        error!("Failed to remove .git directory at {:?}: {}", git_dir, e);
-        return Err(GitCheckError::CommandFailed(format!("FS error: {}", e)));
-    }
+    tokio::fs::remove_dir_all(&git_dir)
+        .await
+        .with_context(|| format!("Impossible de supprimer le dossier {}", git_dir.display()))?;
 
-    info!("Successfully prepped repository at {:?}", repo_path);
+    log::info!("Successfully prepped repository at {:?}", repo_path);
     Ok(())
 }
 
-pub async fn get_latest_commit<'a>(
+pub async fn get_latest_commit(
     branch_name: &str,
     pipelines: &GitWebConfig,
 ) -> Result<String, GitCheckError> {
@@ -157,16 +157,24 @@ pub async fn get_latest_commit<'a>(
         } => {
             let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/branches/{branch_name}");
 
-            Ok(
-                serde_json::from_str::<Value>(&reqwest::get(&url).await?.text().await?)?["commit"]
-                    ["id"]
-                    .as_str()
-                    .ok_or(anyhow::format_err!(
+            let body = reqwest::get(&url)
+                .await
+                .with_context(|| format!("Impossible d'interroger l'API Gitea ({url})"))?
+                .text()
+                .await
+                .with_context(|| format!("Impossible de lire la réponse de l'API Gitea ({url})"))?;
+            let commit_id = serde_json::from_str::<Value>(&body).with_context(|| {
+                format!("Réponse inattendue de l'API Gitea pour la branche {branch_name}")
+            })?["commit"]["id"]
+                .as_str()
+                .map(|id| id.to_string())
+                .ok_or_else(|| {
+                    GitCheckError::CommandFailed(format!(
                         "Cannot get latest commit ID for branch {}",
                         branch_name
-                    ))?
-                    .to_string(),
-            )
+                    ))
+                })?;
+            Ok(commit_id)
         }
 
         GitWebConfig::GitlabV4 { base_url: _, id: _ } => Err(GitCheckError::Unsupported(
@@ -183,16 +191,24 @@ pub async fn get_all_branches(pipelines: &GitWebConfig) -> Result<Vec<String>, G
             repo,
         } => {
             let url = format!("{base_url}/api/v1/repos/{owner}/{repo}/branches");
-            let resp = reqwest::get(&url).await?;
+            let resp = reqwest::get(&url)
+                .await
+                .with_context(|| format!("Impossible de lister les branches ({url})"))?;
             if !resp.status().is_success() {
-                return Err(
-                    anyhow::format_err!("Failed to list branches: {}", resp.status()).into(),
-                );
+                return Err(GitCheckError::CommandFailed(format!(
+                    "Failed to list branches: {}",
+                    resp.status()
+                )));
             }
-            let v = resp.json::<Value>().await?;
-            let arr = v
-                .as_array()
-                .ok_or_else(|| anyhow::anyhow!("Gitea should have responded with an array"))?;
+            let v = resp
+                .json::<Value>()
+                .await
+                .with_context(|| format!("Réponse inattendue de l'API Gitea ({url})"))?;
+            let arr = v.as_array().ok_or_else(|| {
+                GitCheckError::CommandFailed(
+                    "Gitea should have responded with an array".to_string(),
+                )
+            })?;
             Ok(arr
                 .iter()
                 .filter_map(|v| v["name"].as_str().map(|s| s.to_string()))

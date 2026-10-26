@@ -225,7 +225,10 @@
             });
             const data = await response.json();
             if (response.status !== 200) {
-                throw new Error(response.statusText || 'Erreur lors de la sauvegarde du run.');
+                // The status may be a 4xx (invalid form, non-editable run): the
+                // reason is in the Failure payload, next to the status code.
+                const message = getApiMessage(data);
+                throw new Error(message || response.statusText || 'Erreur lors de la sauvegarde du run.');
             }
 
             // Assume isApiSuccess, getApiData, and getApiMessage are defined globally

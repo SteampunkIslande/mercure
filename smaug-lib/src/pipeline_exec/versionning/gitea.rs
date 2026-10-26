@@ -1,9 +1,8 @@
-use super::GitCheckError;
+use super::{DirContentsItem, GitCheckError};
 
 use crate::models::FileIdentification;
 
-use super::DirContentsItem;
-use log::warn;
+use anyhow::Context;
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -29,9 +28,14 @@ pub async fn list_yaml_forms(
         branch_name.replace("/", "_")
     );
     let tmp_root = std::env::temp_dir().join(tmp_id);
-    let _ = tokio::fs::create_dir_all(&tmp_root)
+    tokio::fs::create_dir_all(&tmp_root)
         .await
-        .map_err(|e| GitCheckError::CommandFailed(format!("tmp dir create failed: {}", e)))?;
+        .with_context(|| {
+            format!(
+                "Impossible de créer le dossier temporaire {}",
+                tmp_root.display()
+            )
+        })?;
 
     let repo_path = tmp_root.join(repo);
     let clone_url = format!("{base_url}/{owner}/{repo}.git");
@@ -44,13 +48,19 @@ pub async fn list_yaml_forms(
         .arg(&clone_url)
         .arg(&repo_path);
 
-    let mut clone_child = clone_cmd
-        .spawn()
-        .map_err(|e| GitCheckError::CommandFailed(format!("git spawn failed: {}", e)))?;
+    let mut clone_child = clone_cmd.spawn().with_context(|| {
+        format!("Impossible de lancer `git clone {clone_url}` (branche {branch_name})")
+    })?;
     let clone_res = tokio::time::timeout(Duration::from_secs(60), clone_child.wait()).await;
     let clone_ok = match clone_res {
         Ok(Ok(status)) => status.success(),
-        _ => {
+        Ok(Err(e)) => {
+            let _ = tokio::fs::remove_dir_all(&tmp_root).await;
+            return Err(e).with_context(|| {
+                format!("Erreur en attendant la fin de `git clone` de la branche {branch_name}")
+            })?;
+        }
+        Err(_) => {
             let _ = tokio::fs::remove_dir_all(&tmp_root).await;
             return Err(GitCheckError::CommandFailed(
                 "git clone failed or timed out".into(),
@@ -60,7 +70,7 @@ pub async fn list_yaml_forms(
 
     if !clone_ok {
         if let Err(e) = tokio::fs::remove_dir_all(&tmp_root).await {
-            warn!(
+            log::warn!(
                 "Cannot delete temp dir '{}', error {}",
                 tmp_root.display(),
                 e
@@ -69,11 +79,20 @@ pub async fn list_yaml_forms(
         return Err(GitCheckError::CommandFailed("git clone failed".into()));
     }
 
+    // Per-entry failures (unreadable directory, unrelated path) are logged and
+    // skipped: one bad entry must not remove every other form from the cache.
     let mut results = Vec::new();
     for entry in WalkDir::new(&repo_path) {
         let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
+            Ok(entry) => entry,
+            Err(e) => {
+                log::warn!(
+                    "Impossible de parcourir une entrée de {}: {}",
+                    repo_path.display(),
+                    e
+                );
+                continue;
+            }
         };
         if !entry.file_type().is_file() {
             continue;
@@ -84,8 +103,15 @@ pub async fn list_yaml_forms(
         }
         let full_path = entry.path();
         let rel_path = match full_path.strip_prefix(&repo_path) {
-            Ok(p) => p.to_path_buf(),
-            Err(_) => continue,
+            Ok(rel_path) => rel_path.to_path_buf(),
+            Err(e) => {
+                log::warn!(
+                    "Impossible de calculer le chemin relatif de {}: {}",
+                    full_path.display(),
+                    e
+                );
+                continue;
+            }
         };
         let has_form = rel_path.components().any(|c| {
             let s = c.as_os_str().to_string_lossy().to_ascii_lowercase();
@@ -94,16 +120,19 @@ pub async fn list_yaml_forms(
         if !has_form {
             continue;
         }
+        let content = tokio::fs::read_to_string(full_path)
+            .await
+            .with_context(|| format!("Impossible de lire le fichier {}", full_path.display()))?;
         results.push(DirContentsItem {
             name: file_name.into_owned(),
             path: rel_path,
             item_type: "file".to_string(),
-            content: tokio::fs::read_to_string(full_path).await?,
+            content,
         });
     }
 
     if let Err(e) = tokio::fs::remove_dir_all(&tmp_root).await {
-        warn!(
+        log::warn!(
             "Couldn't remove temp dir {} (error: {})",
             tmp_root.display(),
             e
@@ -126,7 +155,9 @@ async fn is_file(
             file_path,
         } => (file_path, commit_hash),
         FileIdentification::None => {
-            return Err(anyhow::format_err!("Invalid").into());
+            return Err(GitCheckError::NotAFile(
+                "Un formulaire doit être identifié par une branche ou un commit".to_string(),
+            ));
         }
     };
     let url = format!(
@@ -137,15 +168,21 @@ async fn is_file(
         file_path.display(),
         reference_
     );
-    let resp = client.get(&url).send().await?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("Impossible d'interroger l'API Gitea ({url})"))?;
     if !resp.status().is_success() {
-        return Err(
-            anyhow::format_err!("Failed to check if file exists: {}", resp.status()).into(),
-        );
+        return Err(GitCheckError::CommandFailed(format!(
+            "Failed to check if file exists: {}",
+            resp.status()
+        )));
     }
     Ok(resp
         .json::<FileContentsResponse>()
-        .await?
+        .await
+        .with_context(|| format!("Réponse inattendue de l'API Gitea pour {url}"))?
         .file_contents
         .item_type
         .as_str()
@@ -195,13 +232,25 @@ pub async fn git_get_file(
             )
         }
         FileIdentification::None => {
-            return Err(anyhow::format_err!("Invalid form identification").into());
+            return Err(GitCheckError::NotAFile(
+                "Un formulaire doit être identifié par une branche ou un commit".to_string(),
+            ));
         }
     };
 
-    let resp = client.get(&url).send().await?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .with_context(|| format!("Impossible de récupérer le fichier {url}"))?;
     if !resp.status().is_success() {
-        return Err(anyhow::format_err!("Failed to fetch file: {}", resp.status()).into());
+        return Err(GitCheckError::CommandFailed(format!(
+            "Failed to fetch file: {}",
+            resp.status()
+        )));
     }
-    Ok(resp.text().await?)
+    Ok(resp
+        .text()
+        .await
+        .with_context(|| format!("Impossible de lire le contenu de {url}"))?)
 }
