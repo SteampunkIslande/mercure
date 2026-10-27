@@ -1,0 +1,116 @@
+/* SMAUG Signature — feuille spécifique à la page d’accueil uniquement. */
+body.smaug-signature-page {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  min-height: 100vh;
+  background: #fff;
+  color: #102b47;
+  overflow-x: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+}
+.smaug-signature *, .smaug-signature *::before, .smaug-signature *::after { box-sizing: border-box; }
+.smaug-signature { position: relative; isolation: isolate; min-height: 100vh; display: flow-root; overflow: hidden; }
+.smaug-signature::before { content:""; position:absolute; inset:0; z-index:-3; background:
+    radial-gradient(ellipse at 92% 78%, rgba(195,230,250,.36),transparent 38%),
+    linear-gradient(160deg,#fff 35%,#fafdff 100%); }
+.smaug-signature__dna { pointer-events:none; position:absolute; z-index:-2; top:0; right:0;
+  height:100%; width:clamp(360px,32vw,630px);
+  background:url('../images/signature-dna.webp') right center/cover no-repeat;
+  -webkit-mask-image:linear-gradient(to right, transparent 0%, #000 32%);
+  mask-image:linear-gradient(to right, transparent 0%, #000 32%);
+  opacity:.91; }
+.smaug-signature__waves { pointer-events:none; position:absolute; z-index:-1; bottom:0; left:0;
+  width:100%; height:22vh; min-height:110px; max-height:210px;
+  background:url('../images/signature-waves.svg') bottom/100% 100% no-repeat; }
+.smaug-signature__hero { text-align:center; position:relative; width:min(860px,70vw);
+  margin:0 0 60px clamp(42px,calc((100vw - 1450px)/2 + 130px),240px);
+  padding-top:clamp(78px,9vh,132px); }
+.smaug-signature__wordmark { display:flex; justify-content:center; align-items:flex-end; gap:0; min-height:290px; }
+.smaug-signature__dragon { display:block; flex:0 0 auto; width:clamp(190px,21vw,320px);
+  height:auto; object-fit:contain; align-self:center; }
+.smaug-signature__wordmark h1 { font-family:Georgia,"Times New Roman",serif; color:#35101b;
+  font-size:clamp(82px,8vw,142px); font-weight:600; line-height:1;
+  letter-spacing:-.065em; white-space:nowrap; margin:0 0 clamp(12px,3.6vw,52px) -8px;
+  background:linear-gradient(105deg,#102e49 7%,#6f0b1b 62%,#390818 100%);
+  background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.smaug-signature .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.smaug-signature__acronym { max-width:870px; margin:3px auto 17px;
+  font-family:Georgia,"Times New Roman",serif; font-size:clamp(20px,2.02vw,29px);
+  line-height:1.35; color:#173451; white-space:normal; }
+.smaug-signature__acronym em { font-weight:400; }
+.smaug-signature__acronym strong { color:#850d25; font-weight:800; }
+.smaug-signature__divider { width:156px; height:2px; margin:29px auto 25px;
+  background:linear-gradient(to right, transparent,#c5e3f3 20%,#0789c7 53%,#c5e3f3 80%,transparent); }
+.smaug-signature__description { margin:0 auto; max-width:780px; line-height:1.18;
+  font-size:clamp(24px,2.5vw,37px); color:#12304b; }
+/* Bouton « Se connecter » : pilule bleue lumineuse, sans sous-titre. */
+.smaug-signature__login {
+  position:relative; isolation:isolate; overflow:hidden;
+  display:flex; align-items:center; justify-content:space-between;
+  width:min(552px,92%); min-height:105px; margin:50px auto 0;
+  padding:16px 35px 16px 20px; border-radius:999px;
+  color:#fff; text-decoration:none;
+  font:500 clamp(23px,2.3vw,31px)/1.2 Arial,Helvetica,sans-serif;
+  background:
+    radial-gradient(circle at 6% 85%, rgba(56,219,253,.54), transparent 24%),
+    radial-gradient(circle at 95% 5%, rgba(42,198,239,.50), transparent 25%),
+    linear-gradient(165deg,#12b3e2 0%,#087eb6 42%,#043a73 100%);
+  border:1px solid rgba(23,194,236,.57);
+  box-shadow:0 13px 35px rgba(8,112,171,.24),0 0 33px rgba(17,176,230,.31),inset 0 1px 2px rgba(255,255,255,.65);
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+.smaug-signature__login::before {
+  content:""; position:absolute; inset:0; z-index:-1; opacity:.45; pointer-events:none;
+  background:
+   repeating-radial-gradient(ellipse 25px 43px at 0% 95%, transparent 0 9px,rgba(138,233,255,.35) 10px 11px,transparent 12px 21px),
+   repeating-radial-gradient(ellipse 29px 42px at 100% 5%,transparent 0 10px,rgba(138,233,255,.38) 11px 12px,transparent 13px 24px);
+}
+.smaug-signature__login:hover { color:#fff; transform:translateY(-3px);
+  box-shadow:0 18px 38px rgba(8,112,171,.32),0 0 40px rgba(17,176,230,.36);
+  filter:brightness(1.06); }
+.smaug-signature__login:focus-visible { outline:3px solid #961632; outline-offset:6px; }
+.smaug-signature__login-avatar {
+  display:grid; place-items:center; flex:0 0 auto;
+  width:65px; height:65px; border-radius:50%;
+  background:linear-gradient(160deg,#086fa9,#033f76);
+  box-shadow:inset 0 2px 8px rgba(1,25,58,.35),0 1px 3px rgba(255,255,255,.17);
+}
+.smaug-signature__login-icon { width:30px; height:30px; }
+.smaug-signature__login-separator { flex:0 0 auto; height:52px; width:1px;
+  background:rgba(255,255,255,.43); margin:0 8px 0 13px; }
+.smaug-signature__login-label { flex:1; text-align:center; white-space:nowrap; }
+.smaug-signature__arrow { font:300 46px/.8 Arial,Helvetica,sans-serif; margin-left:19px; }
+@media(max-width:1250px){
+  .smaug-signature__hero { width:74vw; margin-left:3vw; padding-top:clamp(55px,8vh,90px); }
+  .smaug-signature__dna { width:45vw; opacity:.56; }
+  .smaug-signature__wordmark { min-height:225px; }
+  .smaug-signature__dragon { width:clamp(180px,21vw,265px); }
+  .smaug-signature__wordmark h1 { font-size:clamp(78px,9vw,125px); }
+}
+@media(max-width:760px){
+  .smaug-signature__hero { width:auto; margin:0 20px 70px; padding-top:clamp(30px,7vh,75px); }
+  .smaug-signature__dna { width:85%; opacity:.15; -webkit-mask-image:linear-gradient(to right,transparent,#000 40%);
+    mask-image:linear-gradient(to right,transparent,#000 40%); }
+  .smaug-signature__wordmark { min-height:0; align-items:center; }
+  .smaug-signature__dragon { width:clamp(135px,31vw,230px); }
+  .smaug-signature__wordmark h1 { font-size:clamp(67px,14vw,112px); margin:0 0 0 -5px; }
+  .smaug-signature__acronym { margin-top:14px; font-size:clamp(18px,4vw,24px); }
+  .smaug-signature__description { font-size:clamp(22px,5vw,30px); line-height:1.3; }
+  .smaug-signature__wide-break { display:none; }
+  .smaug-signature__login { min-height:74px; margin-top:34px; padding:9px 22px 9px 10px; font-size:23px; }
+  .smaug-signature__login-avatar { width:53px; height:53px; }
+  .smaug-signature__login-icon { width:25px; height:25px; }
+  .smaug-signature__login-separator { height:36px; margin:0 8px; }
+  .smaug-signature__arrow { font-size:35px; margin-left:12px; }
+}
+@media(max-width:410px){
+  .smaug-signature__wordmark h1 { font-size:clamp(61px,14vw,74px); }
+  .smaug-signature__dragon { width:clamp(112px,31vw,140px); }
+  .smaug-signature__login { width:100%; font-size:19px; padding-right:15px; }
+  .smaug-signature__login-avatar { width:48px; height:48px; }
+  .smaug-signature__login-separator { margin:0 5px 0 7px; }
+  .smaug-signature__arrow { font-size:30px; margin-left:5px; }
+}
+@media(prefers-reduced-motion:reduce){.smaug-signature__login { transition:none; }}
