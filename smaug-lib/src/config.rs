@@ -13,7 +13,7 @@ pub enum GitWebConfig {
     #[serde(rename = "gitlab_v4")]
     GitlabV4 {
         base_url: String,
-        id: String, // ou u64 selon ce que vous préférez manipuler
+        id: String, // or u64, depending on what you prefer to manipulate
     },
 }
 

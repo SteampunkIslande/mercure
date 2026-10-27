@@ -7,9 +7,9 @@ use time::{Month, OffsetDateTime, Weekday};
 pub static NICE_DATETIME_FORMAT: StaticFormatDescription =
     format_description!("[weekday repr:short] [day padding:none] [month repr:short] [year]");
 
-/// Fonction utilitaire pour nettoyer une chaîne de caractères
+/// Utility function to clean a string
 fn clean_string(input: &str) -> String {
-    // Supprimer tous les caractères d'espacement (espaces, tabulations, retours, etc.)
+    // Remove all whitespace characters (spaces, tabs, newlines, etc.)
     let no_whitespace: String = input.chars().filter(|c| !c.is_whitespace()).collect();
     remove_diacritics(&no_whitespace)
 }
@@ -23,7 +23,7 @@ pub enum SamplesheetError {
 }
 
 pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), SamplesheetError> {
-    // Séparer en lignes en gardant l'ordre
+    // Split into lines while preserving the order
     let lines: Vec<&str> = input.lines().collect();
     let mut cleaned_lines: Vec<String> = Vec::new();
     let mut in_data = false;
@@ -35,26 +35,26 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
     while i < lines.len() {
         let line = lines[i];
 
-        // Conserver les lignes vides telles quelles
+        // Keep empty lines as they are
         if line.is_empty() {
             cleaned_lines.push(line.to_string());
             i += 1;
             continue;
         }
 
-        // Avant la section [Data], conserver telles quelles
+        // Before the [Data] section, keep them as they are
         if !in_data && line != "[Data]" {
             cleaned_lines.push(line.to_string());
             i += 1;
             continue;
         }
 
-        // Début de la section [Data]
+        // Start of the [Data] section
         if line == "[Data]" {
             in_data = true;
             cleaned_lines.push(line.to_string());
 
-            // Trouver la première ligne non vide qui suit comme en-tête
+            // Find the first non-empty line that follows as the header
             i += 1;
             let mut header_line_opt: Option<&str> = None;
             while i < lines.len() {
@@ -78,12 +78,12 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
 
             column_names = header_line.split(',').map(|s| s.to_string()).collect();
 
-            // En-tête nettoyée
+            // Cleaned header
             let clean_column_names: Vec<String> =
                 column_names.iter().map(|c| clean_string(c)).collect();
             cleaned_lines.push(clean_column_names.join(","));
 
-            // Déterminer l'index de la colonne "sample"
+            // Determine the index of the "sample" column
 
             sample_col_index = column_names.iter().position(|col| col == "Sample_ID");
 
@@ -94,15 +94,15 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
                 ));
             }
 
-            // Passer à la ligne suivant l'en-tête pour lire les données
+            // Move to the line after the header to read the data
             i += 1;
             continue;
         }
 
-        // Dans la section Data : traiter les lignes jusqu'à la fin ou une nouvelle section
+        // In the Data section: process lines until the end or a new section
         if in_data && !column_names.is_empty() {
             if line.starts_with('[') {
-                // nouvelle section rencontrée : sortir du mode Data et conserver la ligne
+                // new section encountered: leave Data mode and keep the line
                 in_data = false;
                 cleaned_lines.push(line.to_string());
                 i += 1;
@@ -117,7 +117,7 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
                 )));
             }
 
-            // Construire une ligne nettoyée en respectant le nombre de colonnes (pad si nécessaire)
+            // Build a cleaned line respecting the number of columns (pad if necessary)
             let mut cleaned_values: Vec<String> = Vec::new();
             for col_idx in 0..column_names.len() {
                 let v = values.get(col_idx).copied().unwrap_or("");
@@ -125,7 +125,7 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
             }
             cleaned_lines.push(cleaned_values.join(","));
 
-            // Extraire l'échantillon si présent
+            // Extract the sample if present
             if let Some(sample_idx) = sample_col_index
                 && let Some(val) = values.get(sample_idx)
             {
@@ -139,7 +139,7 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
             continue;
         }
 
-        // Cas général : avancer
+        // General case: move on
         cleaned_lines.push(line.to_string());
         i += 1;
     }
@@ -155,7 +155,7 @@ pub fn correct_samplesheet(input: &str) -> Result<(Vec<String>, String), Samples
 }
 
 pub fn format_french_date(date: &OffsetDateTime, with_time: bool) -> String {
-    // Extraire juste la partie date si c'est un datetime
+    // Extract just the date part if it is a datetime
 
     let weekday = match date.weekday() {
         Weekday::Monday => "lun.",
@@ -196,11 +196,11 @@ pub fn format_french_date(date: &OffsetDateTime, with_time: bool) -> String {
     }
 }
 
-/// Convertit le nom d'un fichier local en un nom servi par la route statique
+/// Converts the name of a local file into a name served by the static route
 /// # Arguments
-/// * `filename` - Le chemin complet du fichier local (sur le serveur)
-/// * `base_path` - Le chemin de base à retirer (le nom du répertoire de téléchargement sur le serveur, servi statiquement)
-/// * `prefix` - Le préfixe (en chemin absolu) utilisé dans la route statique (ex: "/uploads")
+/// * `filename` - The full path of the local file (on the server)
+/// * `base_path` - The base path to strip (the name of the upload directory on the server, served statically)
+/// * `prefix` - The prefix (as an absolute path) used in the static route (e.g. "/uploads")
 pub fn filename_to_static_served_name(
     filename: &str,
     base_path: &str,

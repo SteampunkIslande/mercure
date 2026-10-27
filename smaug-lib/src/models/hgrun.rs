@@ -46,16 +46,16 @@ pub enum RunDefinitionError {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RunStatus {
-    /// Le formulaire a été créé mais pas encore validé
+    /// The form was created but not yet validated
     #[default]
     Idle,
-    /// Le formulaire a été validé mais l'analyse n'a pas encore commencé
+    /// The form was validated but the analysis has not started yet
     Pending,
-    /// Le formulaire a été validé et l'analyse est en cours
+    /// The form was validated and the analysis is running
     Running,
-    /// Le formulaire a été validé et l'analyse s'est terminée avec succès
+    /// The form was validated and the analysis completed successfully
     Success,
-    /// Le formulaire a été validé mais l'analyse a échoué avec une erreur
+    /// The form was validated but the analysis failed with an error
     Failure(String),
 }
 
@@ -65,8 +65,8 @@ impl<'r> FromFormField<'r> for RunStatus {
         Some(RunStatus::Idle)
     }
     fn from_value(field: ValueField<'r>) -> rocket::form::Result<'r, Self> {
-        // Failure seul (filtre du front) désigne tous les statuts d'échec :
-        // la raison est vide, et le filtre préfixe `Failure:%` les couvre tous
+        // Failure alone (front-end filter) means all failure statuses:
+        // the reason is empty, and the `Failure:%` prefix filter covers them all
         if field.value == "Failure" {
             return Ok(RunStatus::Failure(String::new()));
         }
@@ -114,7 +114,7 @@ pub struct Run {
     pub user_id: i64,
 
     /// A user-defined name for this run
-    /// Not modifiable with new attempts.
+    /// Not modifiable with new attempts (ignored by the edit_run associated function).
     pub run_name: String,
 
     /// Date of creation of this run in the database. Not modifiable with new attempts.
@@ -134,18 +134,18 @@ pub struct Run {
 }
 
 impl Run {
-    /// Crée un nouveau HgRun à partir de l'ID d'un HgFormDef et d'autres paramètres nécessaires
+    /// Creates a new HgRun from the ID of an HgFormDef and other required parameters
     pub async fn new_run(mut run_submission: Run, pool: &SqlitePool) -> Result<i64> {
-        // Date de création (peu importe ce que l'utilisateur avait soumis)
+        // Creation date (regardless of what the user had submitted)
         run_submission.creation_date = Some(OffsetDateTime::now_utc());
 
         let user_defined_vars_str = serde_json::to_string(&run_submission.user_defined_vars)
             .context("Impossible de sérialiser les variables du run")?;
 
-        // Insérer dans la table Runs
+        // Insert into the Runs table
         let form = run_submission.get_form().await?;
-        // S'assurer que le formulaire est bien rempli (les vars injectées
-        // `outdir`/`attempt_number` sont ajoutées à l'exécution)
+        // Make sure the form is properly filled in (the injected vars
+        // `outdir`/`attempt_number` are added at execution time)
         form.check_validity(Some(&run_submission.user_defined_vars))
             .await
             .context("Le formulaire soumis est invalide")?;
@@ -185,7 +185,7 @@ impl Run {
         }
     }
 
-    /// Edite un HgRun à partir de son ID et d'autres paramètres nécessaires
+    /// Edits an HgRun from its ID and other required parameters
     pub async fn edit_run(
         run_id: i64,
         user_defined_vars: HashMap<String, String>,
@@ -202,7 +202,7 @@ impl Run {
         }
 
         let form = run.get_form().await?;
-        // S'assurer que le formulaire est bien rempli
+        // Make sure the form is properly filled in
         form.check_validity(Some(&user_defined_vars))
             .await
             .context("Le formulaire édité est invalide")?;
@@ -221,9 +221,9 @@ impl Run {
         Ok(())
     }
 
-    /// Sérialise le run en une ligne de tableau pour le front.
+    /// Serializes the run into a table row for the front end.
     ///
-    /// La sortie doit correspondre colonne par colonne à `Run::runs_table_header`.
+    /// The output must match `Run::runs_table_header` column by column.
     fn to_json(&self, user_name: &str) -> Option<Value> {
         let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
         let creation_date = self
@@ -232,23 +232,23 @@ impl Run {
             .to_offset(local_offset);
         let creation_date_str = format_french_date(&creation_date, false);
         Some(json!([
-            // Colonne 1 - Nom du run
+            // Column 1 - Run name
             json!({
                 "content": &self.run_name,
                 "href": Some(format!("/smaug/show/run/{}", self.run_id?)),
                 "td_class": "content-column"
             }),
-            // Colonne 2 - Utilisateur
+            // Column 2 - User
             json!({
                 "content": user_name,
                 "td_class": "content-column"
             }),
-            // Colonne 3 - Date du run
+            // Column 3 - Run date
             json!({
                 "content": creation_date_str,
                 "td_class": "content-column"
             }),
-            // Colonne 4 - Statut
+            // Column 4 - Status
             json!({
                 "content": match self.status {
                     RunStatus::Idle => "A valider",
@@ -266,7 +266,7 @@ impl Run {
                 }),
                 "td_class": "badge-column"
             }),
-            // Colonne 5 - Tentatives
+            // Column 5 - Attempts
             json!({
                 "content": &self.attempt_count.to_string(),
                 "td_class": "numeric-column"
@@ -274,21 +274,21 @@ impl Run {
         ]))
     }
 
-    /// Entête du tableau des runs.
+    /// Header of the runs table.
     ///
-    /// La sortie doit correspondre colonne par colonne à `Run::to_json`.
-    fn runs_table_header() -> Vec<Value> {
-        vec![
+    /// The output must match `Run::to_json` column by column.
+    fn runs_table_header() -> Value {
+        json!([
             json!({"content": "Nom du run", "class": "content-column"}),
             json!({"content": "Utilisateur", "class": "content-column"}),
             json!({"content": "Date du run", "class": "content-column"}),
             json!({"content": "Statut", "class": "badge-column"}),
             json!({"content": "Tentative", "class": "numeric-column"}),
-        ]
+        ])
     }
 
-    /// Construit le JSON attendu par le front : titre, en-tête de tableau,
-    /// lignes de runs paginées et pagination.
+    /// Builds the JSON expected by the front end: title, table header,
+    /// paginated run rows and pagination.
     fn runs_payload(
         title: &str,
         table: Vec<Value>,
@@ -311,17 +311,17 @@ impl Run {
         })
     }
 
-    /// Noyau SQL commun à `Run::list_runs` et `Run::search_runs`.
+    /// SQL core shared by `Run::list_runs` and `Run::search_runs`.
     ///
-    /// Construit dynamiquement la clause WHERE à partir :
+    /// Dynamically builds the WHERE clause from:
     ///
-    /// 1. de la visibilité : seul un admin (`user = None`) voit tous les runs, un
-    ///    utilisateur standard ne voit que les runs des formulaires associés à au moins
-    ///    un de ses groupes (les paires `branch_name`/`form_path` étant résolues depuis
-    ///    le cache `FormDef`/`FormDefHasGroup`, voir `Run::visible_form_pairs`) ;
-    /// 2. des filtres optionnels passés dans `filters`.
+    /// 1. visibility: only an admin (`user = None`) sees all runs, a
+    ///    standard user only sees the runs of forms associated with at least
+    ///    one of their groups (the `branch_name`/`form_path` pairs being resolved from
+    ///    the `FormDef`/`FormDefHasGroup` cache, see `Run::visible_form_pairs`);
+    /// 2. the optional filters passed in `filters`.
     ///
-    /// Renvoie le JSON prêt pour le front : `{title, header, table, pagination}`.
+    /// Returns JSON ready for the front end: `{title, header, table, pagination}`.
     async fn fetch_runs_table(
         pool: &SqlitePool,
         groups: Option<Vec<Group>>,
@@ -337,12 +337,12 @@ impl Run {
         let mut where_parts: Vec<String> = Vec::new();
         let mut where_binds: Vec<String> = Vec::new();
 
-        // 1. Visibilité par groupes (si les groupes sont importants, c'est-à-dire si l'utilisateur n'est pas admin)
+        // 1. Visibility by groups (if groups matter, i.e. if the user is not an admin)
         if let Some(groups) = groups {
             let form_pairs = CachedForm::visible_form_pairs(pool, groups).await?;
 
             if form_pairs.is_empty() {
-                // L'utilisateur n'a accès à aucun formulaire : liste vide
+                // The user has access to no form: empty list
                 return Ok(Self::runs_payload(
                     title,
                     Vec::new(),
@@ -366,7 +366,7 @@ impl Run {
             }
         }
 
-        // 2. Filtres optionnels
+        // 2. Optional filters
         if let Some(status) = filters.status {
             where_parts.push("r.status LIKE ?".to_string());
             where_binds.push(format!("{status}%"));
@@ -390,10 +390,10 @@ impl Run {
             format!(" WHERE {}", where_parts.join(" AND "))
         };
 
-        // Compte total pour la pagination
+        // Total count for pagination
         let count_query_str = format!("SELECT COUNT(r.run_id) as total FROM Runs r{where_sql}");
 
-        // Résultats paginés, triés par date de création, les plus récents d'abord
+        // Paginated results, sorted by creation date, most recent first
         let base_query_str = format!(
             "SELECT r.run_id, r.user_id, r.run_name, r.creation_date, r.status,
              r.attempt_count, r.user_defined_vars, r.form_path, r.branch_name, u.username
@@ -439,30 +439,30 @@ impl Run {
         ))
     }
 
-    /// Liste les runs visibles, paginés et triés par date de création décroissante.
+    /// Lists visible runs, paginated and sorted by descending creation date.
     ///
-    /// Un utilisateur non-admin ne voit que les runs des formulaires associés à au
-    /// moins un de ses groupes ; passer `user = None` (admin) désactive ce filtre.
+    /// A non-admin user only sees the runs of forms associated with at
+    /// least one of their groups; passing `user = None` (admin) disables this filter.
     ///
     /// # Arguments
     ///
-    /// - `pool` - connexion à la base de données
-    /// - `user` - l'utilisateur demandeur ; `None` signifie `admin`, donc voit tout
-    /// - `groups` - les groupes dont l'utilisateur est membre ; si `None` pour un
-    ///   utilisateur non-admin, ses groupes sont relus depuis la base
-    /// - `page_size` - nombre de runs par page (défaut : 5)
-    /// - `page` - page à afficher, à partir de 1 (défaut : 1)
-    /// - `status` - filtre optionnel de statut, appliqué en préfixe
-    ///   (`LIKE '{status}%'`, ce qui couvre aussi `Failure:raison`) ; `None` n'applique aucun filtre
+    /// - `pool` - database connection
+    /// - `user` - the requesting user; `None` means `admin`, so sees everything
+    /// - `groups` - the groups the user is a member of; if `None` for a
+    ///   non-admin user, their groups are read from the database
+    /// - `page_size` - number of runs per page (default: 5)
+    /// - `page` - page to display, starting at 1 (default: 1)
+    /// - `status` - optional status filter, applied as a prefix
+    ///   (`LIKE '{status}%'`, which also covers `Failure:reason`); `None` applies no filter
     ///
     /// # Returns
     ///
-    /// - Le JSON prêt à consommer par le front : `{title, header, table, pagination}`
+    /// - The JSON ready for the front end to consume: `{title, header, table, pagination}`
     ///
     /// # Errors
     ///
-    /// En cas d'erreur SQL, d'erreur de lecture du cache des formulaires (`FormDef`), ou
-    /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
+    /// In case of an SQL error, an error reading the forms cache (`FormDef`), or
+    /// an error reading the user's groups if `groups` is `None`.
     pub async fn list_runs(
         pool: &SqlitePool,
         page_size: Option<i64>,
@@ -494,31 +494,31 @@ impl Run {
         .await
     }
 
-    /// Recherche paginée de runs visibles, triés par date de création décroissante.
+    /// Paginated search of visible runs, sorted by descending creation date.
     ///
-    /// Même visibilité que `Run::list_runs` : un utilisateur non-admin ne voit que les
-    /// runs des formulaires associés à au moins un de ses groupes.
+    /// Same visibility as `Run::list_runs`: a non-admin user only sees the
+    /// runs of forms associated with at least one of their groups.
     ///
     /// # Arguments
     ///
-    /// - `pool` - connexion à la base de données
-    /// - `user` - l'utilisateur demandeur ; `None` signifie « admin, voit tout »
-    /// - `groups` - les groupes dont l'utilisateur est membre ; si `None` pour un
-    ///   utilisateur non-admin, ses groupes sont relus depuis la base
-    /// - `page_size` - nombre de runs par page (défaut : 5)
-    /// - `page` - page à afficher, à partir de 1 (défaut : 1)
-    /// - `status` - préfixe de statut recherché (`LIKE '{status}%'`)
-    /// - `date_from` / `date_to` - bornes de dates de création au format `YYYY-MM-DD`
-    /// - `run_name_search` - sous-chaîne à retrouver dans le nom du run
+    /// - `pool` - database connection
+    /// - `user` - the requesting user; `None` means "admin, sees everything"
+    /// - `groups` - the groups the user is a member of; if `None` for a
+    ///   non-admin user, their groups are read from the database
+    /// - `page_size` - number of runs per page (default: 5)
+    /// - `page` - page to display, starting at 1 (default: 1)
+    /// - `status` - status prefix to search for (`LIKE '{status}%'`)
+    /// - `date_from` / `date_to` - creation date bounds in `YYYY-MM-DD` format
+    /// - `run_name_search` - substring to find in the run name
     ///
     /// # Returns
     ///
-    /// - Le JSON prêt à consommer par le front : `{title, header, table, pagination}`
+    /// - The JSON ready for the front end to consume: `{title, header, table, pagination}`
     ///
     /// # Errors
     ///
-    /// En cas d'erreur SQL, d'erreur de lecture du cache des formulaires (`FormDef`), ou
-    /// d'erreur de lecture des groupes de l'utilisateur si `groups` vaut `None`.
+    /// In case of an SQL error, an error reading the forms cache (`FormDef`), or
+    /// an error reading the user's groups if `groups` is `None`.
     #[allow(clippy::too_many_arguments)]
     pub async fn search_runs(
         pool: &SqlitePool,
@@ -552,7 +552,7 @@ impl Run {
         .await
     }
 
-    /// Instancie un HgRun à partir de son run_id en le récupérant depuis la base de données
+    /// Instantiates an HgRun from its run_id by retrieving it from the database
     pub async fn get_run_from_id(run_id: i64, pool: &SqlitePool) -> Result<Self> {
         let row = sqlx::query(
             r#"
@@ -568,7 +568,7 @@ impl Run {
         let creation_date = row.try_get("creation_date")?;
 
         let user_id: i64 = row.try_get("user_id")?;
-        // Récupérer l'utilisateur, juste pour s'assurer que le user_id est valide
+        // Retrieve the user, just to make sure the user_id is valid
         let _ = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin
@@ -580,22 +580,22 @@ impl Run {
         .await?
         .context("Utilisateur non trouvé!")?;
 
-        // Désérialiser les variables définies par l'utilisateur
+        // Deserialize the user-defined variables
         let user_defined_vars: HashMap<String, String> =
             serde_json::from_str(row.try_get("user_defined_vars")?)?;
 
-        // Parser le statut
+        // Parse the status
         let status: RunStatus = RunStatus::from_str(row.try_get("status")?)
             .map_err(anyhow::Error::from)
             .with_context(|| format!("Statut invalide pour le run {run_id}"))?;
-        // Nombre de tentatives
+        // Number of attempts
         let attempt_count = row.try_get("attempt_count")?;
-        // Le nom de la branche à utiliser pour l'exécution
+        // The branch name to use for execution
         let branch_name: String = row.try_get("branch_name")?;
 
         let form_path: String = row.try_get("form_path")?;
 
-        // Construire l'instance HgRun
+        // Build the HgRun instance
         let hgrun = Run {
             run_id: Some(run_id),
             user_id,
@@ -628,13 +628,15 @@ impl Run {
             .with_context(|| format!("Impossible de lire l'utilisateur {}", self.user_id))
     }
 
-    /// Valide le formulaire pour ce run : Idle -> Pending
+    //--------- Here are the associated functions (soon to become methods) that are crucial to the state machine
+
+    /// Validates the form for this run: Idle -> Pending
     ///
-    /// Cette fonction ne modifie que la table HgRun.
+    /// This function only modifies the HgRun table.
     ///
-    /// Il est de la responsabilité de l'appelant de mettre à jour la table Attempts **après** cette fonction.
+    /// It is the caller's responsibility to update the Attempts table **after** this function.
     pub(super) async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<()> {
-        // Incrémenter le nombre de tentatives
+        // Increment the number of attempts
         sqlx::query(
             r#"
             UPDATE Runs SET (attempt_count, status) = (attempt_count + 1, ?) WHERE run_id = ?
@@ -649,9 +651,9 @@ impl Run {
         Ok(())
     }
 
-    /// Démarre le run : Pending -> Running (appelé par la routine de surveillance)
+    /// Starts the run: Pending -> Running (called by the monitoring routine)
     pub(super) async fn start_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
-        // Mettre à jour le statut à Running
+        // Update the status to Running
         sqlx::query(
             r#"
             UPDATE Runs SET status = ? WHERE run_id = ?
@@ -666,9 +668,9 @@ impl Run {
         Ok(())
     }
 
-    /// Termine le run avec succès : Running -> Success
+    /// Completes the run successfully: Running -> Success
     pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
-        // Mettre à jour le statut à Success
+        // Update the status to Success
         sqlx::query(
             r#"
             UPDATE Runs SET status = ? WHERE run_id = ?
@@ -683,13 +685,13 @@ impl Run {
         Ok(())
     }
 
-    /// Termine le run avec échec : Running -> Failure
+    /// Completes the run with a failure: Running -> Failure
     pub(super) async fn complete_failure(
         run_id: i64,
         reason: &str,
         pool: &SqlitePool,
     ) -> Result<()> {
-        // Mettre à jour le statut à Failure
+        // Update the status to Failure
         sqlx::query(
             r#"
             UPDATE Runs SET status = ? WHERE run_id = ?
@@ -704,9 +706,9 @@ impl Run {
         Ok(())
     }
 
-    /// Relance le run : Success/Failure -> Idle
+    /// Restarts the run: Success/Failure -> Idle
     pub(super) async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
-        // Mettre à jour le statut à Idle
+        // Update the status to Idle
         sqlx::query(
             r#"
             UPDATE Runs SET status = ? WHERE run_id = ?
@@ -722,7 +724,7 @@ impl Run {
     }
 }
 
-/// Critères de filtrage partagés par `Run::list_runs` et `Run::search_runs`.
+/// Filter criteria shared by `Run::list_runs` and `Run::search_runs`.
 struct RunFilters<'a> {
     status: Option<&'a str>,
     date_from: Option<&'a str>,
@@ -730,8 +732,8 @@ struct RunFilters<'a> {
     run_name_search: Option<&'a str>,
 }
 
-/// Reconstruit un `Run` depuis une ligne de la requête de listing,
-/// puis le sérialise pour le tableau du front.
+/// Rebuilds a `Run` from a row of the listing query,
+/// then serializes it for the front-end table.
 fn run_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Option<Value> {
     let form_identification = FileIdentification::GitBranchAndPath {
         branch: row.try_get("branch_name").ok()?,

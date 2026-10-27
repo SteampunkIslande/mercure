@@ -446,19 +446,19 @@ impl Form {
     }
 }
 
-/// Aperçu d'un formulaire, mis en cache en base de données.
+/// A form preview, cached in the database.
 ///
-/// Un formulaire est défini de façon source de vérité par sa paire
-/// (`branch`, `file_path`) dans le dépôt git : cette structure ne retient
-/// exactement que cette paire, avec un nom et une description, mais laisse la
-/// logique (définition des variables, du mode d'exécution) au fichier YAML de définition.
+/// A form is defined, as the source of truth, by its pair
+/// (`branch`, `file_path`) in the git repository: this structure retains
+/// exactly that pair, with a name and a description, but leaves the
+/// logic (variable definitions, execution mode) to the YAML definition file.
 ///
-/// La visibilité d'un `FormDef` pour un groupe est portée par la table
-/// `FormDefHasGroup` (jointure simple en SQL). Cette table est reconstruite
-/// par `FormDef::refresh_cache`.
+/// The visibility of a `FormDef` for a group is carried by the
+/// `FormDefHasGroup` table (a simple SQL join). This table is rebuilt
+/// by `FormDef::refresh_cache`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CachedForm {
-    /// L'ID d'un formulaire. **Ne pas** l'utiliser pour identifier un formulaire en tant que tel.
+    /// The ID of a form. **Do not** use it to identify a form as such.
     pub form_def_id: i64,
     #[serde(flatten)]
     #[serde(skip_deserializing)]
@@ -888,7 +888,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 
     #[test]
     fn test_vars_to_html_values_list() {
-        // Test d'une variable de type ValuesList
+        // Test a variable of type ValuesList
         let v = Variable {
             title: "Une variable".to_string(),
             name: "v1".to_string(),
@@ -934,7 +934,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
 
     #[test]
     fn test_vars_to_html_date_edit() {
-        // Test d'une variable de type ValuesList
+        // Test a variable of type ValuesList
         let v1 = Variable {
             title: "Une variable".to_string(),
             name: "v1".to_string(),
@@ -953,7 +953,7 @@ rsync -a --info=progress2 "{{ outdir }}/{bam,vcf,reports}" /mnt/nas/analysis/{{ 
     }
 }
 
-/// Tests du cache SQL (`FormDefs` / `FormDefHasGroup`)
+/// Tests for the SQL cache (`FormDefs` / `FormDefHasGroup`)
 #[cfg(test)]
 mod form_def_cache_tests {
     use std::{collections::HashMap, path::Path};
@@ -965,7 +965,7 @@ mod form_def_cache_tests {
     };
 
     async fn test_pool() -> SqlitePool {
-        // Le cache en mémoire vit par connexion : une seule connexion dans le pool
+        // The in-memory cache lives per connection: a single connection in the pool
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:")
@@ -1032,7 +1032,7 @@ mod form_def_cache_tests {
             vec![
                 form("F1", "main", ".forms/f1.yaml", &["Bio"]),
                 form("F2", "dev", ".forms/f2.yaml", &[]),
-                // Groupe inexistant en base : ignoré
+                // Group that does not exist in the database: ignored
                 form("F3", "main", ".forms/f3.yaml", &["Fantome"]),
             ],
         )
@@ -1144,7 +1144,7 @@ mod form_def_cache_tests {
         .await
         .expect("first rebuild");
 
-        // Un nouveau scan ne trouve plus que F1, sans groupe
+        // A new scan now finds only F1, with no group
         CachedForm::rebuild_cache_from_forms(
             &pool,
             vec![form("F1", "main", ".forms/f1.yaml", &[])],
@@ -1162,7 +1162,7 @@ mod form_def_cache_tests {
             }
         );
 
-        // L'ancienne association (F1 -> Bio) ne doit plus exister
+        // The old association (F1 -> Bio) must no longer exist
         assert!(
             CachedForm::get_group_ids(&pool, "main", ".forms/f1.yaml")
                 .await

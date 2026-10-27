@@ -34,7 +34,7 @@ impl<'r> FromRequest<'r> for Authenticated {
     type Error = AuthError;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        // Vérifie si l'utilisateur est authentifié via un cookie de session
+        // Check whether the user is authenticated via a session cookie
         match user_from_cookie(request).await {
             Ok(user) => Outcome::Success(Authenticated { user }),
             Err(err) => Outcome::Error((Status::Unauthorized, err)),

@@ -1,16 +1,21 @@
+{% set status_labels = {
+    "Idle": "A valider",
+    "Pending": "En attente",
+    "Running": "Analyses en cours",
+    "Success": "Succès",
+    "Failure": "Echec"
+} %}
+{% set status_classes = {
+    "Idle": "idle",
+    "Pending": "pending",
+    "Running": "running",
+    "Success": "success",
+    "Failure": "failure"
+} %}
 {% for att in history %}
-{% set status_label = "Echec" %}
-{% set status_class = "failure" %}
-{% if att.status == "Pending" %}
-    {% set status_label = "En attente" %}
-    {% set status_class = "pending" %}
-{% elif att.status == "Running" %}
-    {% set status_label = "Analyses en cours" %}
-    {% set status_class = "running" %}
-{% elif att.status == "Success" %}
-    {% set status_label = "Succès" %}
-    {% set status_class = "success" %}
-{% endif %}
+{% set status_key = att.status if att.status is string else "Failure" %}
+{% set status_label = status_labels[status_key] | default("Echec") %}
+{% set status_class = status_classes[status_key] | default("failure") %}
 <div class="run-attempt {{ status_class }}">
     <a href="/smaug/show/run/{{ run.run_id }}?attempt_number={{ att.attempt_number }}">
         <strong>Tentative {{ att.attempt_number }}:</strong>

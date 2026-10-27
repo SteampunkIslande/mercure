@@ -53,7 +53,7 @@
 
         async function loadRuns(status, emptyMsg = "Aucune donnée à afficher.") {
             try {
-                // Permet d'afficher les dix premiers runs avec le statut `status`
+                // Display the first ten runs with the status `status`
                 const response = await fetch(`/smaug/api/listruns?page=1&page_size=10&status=${encodeURIComponent(status)}`);
                 const json = await response.json();
                 if (isApiSuccess(json)) {

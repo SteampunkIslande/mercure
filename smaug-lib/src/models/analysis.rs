@@ -31,7 +31,7 @@ pub enum AnalysisStateMachineError {
     },
 }
 
-/// Valide le formulaire pour ce run : Idle -> Pending, crée une nouvelle tentative (appelé par le backend)
+/// Validates the form for this run: Idle -> Pending, creates a new attempt (called by the backend)
 pub async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<()> {
     let SmaugConfig { pipelines, .. } = get_smaug_config();
     let run: Run = Run::get_run_from_id(run_id, pool)
@@ -65,7 +65,7 @@ pub async fn validate_form(run_id: i64, pool: &SqlitePool) -> Result<()> {
         .with_context(|| format!("Impossible de créer la tentative du run {run_id}"))
 }
 
-/// Démarre le run : Pending -> Running (appelé par la routine de vérification)
+/// Starts the run: Pending -> Running (called by the monitoring routine)
 pub async fn start_run_analysis(run_id: i64, pool: &SqlitePool) -> Result<()> {
     let run: Run = Run::get_run_from_id(run_id, pool)
         .await
@@ -85,7 +85,7 @@ pub async fn start_run_analysis(run_id: i64, pool: &SqlitePool) -> Result<()> {
         .with_context(|| format!("Impossible de démarrer la tentative du run {run_id}"))
 }
 
-/// Termine le run avec succès : Running -> Success (appelé par la routine de vérification)
+/// Completes the run successfully: Running -> Success (called by the monitoring routine)
 pub async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
     let run: Run = Run::get_run_from_id(run_id, pool)
         .await
@@ -105,7 +105,7 @@ pub async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
         .with_context(|| format!("Impossible de terminer la tentative du run {run_id}"))
 }
 
-/// Termine le run avec échec : Running -> Failure (appelé par la routine de vérification)
+/// Completes the run with a failure: Running -> Failure (called by the monitoring routine)
 pub async fn complete_failure(run_id: i64, reason: &str, pool: &SqlitePool) -> Result<()> {
     let reason = reason.to_string();
     let run: Run = Run::get_run_from_id(run_id, pool)
@@ -126,12 +126,16 @@ pub async fn complete_failure(run_id: i64, reason: &str, pool: &SqlitePool) -> R
         .with_context(|| format!("Impossible de terminer la tentative du run {run_id} en échec"))
 }
 
-/// Transitionne un run en échec si le run est introuvable, ou toute ature erreur empêchant le lancement : Pending -> Failure (appelé par la routine de vérification)
+/// Marks a run as failed when it cannot be analysed at all.
+///
+/// This covers a run that is still `Pending` (for example the state machine
+/// refused to start it) as well as a run already moved to `Running` but whose
+/// preparation failed before the analysis process was actually launched.
 pub async fn fail_cannot_analyse_run(run_id: i64, reason: &str, pool: &SqlitePool) -> Result<()> {
     let run = Run::get_run_from_id(run_id, pool)
         .await
         .with_context(|| format!("Impossible de relire le run {run_id}"))?;
-    if !matches!(run.status, RunStatus::Pending) {
+    if !matches!(run.status, RunStatus::Pending | RunStatus::Running) {
         return Err(AnalysisStateMachineError::InvalidTransition {
             from: run.status.to_string(),
             to: RunStatus::Failure(reason.to_string()).to_string(),
@@ -147,7 +151,7 @@ pub async fn fail_cannot_analyse_run(run_id: i64, reason: &str, pool: &SqlitePoo
     Ok(())
 }
 
-/// Commenter une tentative
+/// Comments on an attempt
 pub async fn comment_attempt(
     run_id: i64,
     attempt_number: u32,
@@ -173,7 +177,7 @@ pub async fn comment_attempt(
     Ok(())
 }
 
-/// Relance le run : Success/Failure -> Idle
+/// Relaunches the run: Success/Failure -> Idle
 pub async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
     let run: Run = Run::get_run_from_id(run_id, pool)
         .await
@@ -185,6 +189,17 @@ pub async fn relaunch_run(run_id: i64, pool: &SqlitePool) -> Result<()> {
         }
         .into());
     }
+    // Make sure the form identification tuple (branch name, form name) is still valid
+    if let Err(e) = run.get_form().await {
+        // TODO: Not very nice to rely on the exact error message provided by an anyhow::Error
+        if e.to_string().starts_with("Impossible de récupérer") {
+            return Err(e).context("Le formulaire n'existe plus dans le dépôt des piplines git");
+        } else {
+            return Err(e);
+        }
+    }
+    // Make sure the user who declared this run is a valid, existing user
+    run.get_user(pool).await?;
     super::hgrun::Run::relaunch_run(run_id, pool)
         .await
         .with_context(|| format!("Impossible de relancer le run {run_id}"))

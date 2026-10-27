@@ -1,4 +1,4 @@
-/* Reset et styles de base */
+/* Reset and base styles */
 * {
     margin: 0;
     padding: 0;
@@ -16,7 +16,7 @@ body {
     margin: 1.2rem 0;
 }
 
-/* En-tête */
+/* Header */
 h1 {
     color: #2d3748;
     font-size: 2.5rem;
@@ -26,7 +26,7 @@ h1 {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Conteneur du tableau */
+/* Table container */
 .table-container {
     background: white;
     border-radius: 12px;
@@ -36,14 +36,14 @@ h1 {
     margin-top: 1.5rem;
 }
 
-/* Styles du tableau */
+/* Table styles */
 table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
 }
 
-/* En-têtes de tableau */
+/* Table headers */
 thead {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -63,7 +63,7 @@ table th {
     border-bottom: 3px solid #4c51bf;
 }
 
-/* Champs de recherche */
+/* Search fields */
 .search-input {
     width: 100%;
     padding: 0.5rem;
@@ -85,7 +85,7 @@ table th {
     color: #a0aec0;
 }
 
-/* Conteneur des filtres */
+/* Filter container */
 .filters-row {
     background: #f7fafc;
     border-bottom: 1px solid #e2e8f0;
@@ -98,7 +98,7 @@ table th {
     border-bottom: 1px solid #e2e8f0;
 }
 
-/* Corps du tableau */
+/* Table body */
 tbody tr {
     border-bottom: 1px solid #e2e8f0;
     transition: background-color 0.2s ease;
@@ -120,7 +120,7 @@ td {
     vertical-align: middle;
 }
 
-/* États spécifiques */
+/* Specific states */
 .state-running {
     color: #38a169;
     font-weight: 600;
@@ -136,7 +136,7 @@ td {
     font-weight: 600;
 }
 
-/* Badge pour les états */
+/* Badge for states */
 .status-badge {
     display: inline-block;
     padding: 0.25rem 0.5rem;
@@ -187,7 +187,7 @@ td {
     color: #2f855a;
 }
 
-/* Badge pour les QOS */
+/* Badge for QOS */
 .qos-badge {
     display: inline-block;
     padding: 0.25rem 0.5rem;
@@ -222,7 +222,7 @@ td {
     border: 1px solid #a0aec0;
 }
 
-/* Barre de contrôles horizontale */
+/* Horizontal control bar */
 .controls-bar {
     display: flex;
     align-items: center;
@@ -236,7 +236,7 @@ td {
     flex-wrap: wrap;
 }
 
-/* Styles pour la sélection de champs */
+/* Styles for field selection */
 .field-selector {
     display: flex;
     align-items: center;
@@ -267,7 +267,7 @@ td {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Styles pour les contrôles de rafraîchissement */
+/* Styles for refresh controls */
 .refresh-controls {
     display: flex;
     align-items: center;
@@ -306,7 +306,7 @@ td {
     transform: none;
 }
 
-/* Responsive design pour la barre de contrôles */
+/* Responsive design for the control bar */
 @media (max-width: 768px) {
     .controls-bar {
         flex-direction: column;
@@ -416,7 +416,7 @@ td {
     }
 }
 
-/* Message d'erreur */
+/* Error message */
 .error-message {
     background: #fed7d7;
     border: 1px solid #feb2b2;
@@ -427,7 +427,7 @@ td {
     text-align: center;
 }
 
-/* Message quand aucun résultat */
+/* Message when there are no results */
 .no-results {
     text-align: center;
     padding: 2rem;

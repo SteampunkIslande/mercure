@@ -39,7 +39,9 @@ pub async fn upload_post(
 
     // Persist the file
     if (form.file.move_copy_to(&filepath).await).is_err() {
-        return Ok(Json(ApiResponse::error("Failed to save file")));
+        return Ok(Json(ApiResponse::error(
+            "Impossible d'enregistrer le fichier",
+        )));
     }
 
     // Return the path

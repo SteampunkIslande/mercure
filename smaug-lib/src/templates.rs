@@ -8,10 +8,10 @@ use rocket::response::{self, Responder, content::RawHtml};
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
 
-// Re-export de context
+// Re-export of context
 pub use minijinja::context;
 
-/// Ces assets sont contenus dans le binaire final
+/// These assets are contained in the final binary
 #[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "../static/templates"]
@@ -23,9 +23,9 @@ pub struct Template {
 }
 
 impl Template {
-    /// Rend le template `name` avec le contexte `context`.
+    /// Renders the template `name` with the context `context`.
     ///
-    /// Le fichier `static/templates/{name}.html.j2` doit exister, sinon une erreur est renvoyée.
+    /// The file `static/templates/{name}.html.j2` must exist, otherwise an error is returned.
     pub fn render<S: Into<String>>(name: S, context: Value) -> Self {
         Self {
             name: name.into(),
@@ -34,10 +34,10 @@ impl Template {
     }
 }
 
-/// Implémentation de Responder pour que Rocket sache comment renvoyer ce Template
+/// Responder implementation so that Rocket knows how to return this Template
 impl<'r, 'o: 'r> Responder<'r, 'o> for Template {
     fn respond_to(self, request: &'r Request<'_>) -> response::Result<'o> {
-        // On récupère l'environnement Minijinja depuis l'état global de Rocket, via la requête
+        // Retrieve the Minijinja environment from Rocket's global state, via the request
         let env = request.rocket().state::<Environment>().ok_or_else(|| {
             error!(
                 "L'environnement Minijinja n'est pas géré par Rocket. As-tu oublié le fairing ?"
@@ -45,7 +45,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Template {
             Status::InternalServerError
         })?;
 
-        // On charge le template
+        // Load the template
         let tmpl = env
             .get_template(&format!("{}.html.j2", self.name))
             .map_err(|e| {
@@ -53,13 +53,13 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for Template {
                 Status::InternalServerError
             })?;
 
-        // On exécute le rendu avec le contexte
+        // Render with the context
         let rendered = tmpl.render(self.context).map_err(|e| {
             error!("Erreur lors du rendu du template '{}': {}", self.name, e);
             Status::InternalServerError
         })?;
 
-        // On délègue la réponse à RawHtml pour s'assurer d'avoir le bon Content-Type (text/html)
+        // Delegate the response to RawHtml to ensure the correct Content-Type (text/html)
         RawHtml(rendered).respond_to(request)
     }
 }
@@ -71,7 +71,7 @@ pub fn minijinja_fairing() -> AdHoc {
 
         let mut env = Environment::new();
 
-        // Racine des templates au moment du run
+        // Template root at run time
         let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
         let template_root = match manifest_dir
             .join("..")
@@ -106,13 +106,13 @@ pub fn minijinja_fairing() -> AdHoc {
                 continue;
             }
 
-            // Chemin relatif utilisé comme nom de template
+            // Relative path used as the template name
             let rel = match path.strip_prefix(&template_root) {
                 Ok(r) => r,
                 Err(_) => continue,
             };
 
-            // On garde le même préfixe que RustEmbed pour que les `render!` restent identiques
+            // Keep the same prefix as RustEmbed so that the `render!` calls remain identical
             let template_name = rel.display().to_string();
             log::info!("Adding template {}", template_name);
 
@@ -196,6 +196,41 @@ mod tests {
         assert!(env.get_template("common/welcome.html.j2").is_ok());
         assert!(env.get_template("admin/dashboard.html.j2").is_ok());
         assert!(env.get_template("common/runningrun.html.j2").is_ok());
+    }
+
+    #[test]
+    fn runtime_config_translates_enum_values() {
+        let env = load_env();
+        let html = env
+            .get_template("admin/runtime_config.html.j2")
+            .unwrap()
+            .render(context! {
+                entries => vec![
+                    context! {
+                        key => "on_sigint",
+                        value => "StopJobs",
+                        value_input => vec!["StopJobs", "WaitForJobCompletion"],
+                        description => "Signal behavior",
+                    },
+                    context! {
+                        key => "active_routine",
+                        value => "RoutineOff",
+                        value_input => vec!["RoutineOff", "RoutineOn"],
+                        description => "Routine state",
+                    },
+                    context! {
+                        key => "shutdown_date",
+                        value => "2026-01-01",
+                        value_input => "date",
+                        description => "Date",
+                    },
+                ]
+            })
+            .unwrap();
+
+        assert!(html.contains("Arrêter les jobs"));
+        assert!(html.contains("Routine désactivée"));
+        assert!(html.contains("value=\"2026-01-01\""));
     }
 
     #[test]

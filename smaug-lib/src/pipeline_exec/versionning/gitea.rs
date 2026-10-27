@@ -63,7 +63,7 @@ pub async fn list_yaml_forms(
         Err(_) => {
             let _ = tokio::fs::remove_dir_all(&tmp_root).await;
             return Err(GitCheckError::CommandFailed(
-                "git clone failed or timed out".into(),
+                "Échec ou expiration du clone git".into(),
             ));
         }
     };
@@ -76,7 +76,7 @@ pub async fn list_yaml_forms(
                 e
             )
         }
-        return Err(GitCheckError::CommandFailed("git clone failed".into()));
+        return Err(GitCheckError::CommandFailed("Échec du clone git".into()));
     }
 
     // Per-entry failures (unreadable directory, unrelated path) are logged and
@@ -175,7 +175,7 @@ async fn is_file(
         .with_context(|| format!("Impossible d'interroger l'API Gitea ({url})"))?;
     if !resp.status().is_success() {
         return Err(GitCheckError::CommandFailed(format!(
-            "Failed to check if file exists: {}",
+            "Impossible de vérifier si le fichier existe : {}",
             resp.status()
         )));
     }
@@ -245,7 +245,7 @@ pub async fn git_get_file(
         .with_context(|| format!("Impossible de récupérer le fichier {url}"))?;
     if !resp.status().is_success() {
         return Err(GitCheckError::CommandFailed(format!(
-            "Failed to fetch file: {}",
+            "Impossible de récupérer le fichier : {}",
             resp.status()
         )));
     }

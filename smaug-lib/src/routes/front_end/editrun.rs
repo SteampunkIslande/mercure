@@ -11,7 +11,7 @@ use crate::templates::{Template, context};
 
 use crate::auth::Authenticated;
 use crate::models::Group;
-use crate::models::{Run, RunStatus};
+use crate::models::{FileIdentification, Run, RunStatus};
 
 #[get("/editrun/<run_id>")]
 pub async fn edit_run_get(
@@ -22,15 +22,57 @@ pub async fn edit_run_get(
     let mut run: Run = Run::get_run_from_id(run_id, pool)
         .await
         .with_context(|| format!("Impossible de lire le run {run_id}"))?;
-    let form = run
-        .get_form()
-        .await
-        .with_context(|| format!("Impossible de lire le formulaire du run {run_id}"))?;
+    let form = match run.get_form().await {
+        Ok(form) => form,
+        Err(e) => {
+            let (branch, form_path) = match &run.form_identification {
+                FileIdentification::GitBranchAndPath { branch, file_path } => {
+                    (branch.clone(), file_path.display().to_string())
+                }
+                FileIdentification::GitCommit {
+                    commit_hash,
+                    file_path,
+                } => (commit_hash.clone(), file_path.display().to_string()),
+                FileIdentification::None => (String::new(), String::new()),
+            };
+            log::warn!(
+                "Le formulaire '{}' sur la branche '{}' n'est plus disponible pour le run {run_id}: {e:#}",
+                form_path,
+                branch
+            );
+            return Err(FrontendError::FormNotFound {
+                branch,
+                file_path: form_path,
+            });
+        }
+    };
     let variables_html: Vec<String> = form.variables.iter().map(|v| v.to_html_safe()).collect();
 
     let variable_names: HashSet<&str> = form.variables.iter().map(|v| v.name.as_str()).collect();
 
-    // Permet de retirer si nécessaire des variables qui ne sont plus utiles dans la version actuelle du formulaire (si une variable a été supprimée entre deux modification des paramètres d'un run)
+    let previous_variable_names: HashSet<&str> =
+        run.user_defined_vars.keys().map(String::as_str).collect();
+    let warning = if previous_variable_names != variable_names {
+        let (branch, form_path) = match &form.form_identification {
+            FileIdentification::GitBranchAndPath { branch, file_path } => {
+                (branch.as_str(), file_path.display().to_string())
+            }
+            FileIdentification::GitCommit {
+                commit_hash,
+                file_path,
+            } => (commit_hash.as_str(), file_path.display().to_string()),
+            FileIdentification::None => ("", String::new()),
+        };
+        Some(format!(
+            "Le formulaire '{}' sur la branche '{}' n'a pas les mêmes variables qu'à l'exécution précédente",
+            form_path, branch
+        ))
+    } else {
+        None
+    };
+
+    // Drop variables that no longer exist in the current version of the form
+    // (a variable may have been removed between two edits of a run).
     run.user_defined_vars = run
         .user_defined_vars
         .into_iter()
@@ -78,6 +120,7 @@ pub async fn edit_run_get(
                     user=> &auth.user,
                     form=> &form,
                     user_defined_vars=> &variables_html,
+                    warning=> warning,
                 },
             )),
             status => {

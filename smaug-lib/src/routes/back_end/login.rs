@@ -34,7 +34,7 @@ pub async fn login_post(
 
     let mut cookie = Cookie::new("user_id", user.id.to_string());
 
-    // Crée un cookie pour la durée de la session (dépend du navigateur)
+    // Create a cookie for the duration of the session (depends on the browser)
     cookie.set_expires(None);
     cookies.add_private(cookie);
 

@@ -64,7 +64,7 @@ pub async fn show_run_get(
     };
 
     if can_see_run {
-        // Récupérer l'historique des tentatives pour la navigation
+        // Retrieve the attempt history for navigation
         let history = Attempt::list_attempts_for_run(run_id, pool)
             .await
             .unwrap_or_default();
@@ -77,7 +77,7 @@ pub async fn show_run_get(
             "".to_string()
         };
 
-        // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
+        // EDIT MODE: If the run is Idle AND the latest attempt is requested
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let attempt = Attempt::get_hypothetic_attempt(&run)?;
             let form = &run.get_form().await.with_context(|| {
@@ -96,10 +96,10 @@ pub async fn show_run_get(
                 },
             ))
         } else {
-            // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
+            // VIEW MODE: Non-Idle run OR specific attempt requested
             let attempt_number = attempt_number.unwrap_or(run.attempt_count);
 
-            // On cherche la tentative demandée
+            // Look up the requested attempt
             let attempt = Attempt::get_attempt_from_number(attempt_number, run_id, pool)
                 .await
                 .with_context(|| {
@@ -109,12 +109,14 @@ pub async fn show_run_get(
                     )
                 })?;
 
-            let attempt_form = attempt.get_form().await?;
+            let attempt_form = attempt.get_form().await.with_context(|| {
+                "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible"
+            })?;
 
             let attempt_date =
                 utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
 
-            // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
+            // Display the template corresponding to the status of the ATTEMPT (not the Run)
             match attempt.status {
                 RunStatus::Pending => Ok(Template::render(
                     "common/pendingrun",
@@ -156,7 +158,7 @@ pub async fn show_run_get(
                     "common/failurerun",
                     context! {
                         run=> &run,
-                        form=> &run.get_form().await?,
+                        form=> &attempt_form,
                         run_creation_date,
                         attempt_date,
                         attempt=> &attempt,

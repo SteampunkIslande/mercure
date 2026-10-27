@@ -54,7 +54,7 @@ impl User {
 
         let now = OffsetDateTime::now_utc();
 
-        // Insérer l'utilisateur
+        // Insert the user
         sqlx::query(
             r#"
             INSERT INTO Users (usermail, username, password_hash, created_at, is_admin)
@@ -69,7 +69,7 @@ impl User {
         .await
         .with_context(|| format!("Impossible de créer l'utilisateur `{}`", new_user.usermail))?;
 
-        // Récupérer l'utilisateur créé
+        // Retrieve the created user
         let user = sqlx::query_as::<_, User>(
             r#"
             SELECT id, usermail, username, password_hash, created_at, last_login, is_admin

@@ -25,9 +25,9 @@ use rocket::response::{self, Responder, Response};
 /// logged, never sent to the client.
 #[derive(Debug, wherror::Error)]
 pub enum AuthError {
-    #[error("Invalid credentials")]
+    #[error("Identifiants invalides")]
     InvalidCredentials,
-    #[error("Unknown user")]
+    #[error("Utilisateur inconnu")]
     UnknownUser,
     #[error("Pas de mot de passe fourni")]
     NoPassword,

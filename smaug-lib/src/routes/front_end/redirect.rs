@@ -8,7 +8,7 @@ pub struct RedirectForm {
     pub message: String,
     pub title: String,
     pub target_url: String,
-    // Optionnel : permet de surcharger le délai en secondes
+    // Optional: allows overriding the delay in seconds
     pub seconds: Option<u64>,
 }
 

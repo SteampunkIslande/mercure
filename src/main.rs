@@ -13,7 +13,7 @@ use smaug::db;
 use crate::admin::Admin;
 use crate::web::Web;
 
-// Init logger dès le démarrage, format date/heure local, niveau INFO, sortie stderr
+// Initialize the logger at startup, local date/time format, INFO level, stderr output
 fn init_logger() {
     Builder::new()
         .format(|buf, record| {
@@ -41,9 +41,9 @@ enum Commands {
     #[command(subcommand)]
     Admin(Admin),
 
-    /// Exécute à la fois l'application web et la routine
+    /// Runs both the web application and the routine
     ///
-    /// La routine et l'application sont lancées de façon concurrente.
+    /// The routine and the application are started concurrently.
     Web(Web),
 }
 

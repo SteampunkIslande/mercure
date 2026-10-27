@@ -53,7 +53,7 @@ pub struct Attempt {
 }
 
 impl Attempt {
-    /// Crée une nouvelle tentative à partir d'une HgRun
+    /// Creates a new attempt from an HgRun
     pub(super) async fn new_attempt(
         run_id: i64,
         current_commit_hash: &str,
@@ -80,7 +80,7 @@ impl Attempt {
             "#,
         )
         .bind(run.run_id)
-        .bind(run.attempt_count) // Pas d'incrémentation, le run que l'on tente d'analyser a déjà incrémenté son `attempt_count`
+        .bind(run.attempt_count) // No increment, the run we are trying to analyze has already incremented its `attempt_count`
         .bind(attempt_date)
         .bind(user_defined_vars)
         .bind(current_commit_hash)
@@ -98,10 +98,10 @@ impl Attempt {
         Ok(())
     }
 
-    /// Crée une tentative hypothétique à partir d'un HgRun (sans l'insérer en base)
+    /// Creates a hypothetical attempt from an HgRun (without inserting it into the database)
     ///
-    /// Utilisé pour prévisualiser les données d'une tentative avant de la créer réellement.
-    /// Pratique pour l'API, uniformise l'environnement jinja2.
+    /// Used to preview the data of an attempt before actually creating it.
+    /// Handy for the API, it standardizes the jinja2 environment.
     pub fn get_hypothetic_attempt(run: &Run) -> Result<Attempt> {
         Ok(Attempt {
             attempt_number: run.attempt_count + 1,
@@ -153,7 +153,7 @@ impl Attempt {
         form.render_template(&ctx).await
     }
 
-    /// Récupère un HgAttempt à partir de son attempt_number et run_id
+    /// Retrieves an HgAttempt from its attempt_number and run_id
     pub async fn get_attempt_from_number(
         attempt_number: u32,
         run_id: i64,
@@ -172,7 +172,7 @@ impl Attempt {
             format!("Impossible de lire la tentative {attempt_number} du run {run_id}")
         })?;
 
-        // Désérialiser les variables définies par l'utilisateur
+        // Deserialize the user-defined variables
         let user_defined_vars: HashMap<String, String> =
             serde_json::from_str(row.try_get("user_defined_vars")?)
                 .context("Impossible de désérialiser les variables de la tentative")?;
@@ -181,7 +181,7 @@ impl Attempt {
             .map_err(anyhow::Error::from)
             .context("Statut de tentative invalide")?;
 
-        // Construire l'instance HgAttempt
+        // Build the HgAttempt instance
         let attempt = Attempt {
             attempt_number,
             run_id,
@@ -229,7 +229,7 @@ impl Attempt {
             .collect())
     }
 
-    /// Récupère toutes les tentatives pour un run_id
+    /// Retrieves all attempts for a run_id
     pub async fn list_attempts_for_run(run_id: i64, pool: &SqlitePool) -> Result<Vec<Self>> {
         let rows = sqlx::query(
             r#"
@@ -244,11 +244,11 @@ impl Attempt {
         Ok(rows
             .into_iter()
             .filter_map(|row| {
-                // Désérialiser les variables définies par l'utilisateur
+                // Deserialize the user-defined variables
                 let user_defined_vars: HashMap<String, String> =
                     serde_json::from_str(row.try_get("user_defined_vars").ok()?).ok()?;
 
-                // Parser le statut
+                // Parse the status
                 let status_str: String = row.try_get("status").ok()?;
                 let status = RunStatus::from_str(status_str.as_str()).ok()?;
                 Some(Attempt {
@@ -286,7 +286,7 @@ impl Attempt {
         Ok(())
     }
 
-    /// La tentative `attempt_number` s'est terminée avec succès.
+    /// The attempt `attempt_number` completed successfully.
     pub(super) async fn complete_success(run_id: i64, pool: &SqlitePool) -> Result<()> {
         let run = Run::get_run_from_id(run_id, pool)
             .await
@@ -310,7 +310,7 @@ impl Attempt {
         Ok(())
     }
 
-    /// La tentative `attempt_number` a échoué.
+    /// The attempt `attempt_number` failed.
     pub(super) async fn complete_failure(
         run_id: i64,
         reason: &str,
@@ -338,7 +338,7 @@ impl Attempt {
         Ok(())
     }
 
-    /// Met à jour le commentaire d'une tentative
+    /// Updates the comment of an attempt
     pub(super) async fn update_comment(
         run_id: i64,
         attempt_number: u32,
