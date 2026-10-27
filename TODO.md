@@ -17,3 +17,7 @@
 - [X] Les erreurs Frontend devraient être plus claires: le `downcast_ref` devrait prendre en charge plus de cas.
 
 - [X] Ajouter une route `smaug/uploads` qui sert statiquement les fichiers de l'utilisateur.
+
+## Intégration continue
+
+- [X] Ajouter au fichier `.github/workflows/release.yml` de lire la version dans `Cargo.toml`. La version est lue dans `Cargo.toml` (étape `Read version from Cargo.toml`) et utilisée pour le tag par défaut (`v<version>`), sauf si un `tag_name` est fourni manuellement. Un script `scripts/release.sh` permet de bump la version (major/minor/patch), de maj `Cargo.toml` + `Cargo.lock`, de commit/tag/pusher, et de déclencher la release.

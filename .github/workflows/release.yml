@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Nom du tag pour la release (ex : v1.0.0)"
-        required: true
-        default: "v0.1.0"
+        description: "Nom du tag pour la release (ex : v1.0.0). Laisser vide pour utiliser la version de Cargo.toml."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -66,7 +66,7 @@ jobs:
 
       - name: Install mdbook
         run: cargo install mdbook
-       
+
       - name: Build mdbook
         run: mdbook build documentation
 
@@ -89,6 +89,32 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(awk '/^\[package\]/{p=1} p && /^version/{gsub(/"/,"",$3); print $3; exit}' Cargo.toml)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Read version from Cargo.toml: $VERSION"
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="v${{ steps.version.outputs.version }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
+
+      - name: Create and push tag
+        run: |
+          git tag "${{ steps.tag.outputs.tag }}"
+          git push origin "${{ steps.tag.outputs.tag }}"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -98,7 +124,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag_name }}
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: binaries/*
           draft: false
           prerelease: false
