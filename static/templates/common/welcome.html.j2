@@ -1,21 +1,52 @@
 {% extends "base.html.j2" %}
 
 {% block title %}SMAUG | GenoBiomics{% endblock %}
-{% block body_attrs %}class="smaug-welcome-page"{% endblock %}
+{% block body_attrs %}class="smaug-signature-page"{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="/smaug/static/styles/smaug-welcome.css">
+<link rel="stylesheet" href="/smaug/static/styles/smaug-signature.css">
 {% endblock %}
 
 {% block banner %}{% endblock %}
 {% block messages %}{% endblock %}
 
 {% block content %}
-<main class="smaug-welcome" aria-labelledby="welcome-title">
-  <div class="smaug-welcome__visual" aria-hidden="true"></div>
-  <header class="smaug-welcome__header">
-    <a href="/smaug" class="smaug-welcome__brand" aria-label="SMAUG, accueil">
-      <img src="/smaug/static/images/smaug-dragon.png" alt="" width="48" height="48">
-      <span>SMAUG</span>
+<main class="smaug-signature" aria-labelledby="signature-title">
+  <div class="smaug-signature__dna" aria-hidden="true"></div>
+  <div class="smaug-signature__waves" aria-hidden="true"></div>
+
+  <section class="smaug-signature__hero">
+    <div class="smaug-signature__wordmark">
+      <img class="smaug-signature__dragon" src="/smaug/static/images/signature-dragon-s.png"
+           width="396" height="415" alt="">
+      <h1 id="signature-title"><span class="sr-only">S</span>MAUG</h1>
+    </div>
+
+    <p class="smaug-signature__acronym"><em>
+      <strong>S</strong>uite <strong>M</strong>odulaire d’<strong>A</strong>nalyses
+      <strong>U</strong>nifiées en <strong>G</strong>énomique
+    </em></p>
+
+    <div class="smaug-signature__divider" aria-hidden="true"></div>
+
+    <p class="smaug-signature__description">
+      Pipelines et outils d’analyses génomiques<br class="smaug-signature__wide-break">
+      humaines, constitutionnelles et somatiques
+    </p>
+
+    <a class="smaug-signature__login" href="/smaug/login">
+      <span class="smaug-signature__login-avatar" aria-hidden="true">
+        <svg class="smaug-signature__login-icon" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="7" r="4"></circle>
+          <path d="M4 21v-2.5a8 8 0 0 1 16 0V21H4Z"></path>
+        </svg>
+      </span>
+      <span class="smaug-signature__login-separator" aria-hidden="true"></span>
+      <span class="smaug-signature__login-label">Se connecter</span>
+      <span class="smaug-signature__arrow" aria-hidden="true">→</span>
+    </a>
+  </section>
+</main>
+{% endblock %}pan>SMAUG</span>
     </a>
   </header>
 
