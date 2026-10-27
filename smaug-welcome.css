@@ -1,0 +1,41 @@
+/* Accueil SMAUG : styles volontairement isolés des autres pages */
+body.smaug-welcome-page {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #fbfdff;
+  color: #0a1a52;
+}
+.smaug-welcome { position: relative; isolation: isolate; min-height: 100vh; overflow: hidden; }
+.smaug-welcome::before { content: ""; position: absolute; inset: 0; z-index: -2;
+  background: radial-gradient(ellipse at 83% 42%,#e2f9ff 0%,transparent 46%),linear-gradient(140deg,#fff 35%,#f5fbff 100%); }
+.smaug-welcome__visual { position:absolute; right:0; top:7%; height:93%; width:49%; z-index:-1;
+  background: url('/smaug/static/images/welcome-dna.webp') center center / cover no-repeat;
+  opacity: .88; mask-image:linear-gradient(90deg,transparent 0%,#000 27%); }
+.smaug-welcome__header { display:flex; align-items:center; padding: 18px clamp(26px,4.5vw,80px); }
+.smaug-welcome__brand { display:inline-flex; align-items:center; gap:7px; color:#08194d; text-decoration:none; font-size:30px; font-weight:800; letter-spacing:-1px; }
+.smaug-welcome__brand img { width:52px; height:52px; object-fit:contain; }
+.smaug-welcome__hero { width:min(780px,64vw); margin:clamp(95px,15vh,190px) 0 90px clamp(48px,15vw,252px); }
+.smaug-welcome__identity { display:flex; align-items:center; gap:15px; }
+.smaug-welcome__identity img { width:clamp(108px,11vw,160px); height:clamp(108px,11vw,160px); object-fit:contain; }
+.smaug-welcome__identity h1 { color:#06154c; font-family:Arial,Helvetica,sans-serif; font-size:clamp(64px,6.2vw,105px); font-weight:800; line-height:1; margin:0; letter-spacing:-4px; }
+.smaug-welcome__description { color:#63708c; font-size:clamp(20px,2vw,31px); line-height:1.48; margin:23px 0 42px; max-width:780px; }
+.smaug-welcome__login { display:inline-flex; align-items:center; justify-content:center; gap:18px; background:#087cff; border-radius:10px; color:#fff; font-size:21px; font-weight:700; padding:17px 38px; min-width:260px; box-shadow:0 12px 28px #0069d52b; text-decoration:none; transition:background .15s,transform .15s; }
+.smaug-welcome__login:hover { color:white; background:#0065d5; transform:translateY(-1px); }
+.smaug-welcome__login:focus-visible,.smaug-welcome__brand:focus-visible { outline:3px solid #06b7c7; outline-offset:4px; }
+.smaug-welcome__hint { font-size:18px; color:#77849c; margin:24px 0 10px 7px; }
+.smaug-welcome__accent { display:block; width:80px; height:3px; background:#0bc4ce; margin-left:100px; }
+@media(max-width:1000px){.smaug-welcome__hero{margin-left:6vw;width:74vw}.smaug-welcome__visual{width:60%;opacity:.35}}
+@media(max-width:640px){
+ .smaug-welcome__header{padding:16px 22px}.smaug-welcome__brand{font-size:24px}.smaug-welcome__brand img{width:42px;height:42px}
+ .smaug-welcome__hero{width:auto;margin:15vh 24px 70px;text-align:center}
+ .smaug-welcome__identity{justify-content:center;gap:8px}.smaug-welcome__identity img{width:87px;height:87px}
+ .smaug-welcome__identity h1{font-size:55px;letter-spacing:-2px}
+ .smaug-welcome__description{font-size:20px;margin:28px 0 34px}
+ .smaug-welcome__desktop-break{display:none}.smaug-welcome__visual{width:100%;height:100%;top:0;opacity:.16;mask-image:none}
+ .smaug-welcome__login{font-size:18px;width:min(100%,310px)}.smaug-welcome__accent{margin:8px auto}
+}
+@media(prefers-reduced-motion:reduce){.smaug-welcome__login{transition:none}}
