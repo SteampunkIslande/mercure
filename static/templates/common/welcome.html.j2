@@ -1,19 +1,33 @@
 {% extends "base.html.j2" %}
 
-{% block title %}Bienvenue sur Smaug{% endblock %}
+{% block title %}SMAUG | GenoBiomics{% endblock %}
+{% block body_attrs %}class="smaug-welcome-page"{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/smaug/static/styles/smaug-welcome.css">
+{% endblock %}
 
-{% block banner_text %}Bienvenue sur Smaug{% endblock %}
-
-{% block banner_actions %}{% endblock %}
-
+{% block banner %}{% endblock %}
 {% block messages %}{% endblock %}
 
 {% block content %}
-    <div class="container">
-        <h1 class="title">Smaug</h1>
-        <p class="paragraph">Le portail de lancement des analyses de la plateforme GenoBiomics</p>
-        <div>
-            <a href="/smaug/login" class="btn btn-primary">Se connecter</a>
-        </div>
+<main class="smaug-welcome" aria-labelledby="welcome-title">
+  <div class="smaug-welcome__visual" aria-hidden="true"></div>
+  <header class="smaug-welcome__header">
+    <a href="/smaug" class="smaug-welcome__brand" aria-label="SMAUG, accueil">
+      <img src="/smaug/static/images/smaug-dragon.png" alt="" width="48" height="48">
+      <span>SMAUG</span>
+    </a>
+  </header>
+
+  <section class="smaug-welcome__hero">
+    <div class="smaug-welcome__identity">
+      <img src="/smaug/static/images/smaug-dragon.png" alt="" width="150" height="150">
+      <h1 id="welcome-title">SMAUG</h1>
     </div>
+    <p class="smaug-welcome__description">Pipelines et outils d’analyses génomiques humaines,<br class="smaug-welcome__desktop-break"> constitutionnelles et somatiques</p>
+    <a class="smaug-welcome__login" href="/smaug/login">Se connecter <span aria-hidden="true">→</span></a>
+    <p class="smaug-welcome__hint">Accéder au portail bioinformatique</p>
+    <span class="smaug-welcome__accent" aria-hidden="true"></span>
+  </section>
+</main>
 {% endblock %}
