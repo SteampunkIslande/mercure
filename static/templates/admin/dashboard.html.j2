@@ -1,108 +1,92 @@
 {% extends "base.html.j2" %}
 
-{% block title %}Page d'administration{% endblock %}
+{% block title %}Administration | SMAUG{% endblock %}
 
 {% block extra_head %}
+    <link rel="stylesheet" href="/smaug/static/styles/smaug-admin.css">
     <script src="/smaug/static/scripts/json_table.js"></script>
+    <script src="/smaug/static/scripts/smaug-admin.js" defer></script>
 {% endblock %}
 
-{% block banner_text %}Bienvenue, {{ user.username }}{% endblock %}
-
-{% block body_attrs %} onload="init()" onclick="closeDropdowns(event)"{% endblock %}
+{% block body_attrs %}class="smaug-admin-page"{% endblock %}
+{% block banner %}{% endblock %}
 
 {% block content %}
-    <div class="dropdown">
-        <button onclick="onDropDown(`users_dropdown`)" class="dropbtn"><span
-                class="material-icons icon-align">account_circle</span> Gestion des utilisateurs</button>
-        <div id="users_dropdown" class="dropdown-content">
-            <a href="/smaug/admin/register">Créer un utilisateur</a>
-            <a href="/smaug/admin/editusers">Editer les utilisateurs</a>
-            <a href="/smaug/admin/groups/new">Nouveau groupe</a>
+<div class="sa-layout">
+    <svg class="sa-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><symbol id="sa-i-shield" viewBox="0 0 24 24"><path d="M12 2 20 6v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></symbol><symbol id="sa-i-logout" viewBox="0 0 24 24"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5"/><path d="M14 7l5 5-5 5M8 12h11"/></symbol><symbol id="sa-i-arrow-left" viewBox="0 0 24 24"><path d="m12 5-7 7 7 7M5 12h15"/></symbol><symbol id="sa-i-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1"/></symbol><symbol id="sa-i-sliders" viewBox="0 0 24 24"><path d="M4 6h8m4 0h4M4 12h3m4 0h9M4 18h10m4 0h2"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></symbol><symbol id="sa-i-user-plus" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M19 8v8m-4-4h8"/></symbol><symbol id="sa-i-network" viewBox="0 0 24 24"><rect x="10" y="2" width="4" height="4" rx="1"/><rect x="2" y="18" width="4" height="4" rx="1"/><rect x="18" y="18" width="4" height="4" rx="1"/><path d="M12 6v6M4 18v-6h16v6"/></symbol><symbol id="sa-i-file" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6zM14 2v5h4M9 11h6M9 15h6M9 19h5"/></symbol><symbol id="sa-i-chevron-right" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol><symbol id="sa-i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol></svg>
+    <header class="sa-topbar">
+        <a class="sa-brand" href="/smaug/home" aria-label="SMAUG, revenir aux analyses">
+            <img src="/smaug/static/images/signature-dragon-s.png" alt="" width="62" height="62">
+            <span class="sa-brand-name">MAUG</span>
+            <span class="sa-brand-caption">Suite Modulaire d’Analyses<br>Unifiées en Génomique</span>
+        </a>
+        <div class="sa-profile">
+            <span class="sa-admin-pill"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-shield"></use></svg></span> Administration</span>
+            <span class="sa-username">{{ user.username }}</span>
+            <a class="sa-logout" href="/smaug/logout"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-logout"></use></svg></span> Déconnexion</a>
         </div>
-    </div>
-    <div class="dropdown">
-        <button onclick="onDropDown(`forms_dropdown`)" class="dropbtn"><span
-                class="material-icons icon-align">build</span> Gestion avancée</button>
-        <div id="forms_dropdown" class="dropdown-content">
-            <a href="/smaug/admin/groups">Groupes</a>
-            <a href="/smaug/admin/forms">Formulaires</a>
-            <a href="/smaug/admin/runtime_config">Configuration d'exécution</a>
-        </div>
-    </div>
-    <div class="dropdown" style="float:right;">
-        <button onclick="navigateTo(`/smaug/home`)" class="dropbtn"><span
-                class="material-icons icon-align">home</span></button>
-    </div>
+    </header>
 
-    <h1>Runs en cours</h1>
+    <main class="sa-main">
+        <section class="sa-intro" aria-labelledby="sa-heading">
+            <div>
+                <p class="sa-eyebrow">SMAUG / ESPACE ADMINISTRATEUR</p>
+                <h1 id="sa-heading">Administration <span class="sa-heading-dot" aria-hidden="true">.</span></h1>
+                <p class="sa-intro-sub">Gérer les accès et les configurations. Superviser les analyses en cours.</p>
+            </div>
+            <a class="sa-back" href="/smaug/home"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-arrow-left"></use></svg></span> Retour à mes analyses</a>
+        </section>
 
-    <div id="running-runs-table"></div>
-    <p id="running-runs-overflow" style="display:none">Plus de 10 runs en cours, <a
-            href="/smaug/show/runs?status=Running">cliquez ici</a> pour les voir</p>
+        <section aria-labelledby="sa-tools-title" class="sa-section">
+            <h2 id="sa-tools-title" class="sa-section-title">Gestion de la plateforme</h2>
+            <div class="sa-tools-grid">
+                <section class="sa-tool-panel" aria-labelledby="sa-users-heading">
+                    <div class="sa-tool-heading">
+                        <span class="sa-panel-icon sa-panel-icon-blue"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-users"></use></svg></span>
+                        <div><h3 id="sa-users-heading">Gestion des utilisateurs</h3><p>Comptes et groupes d'accès</p></div>
+                    </div>
+                    <nav class="sa-action-list" aria-label="Gestion des utilisateurs">
+                        <a href="/smaug/admin/register"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-user-plus"></use></svg></span><span>Créer un utilisateur</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                        <a href="/smaug/admin/editusers"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-users"></use></svg></span><span>Éditer les utilisateurs</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                        <a href="/smaug/admin/groups/new"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-user-plus"></use></svg></span><span>Nouveau groupe</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                    </nav>
+                </section>
+                <section class="sa-tool-panel" aria-labelledby="sa-advanced-heading">
+                    <div class="sa-tool-heading">
+                        <span class="sa-panel-icon sa-panel-icon-violet"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-sliders"></use></svg></span>
+                        <div><h3 id="sa-advanced-heading">Gestion avancée</h3><p>Organisation et configuration des analyses</p></div>
+                    </div>
+                    <nav class="sa-action-list" aria-label="Gestion avancée">
+                        <a href="/smaug/admin/groups"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-network"></use></svg></span><span>Groupes</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                        <a href="/smaug/admin/forms"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-file"></use></svg></span><span>Formulaires</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                        <a href="/smaug/admin/runtime_config"><span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-sliders"></use></svg></span><span>Configuration d'exécution</span><span class="sa-chevron"><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-chevron-right"></use></svg></span></a>
+                    </nav>
+                </section>
+            </div>
+        </section>
 
-    <h1>Runs en échec</h1>
-
-    <div id="failure-runs-table"></div>
-    <p id="failure-runs-overflow" style="display:none">Plus de 10 runs en échec, <a
-            href="/smaug/show/runs?status=Failure">cliquez ici</a> pour les voir</p>
-
-{% endblock %}
-
-{% block extra_js %}
-    <script>
-
-        async function loadRuns(status, emptyMsg = "Aucune donnée à afficher.") {
-            try {
-                // Permet d'afficher les dix premiers runs avec le statut `status`
-                const response = await fetch(`/smaug/api/listruns?page=1&page_size=10&status=${encodeURIComponent(status)}`);
-                const json = await response.json();
-                if (isApiSuccess(json)) {
-                    const data = getApiData(json);
-                    if (data.table.length > 0) {
-                        generateJsonTable(data, `${status.toLowerCase()}-runs-table`);
-                    } else {
-                        document.getElementById(`${status.toLowerCase()}-runs-table`).innerHTML = `<p>${emptyMsg}</p>`;
-                    }
-
-                    if (data.pagination) {
-                        const totalPages = data.pagination.total_pages;
-                        if (totalPages > 1) {
-                            const overflow_elem = document.getElementById(`${status.toLowerCase()}-runs-overflow`);
-                            overflow_elem.style.display = "block";
-                        }
-                    }
-                } else {
-                    showMessage("error", getApiMessage(json) || "Erreur inconnue");
-                }
-            } catch (error) {
-                showMessage('error', error);
-            }
-        }
-
-        function onDropDown(element) {
-            document.getElementById(element).classList.toggle("show");
-        }
-
-        function navigateTo(uri) {
-            window.location.href = uri;
-        }
-
-        function closeDropdowns(event) {
-            if (!event.target.matches('.dropbtn')) {
-                var dropdowns = document.getElementsByClassName("dropdown-content");
-                var i;
-                for (i = 0; i < dropdowns.length; i++) {
-                    var openDropdown = dropdowns[i];
-                    if (openDropdown.classList.contains('show')) {
-                        openDropdown.classList.remove('show');
-                    }
-                }
-            }
-        }
-
-        async function init() {
-            await loadRuns("Running", "Aucun run en cours");
-            await loadRuns("Failure", "Aucun run en échec");
-        }
-    </script>
+        <section class="sa-section" aria-labelledby="sa-supervision-title">
+            <div class="sa-section-row"><h2 id="sa-supervision-title" class="sa-section-title">Supervision des runs</h2><p>Exécution et incidents</p></div>
+            <div class="sa-runs-grid">
+                <section class="sa-run-panel" aria-labelledby="sa-running-heading">
+                    <div class="sa-run-heading">
+                        <div class="sa-run-heading-left"><span class="sa-status-indicator running" aria-hidden="true"></span><h3 id="sa-running-heading">Runs en cours</h3></div>
+                        <a href="/smaug/show/runs?status=Running" class="sa-table-link">Tous les runs <span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-arrow-right"></use></svg></span></a>
+                    </div>
+                    <div class="sa-table-wrap" id="running-runs-table" aria-live="polite"><p class="sa-empty">Chargement des runs en cours…</p></div>
+                    <p id="running-runs-overflow" class="sa-overflow" hidden>Plus de 10 runs en cours. <a href="/smaug/show/runs?status=Running">Afficher la liste complète</a></p>
+                </section>
+                <section class="sa-run-panel" aria-labelledby="sa-failure-heading">
+                    <div class="sa-run-heading">
+                        <div class="sa-run-heading-left"><span class="sa-status-indicator failure" aria-hidden="true"></span><h3 id="sa-failure-heading">Runs en échec</h3></div>
+                        <a href="/smaug/show/runs?status=Failure" class="sa-table-link">Tous les runs <span><svg class="sa-icon" aria-hidden="true"><use href="#sa-i-arrow-right"></use></svg></span></a>
+                    </div>
+                    <div class="sa-table-wrap" id="failure-runs-table" aria-live="polite"><p class="sa-empty">Chargement des runs en échec…</p></div>
+                    <p id="failure-runs-overflow" class="sa-overflow" hidden>Plus de 10 runs en échec. <a href="/smaug/show/runs?status=Failure">Afficher la liste complète</a></p>
+                </section>
+            </div>
+        </section>
+        <footer class="sa-footer">SMAUG · Administration de la plateforme <span>Les accès restent contrôlés par l'application SMAUG.</span></footer>
+    </main>
+</div>
 {% endblock %}
