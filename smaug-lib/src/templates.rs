@@ -207,7 +207,8 @@ mod tests {
             .render(context! {})
             .unwrap();
         assert!(html.contains("<!DOCTYPE html>"));
-        assert!(html.contains("Bienvenue sur Smaug"));
+        assert!(html.contains("Pipelines et outils d’analyses génomiques"));
+        assert!(html.contains("/smaug/login"));
         assert!(html.contains("/smaug/static/styles/default.css"));
         assert!(!html.contains("Déconnexion"));
     }
