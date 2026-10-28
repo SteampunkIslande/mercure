@@ -16,7 +16,34 @@
 
 - [X] Les erreurs Frontend devraient être plus claires: le `downcast_ref` devrait prendre en charge plus de cas.
 
-- [X] Ajouter une route `smaug/uploads` qui sert statiquement les fichiers de l'utilisateur.
+## Nouvelles fonctionnalités
+
+- [ ] Créer un rapport d'exécution dans le dossier de run (dans `{analysis_dir}/run-{run_id}/smaug-run-report-attempt-{attempt_number}.db`): un fichier sqlite avec une table snakemake pour stocker, pour chaque étape de snakemake:
+  - le slurm job name (le UUID tel que parsé dans `parse_log.rs`)
+  - le slurm job id
+  - le snakemake job id
+  - les chemins complets de tous les logs (snakemake et slurm)
+  - les valeurs de wildcards associées à ce job (séparés par des virgules, liste de chaînes de caractères fournies par snakemake)
+  - les chemins complets de tous les inputs (séparés par des virgules)
+  - les tailles en octets de tous les inputs (dans le même ordre que les chemins des inputs)
+  Ce fichier sera généré au fur et à mesure de l'exécution de chaque run.
+
+- [ ] S'assurer que les routes suivantes sont soumises à authentification:
+  - [ ] `/smaug/logs`: seulement servir `/smaug/logs/run-{run_id}-tentative-{attempt_number}.{stdout,stderr}` aux utilisateurs qui peuvent voir ce run
+  - [ ] `/smaug/uploads`: seulement à un utilisateur authentifié (faute de mieux, sinon il faudrait trouver un moyen de savoir pour chaque fichier de upload, quel utilisateur l'a uplaodé...)
+
+- [ ] Ajouter, sur chaque page qui affiche une tentative, une liste de titres, correspondant chacun à un sous-dossier (s'il existe) de `{analysis_dir}/run-{run_id}/exports`. Sous chacune de ces sections,
+un lien http (`<a href=...>`) par fichier. Ainsi, on aurait par exemple:
+    | Rapports            |
+    | ------------------- |
+    | rapport_sampleA.pdf |
+    | rapport_sampleB.pdf |
+
+    | Logs                         |
+    | ---------------------------- |
+    | Tous les logs disponibles... |
+
+- [ ] Déplacer la route `/smaug/data` dans le module backend...
 
 ## Intégration continue
 

@@ -55,7 +55,7 @@ pub async fn serve_export_file(
     let analysis_dir = PathBuf::from(&get_smaug_config().analysis_dir);
     let export_dir = analysis_dir
         .join(format!("run-{:0>8}", run_id))
-        .join(format!("exports-{}", attempt_number))
+        .join(format!("exports-{:0>8}", attempt_number))
         .canonicalize()
         .map_err(|_| Status::NotFound)?;
     let file_path = export_dir
