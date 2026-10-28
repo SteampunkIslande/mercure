@@ -1,0 +1,75 @@
+/* SMAUG - page d'administration uniquement. Ne modifie aucun style global. */
+body.smaug-admin-page{--sa-blue:#0875e8;--sa-navy:#10294c;--sa-muted:#647992;--sa-line:#dfe7f0;--sa-bg:#f7f9fc;--sa-red:#bc293e;max-width:none;margin:0;padding:0;background:var(--sa-bg);font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--sa-navy);line-height:1.45}
+body.smaug-admin-page *{box-sizing:border-box}
+body.smaug-admin-page .sa-layout a{text-decoration:none}
+body.smaug-admin-page .sa-layout h1,body.smaug-admin-page .sa-layout h2,body.smaug-admin-page .sa-layout h3{font-family:Inter,"Segoe UI",Arial,sans-serif;letter-spacing:-.02em;margin:0;color:var(--sa-navy)}
+body.smaug-admin-page .sa-layout p{margin:0;color:var(--sa-muted)}
+body.smaug-admin-page .sa-layout a:focus-visible{outline:3px solid #86c7ff;outline-offset:2px}
+body.smaug-admin-page .sa-topbar{background:#fff;min-height:78px;padding:9px max(22px,calc((100vw - 1280px)/2));display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--sa-line)}
+body.smaug-admin-page .sa-brand{display:flex;align-items:center;color:#09264f;min-width:0;white-space:nowrap;gap:0}
+body.smaug-admin-page .sa-brand img{width:62px;height:62px;object-fit:contain;margin-right:0}
+body.smaug-admin-page .sa-brand-name{font-size:31px;letter-spacing:-.02em;font-weight:800;font-family:Georgia,"Times New Roman",serif}
+body.smaug-admin-page .sa-brand-caption{font-size:10px;font-weight:600;line-height:1.35;white-space:normal;border-left:1px solid var(--sa-line);margin-left:20px;padding-left:18px;color:#4c6482}
+body.smaug-admin-page .sa-profile{display:flex;align-items:center;gap:19px;font-size:12px;font-weight:700}
+body.smaug-admin-page .sa-admin-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:30px;background:#fff0f1;border:1px solid #f9d6dc;color:#a7273b;white-space:nowrap;font-size:11px}
+body.smaug-admin-page .sa-admin-pill .sa-icon{font-size:16px}
+body.smaug-admin-page .sa-username{white-space:nowrap}
+body.smaug-admin-page .sa-logout{border-left:1px solid var(--sa-line);padding-left:18px;display:inline-flex;align-items:center;gap:7px;color:#3c5270;white-space:nowrap}
+body.smaug-admin-page .sa-logout:hover{color:#b2243b}
+body.smaug-admin-page .sa-logout .sa-icon{color:#bd3040;font-size:19px}
+body.smaug-admin-page .sa-main{max-width:1280px;margin:0 auto;padding:35px 26px 32px}
+body.smaug-admin-page .sa-intro{display:flex;justify-content:space-between;align-items:center;gap:26px;margin-bottom:31px}
+body.smaug-admin-page .sa-eyebrow{font-size:10px!important;letter-spacing:.16em;font-weight:800;color:#6884a5!important;margin-bottom:9px!important}
+body.smaug-admin-page .sa-intro h1{font-size:clamp(28px,3vw,39px);line-height:1.14;font-weight:850}
+body.smaug-admin-page .sa-heading-dot{color:#d23c51}
+body.smaug-admin-page .sa-intro-sub{font-size:14px;margin-top:10px!important}
+body.smaug-admin-page .sa-back{display:flex;align-items:center;gap:9px;color:#136bc5;background:white;border:1px solid #d4e3f2;border-radius:9px;padding:11px 14px;white-space:nowrap;font-size:12px;font-weight:800;box-shadow:0 4px 13px #16446906}
+body.smaug-admin-page .sa-back:hover{background:#f1f8ff}
+body.smaug-admin-page .sa-back .sa-icon{font-size:17px}
+body.smaug-admin-page .sa-section{margin-bottom:33px}
+body.smaug-admin-page .sa-section-row{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:14px}
+body.smaug-admin-page .sa-section-row>p{font-size:12px}
+body.smaug-admin-page .sa-section-title{font-size:18px;font-weight:850;margin-bottom:15px!important}
+body.smaug-admin-page .sa-section-row .sa-section-title{margin-bottom:0!important}
+body.smaug-admin-page .sa-tools-grid,body.smaug-admin-page .sa-runs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}
+body.smaug-admin-page .sa-tool-panel,body.smaug-admin-page .sa-run-panel{background:#fff;border:1px solid var(--sa-line);border-radius:13px;box-shadow:0 8px 25px rgba(22,61,102,.035);min-width:0}
+body.smaug-admin-page .sa-tool-panel{padding:21px 22px 16px}
+body.smaug-admin-page .sa-tool-heading{display:flex;align-items:center;gap:13px;padding-bottom:15px;border-bottom:1px solid #ecf0f5}
+body.smaug-admin-page .sa-panel-icon{width:45px;height:45px;display:grid;place-items:center;border-radius:11px;font-size:25px}
+body.smaug-admin-page .sa-panel-icon-blue{background:#e7f2ff;color:#126ec6}
+body.smaug-admin-page .sa-panel-icon-violet{background:#eeeafb;color:#7252bf}
+body.smaug-admin-page .sa-tool-heading h3{font-size:16px;font-weight:800}
+body.smaug-admin-page .sa-tool-heading p{font-size:12px;margin-top:3px}
+body.smaug-admin-page .sa-action-list{padding-top:7px}
+body.smaug-admin-page .sa-action-list a{display:flex;align-items:center;gap:12px;padding:13px 8px;border-radius:8px;color:#213d61;font-size:13px;font-weight:650;min-height:45px}
+body.smaug-admin-page .sa-action-list a:hover{background:#f3f8fd;color:#006dcf}
+body.smaug-admin-page .sa-action-list .sa-icon{color:#327cb9;font-size:20px}
+body.smaug-admin-page .sa-action-list .sa-chevron{margin-left:auto;color:#9bb0c7;font-size:19px}
+body.smaug-admin-page .sa-run-panel{padding:0 0 11px}
+body.smaug-admin-page .sa-run-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--sa-line);padding:17px 19px}
+body.smaug-admin-page .sa-run-heading-left{display:flex;align-items:center;gap:9px}
+body.smaug-admin-page .sa-run-heading h3{font-size:15px;font-weight:800}
+body.smaug-admin-page .sa-status-indicator{display:block;height:9px;width:9px;border-radius:50%}
+body.smaug-admin-page .sa-status-indicator.running{background:#6e45be;box-shadow:0 0 0 4px #f1eafb}
+body.smaug-admin-page .sa-status-indicator.failure{background:#ce4057;box-shadow:0 0 0 4px #ffedf0}
+body.smaug-admin-page .sa-table-link{display:flex;align-items:center;gap:5px;color:#0772dc;font-size:11px;font-weight:800;white-space:nowrap}
+body.smaug-admin-page .sa-table-link .sa-icon{font-size:16px}
+body.smaug-admin-page .sa-table-link:hover{text-decoration:underline}
+body.smaug-admin-page .sa-table-wrap{padding:10px 14px 5px;min-height:143px;overflow-x:auto}
+body.smaug-admin-page .sa-empty{display:flex;align-items:center;justify-content:center;text-align:center;background:#f7f9fc;border:1px dashed #dbe4ed;border-radius:9px;min-height:97px;margin:12px 0!important;font-size:12px!important}
+body.smaug-admin-page .sa-table-wrap table{border-collapse:collapse;table-layout:auto;width:100%;font-size:11.5px;line-height:1.5}
+body.smaug-admin-page .sa-table-wrap table th,body.smaug-admin-page .sa-table-wrap table td{padding:10px 8px;border:0;border-bottom:1px solid #eaf0f6;vertical-align:middle;text-align:left;background:#fff;min-width:0}
+body.smaug-admin-page .sa-table-wrap table th{background:#f4f7fb;color:#48617c;font-size:10.5px;font-weight:750;white-space:normal}
+body.smaug-admin-page .sa-table-wrap table td a{color:#0974e5;text-decoration:underline}
+body.smaug-admin-page .sa-table-wrap .badge,body.smaug-admin-page .sa-table-wrap .status-badge{border-radius:30px;font-size:10px;padding:5px 7px}
+body.smaug-admin-page .sa-overflow{padding:0 18px 9px;font-size:11px}
+body.smaug-admin-page .sa-overflow a{color:#0875e8;text-decoration:underline}
+body.smaug-admin-page .sa-footer{border-top:1px solid #e5edf5;color:#8394a8;font-size:11px;padding:16px 2px;display:flex;justify-content:space-between;gap:14px}
+body.smaug-admin-page #info-message,body.smaug-admin-page #error-message,body.smaug-admin-page #success-message{position:fixed;top:80px;right:22px;z-index:1000;max-width:min(430px,calc(100vw - 44px));margin:0;box-shadow:0 12px 24px #12345620}
+body.smaug-admin-page [hidden]{display:none!important}
+@media(max-width:980px){body.smaug-admin-page .sa-tools-grid,body.smaug-admin-page .sa-runs-grid{grid-template-columns:1fr}body.smaug-admin-page .sa-profile{gap:12px}body.smaug-admin-page .sa-username{display:none}}
+@media(max-width:680px){body.smaug-admin-page .sa-topbar{padding:6px 16px}.sa-brand-caption{display:none!important}body.smaug-admin-page .sa-admin-pill{display:none}body.smaug-admin-page .sa-main{padding:24px 14px}body.smaug-admin-page .sa-intro{align-items:stretch;flex-direction:column;gap:15px}body.smaug-admin-page .sa-back{align-self:flex-start}body.smaug-admin-page .sa-tool-panel{padding:17px 15px 10px}body.smaug-admin-page .sa-brand-name{font-size:28px}body.smaug-admin-page .sa-brand img{width:52px;height:52px}body.smaug-admin-page .sa-footer{flex-direction:column}}
+
+body.smaug-admin-page .sa-table-wrap table a{background:transparent!important;border-radius:0!important;padding:0!important;color:#0875e8!important;text-decoration:underline!important;display:inline!important}body.smaug-admin-page .sa-table-wrap .run-status{display:inline-block;width:auto;max-width:170px;padding:4px 8px;font-size:10px;white-space:normal;line-height:1.3}body.smaug-admin-page .sa-table-wrap .run-status.running{background:#efe4fa;color:#66359d;border-color:#e9d7f7}body.smaug-admin-page .sa-table-wrap .run-status.failure{background:#fce7ec;color:#a92842;border-color:#f4d0d9}@media(max-width:680px){body.smaug-admin-page .sa-table-wrap table{min-width:540px}}
+
+body.smaug-admin-page .sa-sprite{position:absolute;width:0;height:0;overflow:hidden}body.smaug-admin-page .sa-icon{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block;flex-shrink:0}body.smaug-admin-page .sa-panel-icon .sa-icon{width:24px;height:24px}
