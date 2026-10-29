@@ -30,6 +30,7 @@
 
 - [X] S'assurer que les routes suivantes sont soumises à authentification:
   - [X] `/smaug/logs`: seulement servir `/smaug/logs/run-{run_id}-tentative-{attempt_number}.{stdout,stderr}` aux utilisateurs qui peuvent voir ce run
+    Update: `/smaug/logs/<file..>` devrait plutôt être `/smaug/logs/<run_id>/<attempt_number>/<out_type>` (où `out_type` est `stder` ou `stdout`)
   - [X] `/smaug/uploads`: seulement à un utilisateur authentifié (faute de mieux, sinon il faudrait trouver un moyen de savoir pour chaque fichier de upload, quel utilisateur l'a uplaodé...)
 
 - [X] Ajouter, sur chaque page qui affiche une tentative, une liste de titres, correspondant chacun à un sous-dossier (s'il existe) de `{analysis_dir}/run-{run_id}/exports`. Sous chacune de ces sections,
