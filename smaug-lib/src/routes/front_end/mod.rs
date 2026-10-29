@@ -1,5 +1,4 @@
 mod admin;
-mod data;
 mod editgroups;
 mod editrun;
 mod editusers;
@@ -13,7 +12,6 @@ mod runtime_config;
 mod showrun;
 
 pub use admin::*;
-pub use data::*;
 pub use editgroups::*;
 pub use editrun::*;
 pub use editusers::*;

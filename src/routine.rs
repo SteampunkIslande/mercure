@@ -4,7 +4,7 @@ use smaug::config::get_smaug_config;
 use smaug::models::{
     AttemptError, FormDefinitionError, RunDefinitionError, SigintBehavior, analysis, appstate,
 };
-use smaug_lib::pipeline_exec::{LogProgressParser, RunProgressCache, versionning};
+use smaug_lib::pipeline_exec::{LogProgressParser, RunProgressCache, RunReport, versionning};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -238,6 +238,7 @@ async fn tee_stream_to_file_and_cache<R>(
     run_id: i64,
     attempt_number: u32,
     stream_type: &'static str,
+    run_report: Option<RunReport>,
 ) -> Result<()>
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,
@@ -259,25 +260,57 @@ where
         None
     };
 
-    loop {
-        line.clear();
-        let bytes_read = reader
-            .read_line(&mut line)
-            .await
-            .with_context(|| format!("Impossible de lire la sortie {}", stream_type))?;
-        if bytes_read == 0 {
-            break;
+    let (report_tx, report_handle) = match run_report {
+        Some(report) => {
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(4096);
+            let handle = tokio::spawn(async move {
+                while let Some(line) = rx.recv().await {
+                    report.observe(&line).await;
+                }
+                report.finish().await;
+            });
+            (Some(tx), Some(handle))
         }
+        None => (None, None),
+    };
 
-        file.write_all(line.as_bytes())
-            .await
-            .with_context(|| format!("Impossible d'écrire dans {}", file_path.display()))?;
+    let read_result: Result<()> = async {
+        loop {
+            line.clear();
+            let bytes_read = reader
+                .read_line(&mut line)
+                .await
+                .with_context(|| format!("Impossible de lire la sortie {}", stream_type))?;
+            if bytes_read == 0 {
+                break;
+            }
 
-        if let Some(parser) = parser.as_mut() {
-            parser.parse_line(&line);
-            progress_cache.upsert(parser.state().clone()).await;
+            file.write_all(line.as_bytes())
+                .await
+                .with_context(|| format!("Impossible d'écrire dans {}", file_path.display()))?;
+
+            if let Some(parser) = parser.as_mut() {
+                parser.parse_line(&line);
+                progress_cache.upsert(parser.state().clone()).await;
+            }
+
+            // Reporting is best-effort: a slow report must never backpressure the
+            // analysis by blocking this stderr drain loop.
+            if let Some(tx) = report_tx.as_ref() {
+                let _ = tx.try_send(line.clone());
+            }
         }
+        Ok(())
     }
+    .await;
+
+    drop(report_tx);
+    if let Some(handle) = report_handle
+        && let Err(e) = handle.await
+    {
+        warn!("La tâche d'écriture du rapport d'exécution a échoué: {e}");
+    }
+    read_result?;
 
     file.flush()
         .await
@@ -326,6 +359,19 @@ async fn run_script(
         .await
         .context("Impossible d'écrire le script rendu")?;
 
+    // The report is written while the analysis runs; failing to create it must
+    // not prevent the analysis from starting.
+    let run_report = match RunReport::create(attempt).await {
+        Ok(report) => Some(report),
+        Err(e) => {
+            warn!(
+                "Impossible de créer le rapport d'exécution de la tentative {} du run {}: {e:#}",
+                attempt.attempt_number, attempt.run_id
+            );
+            None
+        }
+    };
+
     // Clones the whole repo into the working directory. Now, PWD of the rendered script contains a `pipelines` directory.
     versionning::git_clone_to(&attempt.outdir(), &attempt.form_identification, git_manager).await?;
 
@@ -367,6 +413,7 @@ async fn run_script(
             run_id,
             attempt_number,
             "stdout",
+            None,
         )
         .await
     });
@@ -379,6 +426,7 @@ async fn run_script(
             run_id,
             attempt_number,
             "stderr",
+            run_report,
         )
         .await
     });

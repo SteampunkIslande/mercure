@@ -139,6 +139,14 @@ impl Attempt {
         )
     }
 
+    /// Path of the sqlite report describing the snakemake jobs of this attempt.
+    pub fn run_report_path(&self) -> PathBuf {
+        self.outdir().join(format!(
+            "smaug-run-report-attempt-{}.db",
+            self.attempt_number
+        ))
+    }
+
     pub async fn render_script(&self, run_name: &str) -> Result<String> {
         let form = self.get_form().await?;
         let outdir = self.outdir().display().to_string();

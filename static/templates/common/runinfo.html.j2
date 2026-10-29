@@ -61,3 +61,19 @@
 {% else %}
 <p>Aucune variable définie pour ce formulaire.</p>
 {% endif %}
+
+{% if exports %}
+<h3>Fichiers exportés</h3>
+{% for section in exports %}
+<h4>{{ section.title | e }}</h4>
+<table>
+    <tbody>
+        {% for file in section.files %}
+        <tr>
+            <td><a href="{{ file.url | e }}">{{ file.name | e }}</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+{% endif %}

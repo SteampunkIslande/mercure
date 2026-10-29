@@ -70,9 +70,9 @@ async fn rocket(
 
     let mut r = rocket::custom(figment)
         .register("/smaug", catchers![unauthorized])
-        .mount("/smaug/uploads", FileServer::from(&config.upload_dir))
-        .mount("/smaug/logs", FileServer::from(&config.logs_dir))
-        .mount("/smaug/data", routes![routes::frontend::serve_export_file])
+        .mount("/smaug/uploads", routes![routes::backend::serve_upload])
+        .mount("/smaug/logs", routes![routes::backend::serve_run_log])
+        .mount("/smaug/data", routes![routes::backend::serve_export_file])
         .mount(
             "/smaug",
             routes![
