@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="/smaug/static/styles/smaug-dashboard.css">
 <script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
-{% block body_attrs %}class="smaug-dashboard-page"{% endblock %}
+{% block body_attrs %}class="smaug-dashboard-page" onload="init()" onclick="closeDropdowns(event)"{% endblock %}
 {% block banner %}{% endblock %}
 {% block messages %}
 <div class="sd-messages" aria-live="polite">
@@ -96,12 +96,30 @@
 
       <div class="bottom-grid">
         <section id="forms" class="panel forms-panel" aria-labelledby="formsTitle">
-          <div class="panel-title"><div><svg class="icon section-icon"><use href="#i-flask"></use></svg><h2 id="formsTitle">Formulaires disponibles</h2></div><span class="soft-badge" id="availableCount"></span></div>
-          <div class="filterline"><div class="panel-search"><svg class="icon"><use href="#i-search"></use></svg><input id="formSearch" aria-label="Rechercher un formulaire" placeholder="Rechercher un formulaire…"></div><button type="button" class="filter-clear" id="resetFilters" hidden>Réinitialiser ×</button></div>
-          <div class="form-tabs" role="tablist" aria-label="Groupes autorisés" id="groupTabs"></div>
-          <div id="formList" class="form-list" aria-live="polite"></div>
-          <p id="no-user-group" class="panel-footnote" hidden>Vous n’appartenez à aucun groupe. Veuillez contacter votre administrateur système.</p>
-        </section>
+  <div class="panel-title"><div><svg class="icon section-icon"><use href="#i-flask"></use></svg><h2 id="formsTitle">Formulaires disponibles</h2></div></div>
+  <div id="search-forms" class="filterline"><div class="panel-search"><svg class="icon"><use href="#i-search"></use></svg><input type="text" name="q" aria-label="Rechercher un formulaire" placeholder="Rechercher un formulaire…" oninput="filterForms()"></div></div>
+  <div class="form-tabs tab" aria-label="Groupes autorisés" id="groupTabs">
+    {% for group in user_groups %}
+    <button type="button" id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active{% endif %}" onclick="openTab(event,{{ group.id }})">{{ group.name }}</button>
+    {% endfor %}
+    {% if user.is_admin %}
+    <button type="button" id="tab-None" class="tablinks" onclick="openTab(event,`None`)">Formulaires sans groupe</button>
+    {% endif %}
+  </div>
+  <div class="smaug-forms-table-wrap">
+    {% for group in user_groups %}
+    <table id="forms-container-{{ group.id }}" class="tabcontent smaug-forms-table" style="{% if loop.first %}display:block;{% endif %}">
+      <tr><th class="content-column">Nom du formulaire</th><th class="numeric-column padding-x centered">Lancement d'un run</th></tr>
+    </table>
+    {% endfor %}
+    {% if user.is_admin %}
+    <table id="forms-container-None" class="tabcontent smaug-forms-table">
+      <tr><th class="content-column">Nom du formulaire</th><th class="numeric-column padding-x centered">Lancement d'un run</th></tr>
+    </table>
+    {% endif %}
+  </div>
+  <p id="no-user-group" class="panel-footnote" style="display:none">Vous n'appartenez à aucun groupe. Veuillez contacter votre administrateur système.</p>
+</section>
         <section id="runs" class="panel runs-panel" aria-labelledby="runsTitle"><div class="panel-title"><div><svg class="icon section-icon"><use href="#i-chart"></use></svg><h2 id="runsTitle">Runs récents</h2></div><a href="/smaug/show/runs" class="text-link">Voir tous mes runs <svg class="icon"><use href="#i-arrow"></use></svg></a></div><div id="latest-runs-table" class="table-scroll" aria-live="polite"><p>Chargement des runs…</p></div></section>
       </div>
       <footer class="footer">SMAUG · Suite Modulaire d’Analyses Unifiées en Génomique <span>Interface de lancement et de suivi des analyses</span></footer>
@@ -110,12 +128,6 @@
   
 {% endblock %}
 {% block extra_js %}
-<script>
-  // Source des groupes et rôles : route Rust /smaug/home (jamais le navigateur).
-  window.smaugDashboardConfig = {
-    userGroups: {{ user_groups | tojson }},
-    isAdmin: {{ 'true' if is_admin else 'false' }}
-  };
-</script>
+<script>window.smaugUserGroups = {{ user_groups | tojson }}; window.smaugIsAdmin = {{ is_admin | tojson }};</script>
 <script src="/smaug/static/scripts/smaug-dashboard.js"></script>
 {% endblock %}
