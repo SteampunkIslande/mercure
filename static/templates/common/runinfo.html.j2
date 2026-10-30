@@ -1,16 +1,32 @@
 {% import "_macros.html.j2" as ui %}
 <section class="panel" aria-labelledby="run-details-title">
   <div class="panel-title">
-    <div>{{ ui.icon("file", "section-icon") }}<h2 id="run-details-title">Détails du run</h2></div>
+    <div>{{ ui.icon("file", "section-icon") }}<h2 id="run-details-title">Détails du run</h2>
+    </div>
     <span class="soft-badge">Tentative {{ attempt.attempt_number }}</span>
   </div>
   <div class="grid-2">
     <dl class="run-meta">
-      <div class="info-row"><dt>Nom du run</dt><dd>{{ run.run_name }}</dd></div>
-      <div class="info-row"><dt>Formulaire</dt><dd>{{ form.name }}</dd></div>
-      <div class="info-row"><dt>Créé le</dt><dd>{{ run_creation_date }}</dd></div>
-      {% if attempt_date %}<div class="info-row"><dt>Démarré le</dt><dd>{{ attempt_date }}</dd></div>{% endif %}
-      {% if attempt.comment %}<div class="info-row"><dt>Commentaire</dt><dd>{{ attempt.comment }}</dd></div>{% endif %}
+      <div class="info-row">
+        <dt>Nom du run</dt>
+        <dd>{{ run.run_name }}</dd>
+      </div>
+      <div class="info-row">
+        <dt>Formulaire</dt>
+        <dd>{{ form.name }}</dd>
+      </div>
+      <div class="info-row">
+        <dt>Run créé le</dt>
+        <dd>{{ run_creation_date }}</dd>
+      </div>
+      {% if attempt_date %}<div class="info-row">
+        <dt>Tentative démarrée le</dt>
+        <dd>{{ attempt_date }}</dd>
+      </div>{% endif %}
+      {% if attempt.comment %}<div class="info-row">
+        <dt>Commentaire</dt>
+        <dd>{{ attempt.comment }}</dd>
+      </div>{% endif %}
     </dl>
     <div>
       <h3>Tentatives</h3>
@@ -28,14 +44,16 @@
 
 <section class="panel" aria-labelledby="run-variables-title">
   <div class="panel-title">
-    <div>{{ ui.icon("sliders", "section-icon") }}<h2 id="run-variables-title">Variables</h2></div>
+    <div>{{ ui.icon("sliders", "section-icon") }}<h2 id="run-variables-title">Variables</h2>
+    </div>
   </div>
   {% if form.variables %}
   <dl class="variables">
     {% for var in form.variables %}
     <div class="var-item">
       <dt>{{ var.title }}</dt>
-      <dd>{% if attempt.user_defined_vars[var.name] %}{{ attempt.user_defined_vars[var.name] }}{% else %}—{% endif %}</dd>
+      <dd>{% if attempt.user_defined_vars[var.name] %}{{ attempt.user_defined_vars[var.name] }}{% else %}—{% endif %}
+      </dd>
       {% if var.description %}<dd class="var-description">{{ var.description }}</dd>{% endif %}
     </div>
     {% endfor %}
@@ -48,7 +66,8 @@
 {% if exports %}
 <section class="panel" aria-labelledby="exports-title">
   <div class="panel-title">
-    <div>{{ ui.icon("download", "section-icon") }}<h2 id="exports-title">Fichiers exportés</h2></div>
+    <div>{{ ui.icon("download", "section-icon") }}<h2 id="exports-title">Fichiers exportés</h2>
+    </div>
   </div>
   <div class="exports">
     {% for section in exports %}
