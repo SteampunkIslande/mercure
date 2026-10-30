@@ -7,13 +7,13 @@ use rocket::{State, get};
 use serde_json::Value;
 use sqlx::SqlitePool;
 
-/// Résout ce que l'utilisateur courant est autorisé à voir :
+/// Resolves what the current user is allowed to see:
 ///
-/// - un admin voit tous les runs (`groups` = None) ;
-/// - un utilisateur standard ne voit que les runs des formulaires associés à au
-///   moins un de ses groupes (voir `Run::fetch_runs_table`).
+/// - an admin sees all runs (`groups` = None);
+/// - a standard user only sees the runs of forms associated with at
+///   least one of their groups (see `Run::fetch_runs_table`).
 ///
-/// Renvoie `None` pour un admin (aucun filtre), les groupes de l'utilisateur sinon.
+/// Returns `None` for an admin (no filter), the user's groups otherwise.
 async fn resolve_viewer(pool: &SqlitePool, user: &User) -> anyhow::Result<Option<Vec<Group>>> {
     if user.is_admin {
         Ok(None)

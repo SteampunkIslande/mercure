@@ -103,7 +103,7 @@ pub async fn git_clone_to(
     if !clone_output.status.success() {
         let _ = tokio::fs::remove_dir_all(&repo_path).await;
         return Err(GitCheckError::CommandFailed(format!(
-            "Clone failed:\nstdout: {}\nstderr: {}",
+            "Échec du clone :\nstdout: {}\nstderr: {}",
             String::from_utf8_lossy(&clone_output.stdout),
             String::from_utf8_lossy(&clone_output.stderr)
         )));
@@ -142,7 +142,7 @@ pub async fn git_clone_to(
     if !checkout_output.status.success() {
         let _ = tokio::fs::remove_dir_all(&repo_path).await;
         return Err(GitCheckError::CommandFailed(format!(
-            "Checkout failed:\nstdout: {}\nstderr: {}",
+            "Échec du checkout :\nstdout: {}\nstderr: {}",
             String::from_utf8_lossy(&checkout_output.stdout),
             String::from_utf8_lossy(&checkout_output.stderr)
         )));
@@ -183,7 +183,7 @@ pub async fn get_latest_commit(
                 .map(|id| id.to_string())
                 .ok_or_else(|| {
                     GitCheckError::CommandFailed(format!(
-                        "Cannot get latest commit ID for branch {}",
+                        "Impossible d'obtenir l'identifiant du dernier commit de la branche {}",
                         branch_name
                     ))
                 })?;
@@ -209,7 +209,7 @@ pub async fn get_all_branches(pipelines: &GitWebConfig) -> Result<Vec<String>, G
                 .with_context(|| format!("Impossible de lister les branches ({url})"))?;
             if !resp.status().is_success() {
                 return Err(GitCheckError::CommandFailed(format!(
-                    "Failed to list branches: {}",
+                    "Impossible de lister les branches : {}",
                     resp.status()
                 )));
             }
@@ -219,7 +219,7 @@ pub async fn get_all_branches(pipelines: &GitWebConfig) -> Result<Vec<String>, G
                 .with_context(|| format!("Réponse inattendue de l'API Gitea ({url})"))?;
             let arr = v.as_array().ok_or_else(|| {
                 GitCheckError::CommandFailed(
-                    "Gitea should have responded with an array".to_string(),
+                    "L'API Gitea aurait dû renvoyer un tableau".to_string(),
                 )
             })?;
             Ok(arr

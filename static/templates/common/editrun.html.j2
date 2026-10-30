@@ -34,6 +34,10 @@
     <p>{{ form.description }}</p>
     {% endif %}
 
+    {% if warning %}
+    <div class="warning-msg">{{ warning }}</div>
+    {% endif %}
+
     <h3>Variables du formulaire</h3>
     <div id="form-variables">
         {% for var in user_defined_vars %}
@@ -163,7 +167,7 @@
                     const response = await fetch('/smaug/api/upload', { method: 'POST', body: formData });
                     const json = await response.json();
                     if (!isApiSuccess(json)) {
-                        throw new Error(`Upload failed for ${key}: ${json.error || response.statusText}`);
+                        throw new Error(`Échec de l'envoi de ${key} : ${json.error || response.statusText}`);
                     }
                     else {
                         variables[key] = getApiData(json);

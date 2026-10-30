@@ -21,7 +21,7 @@ fn diacritics_and_spaces() {
         samples,
         vec!["echantillon1".to_string(), "sample2".to_string()]
     );
-    // On attend que le nettoyage ait modifié l'entrée originale (espaces/diacritiques)
+    // We expect the cleaning to have modified the original input (spaces/diacritics)
     assert_ne!(cleaned, input);
     assert!(cleaned.contains("echantillon1"));
 }
@@ -32,6 +32,6 @@ fn invalid_samplesheet_missing_sample_id() {
     let res = correct_samplesheet(&input);
     assert!(res.is_err());
     let err = res.err().unwrap().to_string();
-    // L'erreur attendue contient une mention évidente en français
+    // The expected error contains an obvious mention in French
     assert!(err.to_lowercase().contains("aucune") || err.to_lowercase().contains("impossible"));
 }

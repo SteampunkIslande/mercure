@@ -26,8 +26,11 @@ pub use showrun::*;
 
 use rocket::{Response, http::Status, response::Responder};
 
-use crate::models::ModelError;
+use crate::models::{
+    AnalysisStateMachineError, AttemptError, FormDefinitionError, ModelError, RunDefinitionError,
+};
 use crate::templates::{Template, context};
+use crate::utils::SamplesheetError;
 
 /// What the browser gets when a page cannot be rendered.
 ///
@@ -41,12 +44,42 @@ pub enum FrontendError {
     /// The user is authenticated but not allowed to see this page.
     #[error("Accès réservé aux admins")]
     AdminsOnly,
+    /// The run references a form that no longer exists in the pipelines repository.
+    #[error("Le formulaire '{file_path}' sur la branche '{branch}' n'existe plus")]
+    FormNotFound { branch: String, file_path: String },
     #[error("Erreur dans le fichier {location}: {source}")]
     AnyhowError {
         #[from]
         source: anyhow::Error,
         location: &'static std::panic::Location<'static>,
     },
+}
+
+/// Extracts the user-facing message from a named model error.
+///
+/// The model layer returns `anyhow::Result`; when a route surfaces one of its
+/// errors, the named error carries a message written for the user. Any other
+/// error falls back to the full context chain.
+fn cause_message(error: &anyhow::Error) -> String {
+    if let Some(cause) = error.downcast_ref::<ModelError>() {
+        return cause.to_string();
+    }
+    if let Some(cause) = error.downcast_ref::<RunDefinitionError>() {
+        return cause.to_string();
+    }
+    if let Some(cause) = error.downcast_ref::<AnalysisStateMachineError>() {
+        return cause.to_string();
+    }
+    if let Some(cause) = error.downcast_ref::<FormDefinitionError>() {
+        return cause.to_string();
+    }
+    if let Some(cause) = error.downcast_ref::<AttemptError>() {
+        return cause.to_string();
+    }
+    if let Some(cause) = error.downcast_ref::<SamplesheetError>() {
+        return cause.to_string();
+    }
+    format!("{error:#}")
 }
 
 /// Renders the error page shown to the user. Free-standing because the
@@ -73,14 +106,19 @@ impl<'r> Responder<'r, 'static> for FrontendError {
                 "Accès protégé".to_string(),
                 "Seuls les administrateurs peuvent accéder à cette page.",
             ),
+            FrontendError::FormNotFound { branch, file_path } => error_page(
+                "Formulaire introuvable".to_string(),
+                &format!(
+                    "Le formulaire '{file_path}' sur la branche '{branch}' n'existe plus. Ce run ne peut donc plus être édité."
+                ),
+            ),
             FrontendError::AnyhowError { source, location } => {
                 // The location and the full chain are for the server logs only.
                 log::error!("Erreur page dans le fichier {location}: {source:#}");
-                let cause = source
-                    .downcast_ref::<ModelError>()
-                    .map(|e| e.to_string())
-                    .unwrap_or_else(|| format!("{source:#}"));
-                error_page(format!("Erreur dans le fichier {location}"), &cause)
+                error_page(
+                    "Une erreur est survenue".to_string(),
+                    &cause_message(source),
+                )
             }
         };
 

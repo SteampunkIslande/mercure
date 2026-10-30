@@ -1,5 +1,5 @@
 /**
- * Génère un tableau HTML à partir d'un objet JSON avec le format:
+ * Generates an HTML table from a JSON object with the format:
  * {
  *   "header": [
  *     {"content": "colA", "class": "content-column"},
@@ -32,12 +32,12 @@ function generateJsonTable(data, elementId) {
 }
 
 /**
- * Crée le HTML d'un tableau à partir des données JSON
+ * Creates the HTML of a table from the JSON data
  */
 function createTableFromJson(jsonData) {
   const { header, table } = jsonData;
 
-  // Créer l'en-tête
+  // Create the header
   const headerRow = `<tr>${header
     .map((col) => {
       const headerClass = col.class ? ` class="${col.class}"` : "";
@@ -45,7 +45,7 @@ function createTableFromJson(jsonData) {
     })
     .join("")}</tr>`;
 
-  // Créer les lignes de données
+  // Create the data rows
   const dataRows = table
     .map((row) => {
       const cells = row

@@ -4,130 +4,431 @@
 <link rel="stylesheet" href="/smaug/static/styles/smaug-dashboard.css">
 <script src="/smaug/static/scripts/json_table.js"></script>
 {% endblock %}
-{% block body_attrs %}class="smaug-dashboard-page" onload="init()" onclick="closeDropdowns(event)"{% endblock %}
+{% block body_attrs %}class="smaug-dashboard-page"{% endblock %}
 {% block banner %}{% endblock %}
 {% block messages %}
 <div class="sd-messages" aria-live="polite">
-  <div id="info-message" class="info-msg" style="display:none"></div>
-  <div id="error-message" class="error-msg" style="display:none"></div>
-  <div id="success-message" class="success-msg" style="display:none"></div>
+    <div id="info-message" class="info-msg" style="display:none"></div>
+    <div id="error-message" class="error-msg" style="display:none"></div>
+    <div id="success-message" class="success-msg" style="display:none"></div>
 </div>
 {% endblock %}
 {% block content %}
-  <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
-    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 2h6M10 2v7l-6.5 9A2 2 0 0 0 5.2 21h13.6a2 2 0 0 0 1.7-3L14 9V2M7 16h10"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10m5 10V5m5 15v-8m5 8V3"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
-    <symbol id="i-files" viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></symbol>
-    <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1zm0 0v15"/></symbol>
-    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.6 2.8h4.8l.5 2.1 2 .9 1.9-1.1 3.3 3.4-1.1 1.8.9 2.1 2.1.5v4.7l-2.1.5-.9 2.1 1.1 1.8-3.3 3.4-1.9-1.1-2 .9-.5 2.1H9.6l-.5-2.1-2-.9-1.9 1.1-3.3-3.4 1.1-1.8-.9-2.1L0 17.2v-4.7l2.1-.5.9-2.1-1.1-1.8 3.3-3.4 1.9 1.1 2-.9zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></symbol>
-    <symbol id="i-out" viewBox="0 0 24 24"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5m6-4 5-5-5-5m5 5H9"/></symbol>
-    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
-    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/></symbol>
-    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.7 2.7 0 1 1 4.3 2.2L12 13v2m0 3v.3"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
-    <symbol id="i-dna" viewBox="0 0 24 24"><path d="M7 2c9 5 1 15 10 20M17 2C8 7 16 17 7 22M8 5h8M7 10h10M7 15h10M8 20h8"/></symbol>
-    <symbol id="i-nodes" viewBox="0 0 24 24"><circle cx="12" cy="4" r="2"/><circle cx="4.5" cy="17" r="2"/><circle cx="19.5" cy="17" r="2"/><path d="m10.8 5.8-5 9.5m7.4-9.5 5 9.5M6.5 17h11"/></symbol>
-    <symbol id="i-antibody" viewBox="0 0 24 24"><path d="M12 21V10M12 12 4 4m8 8 8-8M4 4v6m16-6v6"/></symbol>
-    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></symbol>
-    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5 11-11"/></symbol>
-  </svg>
-  <div class="app">
+<svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24">
+        <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+    </symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24">
+        <path d="M9 2h6M10 2v7l-6.5 9A2 2 0 0 0 5.2 21h13.6a2 2 0 0 0 1.7-3L14 9V2M7 16h10" />
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M4 20V10m5 10V5m5 15v-8m5 8V3" />
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 4v16M4 12h16" />
+    </symbol>
+    <symbol id="i-files" viewBox="0 0 24 24">
+        <path d="M4 5h6l2 2h8v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+    </symbol>
+    <symbol id="i-book" viewBox="0 0 24 24">
+        <path d="M12 6c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1zm0 0v15" />
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+        <path
+            d="M9.6 2.8h4.8l.5 2.1 2 .9 1.9-1.1 3.3 3.4-1.1 1.8.9 2.1 2.1.5v4.7l-2.1.5-.9 2.1 1.1 1.8-3.3 3.4-1.9-1.1-2 .9-.5 2.1H9.6l-.5-2.1-2-.9-1.9 1.1-3.3-3.4 1.1-1.8-.9-2.1L0 17.2v-4.7l2.1-.5.9-2.1-1.1-1.8 3.3-3.4 1.9 1.1 2-.9zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6" />
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.8" cy="10.8" r="6.8" />
+        <path d="m16 16 5 5" />
+    </symbol>
+    <symbol id="i-out" viewBox="0 0 24 24">
+        <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5m6-4 5-5-5-5m5 5H9" />
+    </symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24">
+        <path d="m9 5 7 7-7 7" />
+    </symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M4 12h16m-6-6 6 6-6 6" />
+    </symbol>
+    <symbol id="i-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="7" r="4" />
+        <path d="M4 21c0-4 3-7 8-7s8 3 8 7" />
+    </symbol>
+    <symbol id="i-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.5 9a2.7 2.7 0 1 1 4.3 2.2L12 13v2m0 3v.3" />
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="5" y="10" width="14" height="11" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </symbol>
+    <symbol id="i-dna" viewBox="0 0 24 24">
+        <path d="M7 2c9 5 1 15 10 20M17 2C8 7 16 17 7 22M8 5h8M7 10h10M7 15h10M8 20h8" />
+    </symbol>
+    <symbol id="i-nodes" viewBox="0 0 24 24">
+        <circle cx="12" cy="4" r="2" />
+        <circle cx="4.5" cy="17" r="2" />
+        <circle cx="19.5" cy="17" r="2" />
+        <path d="m10.8 5.8-5 9.5m7.4-9.5 5 9.5M6.5 17h11" />
+    </symbol>
+    <symbol id="i-antibody" viewBox="0 0 24 24">
+        <path d="M12 21V10M12 12 4 4m8 8 8-8M4 4v6m16-6v6" />
+    </symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24">
+        <path d="M2 12h4l3-7 4 14 3-7h6" />
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 6v6l4 2" />
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7z" />
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m4 12 5 5 11-11" />
+    </symbol>
+</svg>
+<div class="app">
     <header class="topbar">
-      <div class="brand" aria-label="SMAUG, Suite Modulaire d’Analyses Unifiées en Génomique">
-        <img src="/smaug/static/images/signature-dragon-s.png" alt="Dragon formant le S de SMAUG">
-        <div class="brand-name">MAUG<span class="brand-tagline">Suite Modulaire d’Analyses Unifiées en Génomique</span></div>
-      </div>
-      <div class="top-search"><svg class="icon"><use href="#i-search"></use></svg><input id="globalSearch" aria-label="Rechercher" placeholder="Rechercher un formulaire ou une analyse…"></div>
-      <div class="top-actions"><div class="avatar" aria-hidden="true">{{ user.username[0] | upper }}</div><span class="display-name">{{ user.username }}</span><a class="logout" href="/smaug/logout"><svg class="icon" aria-hidden="true"><use href="#i-out"></use></svg><span>Déconnexion</span></a></div>
+        <div class="brand" aria-label="SMAUG, Suite Modulaire d’Analyses Unifiées en Génomique">
+            <img src="/smaug/static/images/signature-dragon-s.png" alt="Dragon formant le S de SMAUG">
+            <div class="brand-name">MAUG<span class="brand-tagline">Suite Modulaire d’Analyses Unifiées en
+                    Génomique</span></div>
+        </div>
+        <div class="top-search"><svg class="icon">
+                <use href="#i-search"></use>
+            </svg><input id="globalSearch" aria-label="Rechercher"
+                placeholder="Rechercher un formulaire ou une analyse…"></div>
+        <div class="top-actions">
+            <div class="avatar" aria-hidden="true">{{ user.username[0] | upper }}</div><span class="display-name">{{
+                user.username }}</span><a class="logout" href="/smaug/logout"><svg class="icon" aria-hidden="true">
+                    <use href="#i-out"></use>
+                </svg><span>Déconnexion</span></a>
+        </div>
     </header>
 
     <aside class="sidebar" aria-label="Navigation principale">
-      <nav class="nav-group">
-        <a class="nav-link active" href="/smaug/home" aria-current="page"><svg class="icon"><use href="#i-home"></use></svg>Accueil</a>
-        <a class="nav-link" href="/smaug/show/runs"><svg class="icon"><use href="#i-chart"></use></svg>Mes analyses</a>
-        <a class="nav-link" href="#categories"><svg class="icon"><use href="#i-plus"></use></svg>Lancer une analyse</a>
-        
-        <a class="nav-link" href="/smaug/documentation"><svg class="icon"><use href="#i-book"></use></svg>Documentation</a>
-      </nav>
-      <div class="sidebar-bottom">
-        {% if is_admin %}
-        <a id="adminNav" class="nav-link" href="/smaug/admin/dashboard"><svg class="icon"><use href="#i-settings"></use></svg>Administration</a>
-        {% else %}
-        <a class="nav-link" href="/smaug/passedit/{{ user.id }}"><svg class="icon"><use href="#i-lock"></use></svg>Modifier le mot de passe</a>
-        {% endif %}
-</div>
+        <nav class="nav-group">
+            <a class="nav-link active" href="/smaug/home" aria-current="page"><svg class="icon">
+                    <use href="#i-home"></use>
+                </svg>Accueil</a>
+            <a class="nav-link" href="/smaug/show/runs"><svg class="icon">
+                    <use href="#i-chart"></use>
+                </svg>Mes analyses</a>
+            <a class="nav-link" href="#categories"><svg class="icon">
+                    <use href="#i-plus"></use>
+                </svg>Lancer une analyse</a>
+
+            <a class="nav-link" href="/smaug/documentation"><svg class="icon">
+                    <use href="#i-book"></use>
+                </svg>Documentation</a>
+        </nav>
+        <div class="sidebar-bottom">
+            {% if is_admin %}
+            <a id="adminNav" class="nav-link" href="/smaug/admin/dashboard"><svg class="icon">
+                    <use href="#i-settings"></use>
+                </svg>Administration</a>
+            {% else %}
+            <a class="nav-link" href="/smaug/passedit/{{ user.id }}"><svg class="icon">
+                    <use href="#i-lock"></use>
+                </svg>Modifier le mot de passe</a>
+            {% endif %}
+        </div>
     </aside>
 
     <main id="top" class="main">
-      <section class="hero" aria-labelledby="welcomeTitle">
-        <div class="hero-text">
-          <h1 id="welcomeTitle">Bienvenue, <span>{{ user.username }}</span></h1>
-          <p>Sur la plateforme SMAUG, dédiée aux analyses de données en génomique</p>
-          <span class="hero-red-stroke" aria-hidden="true"></span>
-        </div>
-        <div class="hero-motto" aria-label="Analyser, comprendre, partager, au service de la génomique">
-          <span>ANALYSER</span>
-          <span>COMPRENDRE</span>
-          <span>PARTAGER</span>
-          <span class="motto-break">AU SERVICE</span>
-          <span>DE LA GÉNOMIQUE</span>
-          <span class="motto-stroke" aria-hidden="true"></span>
-        </div>
-      </section>
+        <section class="hero" aria-labelledby="welcomeTitle">
+            <div class="hero-text">
+                <h1 id="welcomeTitle">Bienvenue, <span>{{ user.username }}</span></h1>
+                <p>Sur la plateforme SMAUG, dédiée aux analyses de données en génomique</p>
+                <span class="hero-red-stroke" aria-hidden="true"></span>
+            </div>
+            <div class="hero-motto" aria-label="Analyser, comprendre, partager, au service de la génomique">
+                <span>ANALYSER</span>
+                <span>COMPRENDRE</span>
+                <span>PARTAGER</span>
+                <span class="motto-break">AU SERVICE</span>
+                <span>DE LA GÉNOMIQUE</span>
+                <span class="motto-stroke" aria-hidden="true"></span>
+            </div>
+        </section>
 
-      <section id="categories" class="section modules" aria-labelledby="categoriesTitle">
-        <div class="section-heading"><div><h2 id="categoriesTitle">Lancer une analyse</h2><p>Choisissez votre domaine ou retrouvez un formulaire ci-dessous.</p></div><button type="button" class="text-link" data-target="forms">Tous les formulaires <svg class="icon"><use href="#i-arrow"></use></svg></button></div>
-        <div class="module-grid">
-          <button type="button" class="module-card blue" data-category="demultiplexage"><div class="module-icon"><svg class="icon"><use href="#i-dna"></use></svg></div><div><strong>Démultiplexage</strong><p>Traitement des données de séquençage Illumina</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></button>
-          <button type="button" class="module-card coral" data-category="genetique"><div class="module-icon"><svg class="icon"><use href="#i-dna"></use></svg></div><div><strong>Génétique constitutionnelle</strong><p>Analyses germinales, WES, WGS et panels</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></button>
-          <button type="button" class="module-card violet" data-category="onco"><div class="module-icon"><svg class="icon"><use href="#i-nodes"></use></svg></div><div><strong>Onco-hématologie</strong><p>Analyses somatiques, CNA, CNV et MRD</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></button>
-          <button type="button" class="module-card mint" data-category="immunologie"><div class="module-icon"><svg class="icon"><use href="#i-antibody"></use></svg></div><div><strong>Immunologie</strong><p>Analyses d'expression et immunogénomique</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></button>
-          <a class="module-card amber" href="/smaug/show/runs"><div class="module-icon"><svg class="icon"><use href="#i-chart"></use></svg></div><div><strong>Suivi des analyses</strong><p>Runs, statuts, résultats et validations</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></a>
-          <button type="button" class="module-card slate" data-category="autres"><div class="module-icon"><svg class="icon"><use href="#i-settings"></use></svg></div><div><strong>Autres outils</strong><p>QC, annotations, conversions et utilitaires</p></div><svg class="icon module-arrow"><use href="#i-chev"></use></svg></button>
-        </div>
-        <p id="categoryFeedback" class="sd-category-feedback" role="status" hidden></p>
-      </section>
+        <section id="categories" class="section modules" aria-labelledby="categoriesTitle">
+            <div class="section-heading">
+                <div>
+                    <h2 id="categoriesTitle">Lancer une analyse</h2>
+                    <p>Choisissez votre domaine ou retrouvez un formulaire ci-dessous.</p>
+                </div><button type="button" class="text-link" data-target="forms">Tous les formulaires <svg
+                        class="icon">
+                        <use href="#i-arrow"></use>
+                    </svg></button>
+            </div>
+            <div class="module-grid">
+                <button type="button" class="module-card blue" data-category="demultiplexage">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-dna"></use>
+                        </svg></div>
+                    <div><strong>Démultiplexage</strong>
+                        <p>Traitement des données de séquençage Illumina</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </button>
+                <button type="button" class="module-card coral" data-category="genetique">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-dna"></use>
+                        </svg></div>
+                    <div><strong>Génétique constitutionnelle</strong>
+                        <p>Analyses germinales, WES, WGS et panels</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </button>
+                <button type="button" class="module-card violet" data-category="onco">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-nodes"></use>
+                        </svg></div>
+                    <div><strong>Onco-hématologie</strong>
+                        <p>Analyses somatiques, CNA, CNV et MRD</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </button>
+                <button type="button" class="module-card mint" data-category="immunologie">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-antibody"></use>
+                        </svg></div>
+                    <div><strong>Immunologie</strong>
+                        <p>Analyses d'expression et immunogénomique</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </button>
+                <a class="module-card amber" href="/smaug/show/runs">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-chart"></use>
+                        </svg></div>
+                    <div><strong>Suivi des analyses</strong>
+                        <p>Runs, statuts, résultats et validations</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </a>
+                <button type="button" class="module-card slate" data-category="autres">
+                    <div class="module-icon"><svg class="icon">
+                            <use href="#i-settings"></use>
+                        </svg></div>
+                    <div><strong>Autres outils</strong>
+                        <p>QC, annotations, conversions et utilitaires</p>
+                    </div><svg class="icon module-arrow">
+                        <use href="#i-chev"></use>
+                    </svg>
+                </button>
+            </div>
+            <p id="categoryFeedback" class="sd-category-feedback" role="status" hidden></p>
+        </section>
 
-      <div class="bottom-grid">
-        <section id="forms" class="panel forms-panel" aria-labelledby="formsTitle">
-  <div class="panel-title"><div><svg class="icon section-icon"><use href="#i-flask"></use></svg><h2 id="formsTitle">Formulaires disponibles</h2></div></div>
-  <div id="search-forms" class="filterline"><div class="panel-search"><svg class="icon"><use href="#i-search"></use></svg><input type="text" name="q" aria-label="Rechercher un formulaire" placeholder="Rechercher un formulaire…" oninput="filterForms()"></div></div>
-  <div class="form-tabs tab" aria-label="Groupes autorisés" id="groupTabs">
-    {% for group in user_groups %}
-    <button type="button" id="tab-{{ group.id }}" class="tablinks{% if loop.first %} active{% endif %}" onclick="openTab(event,{{ group.id }})">{{ group.name }}</button>
-    {% endfor %}
-    {% if user.is_admin %}
-    <button type="button" id="tab-None" class="tablinks" onclick="openTab(event,`None`)">Formulaires sans groupe</button>
-    {% endif %}
-  </div>
-  <div class="smaug-forms-table-wrap">
-    {% for group in user_groups %}
-    <table id="forms-container-{{ group.id }}" class="tabcontent smaug-forms-table" style="{% if loop.first %}display:block;{% endif %}">
-      <tr><th class="content-column">Nom du formulaire</th><th class="numeric-column padding-x centered">Lancement d'un run</th></tr>
-    </table>
-    {% endfor %}
-    {% if user.is_admin %}
-    <table id="forms-container-None" class="tabcontent smaug-forms-table">
-      <tr><th class="content-column">Nom du formulaire</th><th class="numeric-column padding-x centered">Lancement d'un run</th></tr>
-    </table>
-    {% endif %}
-  </div>
-  <p id="no-user-group" class="panel-footnote" style="display:none">Vous n'appartenez à aucun groupe. Veuillez contacter votre administrateur système.</p>
-</section>
-        <section id="runs" class="panel runs-panel" aria-labelledby="runsTitle"><div class="panel-title"><div><svg class="icon section-icon"><use href="#i-chart"></use></svg><h2 id="runsTitle">Runs récents</h2></div><a href="/smaug/show/runs" class="text-link">Voir tous mes runs <svg class="icon"><use href="#i-arrow"></use></svg></a></div><div id="latest-runs-table" class="table-scroll" aria-live="polite"><p>Chargement des runs…</p></div></section>
-      </div>
-      <footer class="footer">SMAUG · Suite Modulaire d’Analyses Unifiées en Génomique <span>Interface de lancement et de suivi des analyses</span></footer>
+        <div class="bottom-grid">
+            <section id="forms" class="panel forms-panel" aria-labelledby="formsTitle">
+                <div class="panel-title">
+                    <div><svg class="icon section-icon">
+                            <use href="#i-flask"></use>
+                        </svg>
+                        <h2 id="formsTitle">Formulaires disponibles</h2>
+                    </div><span class="soft-badge" id="availableCount"></span>
+                </div>
+                <div class="filterline">
+                    <div class="panel-search"><svg class="icon">
+                            <use href="#i-search"></use>
+                        </svg><input id="formSearch" aria-label="Rechercher un formulaire"
+                            placeholder="Rechercher un formulaire…"></div><button type="button" class="filter-clear"
+                        id="resetFilters" hidden>Réinitialiser ×</button>
+                </div>
+                <div class="form-tabs" role="tablist" aria-label="Groupes autorisés" id="groupTabs"></div>
+                <div id="formList" class="form-list" aria-live="polite"></div>
+                <p id="no-user-group" class="panel-footnote" hidden>Vous n’appartenez à aucun groupe. Veuillez contacter
+                    votre administrateur système.</p>
+            </section>
+            <section id="runs" class="panel runs-panel" aria-labelledby="runsTitle">
+                <div class="panel-title">
+                    <div><svg class="icon section-icon">
+                            <use href="#i-chart"></use>
+                        </svg>
+                        <h2 id="runsTitle">Runs récents</h2>
+                    </div><a href="/smaug/show/runs" class="text-link">Voir tous mes runs <svg class="icon">
+                            <use href="#i-arrow"></use>
+                        </svg></a>
+                </div>
+                <div id="latest-runs-table" class="table-scroll" aria-live="polite">
+                    <p>Chargement des runs…</p>
+                </div>
+            </section>
+        </div>
+        <footer class="footer">SMAUG · Suite Modulaire d’Analyses Unifiées en Génomique <span>Interface de lancement et
+                de suivi des analyses</span></footer>
     </main>
-  </div>
-  
+</div>
+
 {% endblock %}
 {% block extra_js %}
-<script>window.smaugUserGroups = {{ user_groups | tojson }}; window.smaugIsAdmin = {{ is_admin | tojson }};</script>
+<script>
+    function onDropDown(element) {
+        document.getElementById(element).classList.toggle("show");
+    }
+    function navigateTo(uri) {
+        window.location.href = uri;
+    }
+
+    function closeDropdowns(event) {
+        if (!event.target.matches('.dropbtn')) {
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            var i;
+            for (i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    }
+
+    function openTab(evt, group_id) {
+        var i, tabcontent, tablinks;
+
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        document.getElementById(`forms-container-${group_id}`).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    const userGroups = {{ user_groups | tojson }};
+    async function fetchAndRenderForms(groupId, listKey) {
+        try {
+            const response = await fetch(`/smaug/api/groups/forms/${groupId}`);
+            const result = await response.json();
+
+            if (!isApiSuccess(result)) {
+                throw new Error(getApiMessage(result) || "Erreur inconnue");
+            }
+
+            const formsData = getApiData(result);
+            const forms = formsData[listKey] || [];
+
+            let table = document.getElementById(`forms-container-${groupId}`);
+            if (!table) return;
+
+            let container = table.querySelector('tbody') || table;
+
+            forms.forEach(form => {
+                const formBox = document.createElement('tr');
+                let submitUrl = "#";
+
+                // The switch/case handles different variants smoothly.
+                switch (form.form_id) {
+                    case "GitBranchAndPath": {
+                        // FIX: Because of #[serde(flatten)], branch and file_path are on the root 'form' object, 
+                        // not inside 'form.form_id' (which is just the string tag "GitBranchAndPath").
+                        const { branch, file_path } = form;
+                        submitUrl = `/smaug/runs/submit/branch/${branch}/${file_path}`;
+                        break;
+                    }
+                    case "GitCommit": {
+                        const { hash, file_path } = form;
+                        submitUrl = `/smaug/runs/submit/commit/${hash}/${file_path}`;
+                        break;
+                    }
+                    default:
+                        console.warn(`Unknown form_id type: ${form.form_id}`);
+                        break;
+                }
+
+                formBox.innerHTML = `
+               <td class="content-column">${form.name}<br>${form.description}</td>
+               <td class="numeric-column">
+                   <a href="${submitUrl}" class="inline-table centered">Lancer un run</a>
+               </td>
+            `;
+                container.appendChild(formBox);
+            });
+        } catch (error) {
+            showMessage("error", `Erreur lors du chargement des formulaires du groupe ${groupId} : ${error.message}`);
+        }
+    }
+
+    async function loadGroupForms() {
+        const fetchTasks = [];
+
+        if (userGroups && userGroups.length > 0) {
+            // Queue all group fetches to run concurrently
+            userGroups.forEach(group => {
+                fetchTasks.push(fetchAndRenderForms(group.id, "with_group"));
+            });
+        } else {
+            console.log("User has no groups!");
+            const noGroupElement = document.getElementById("no-user-group");
+            if (noGroupElement) noGroupElement.style.display = "block";
+        }
+
+        {% if user.is_admin %}
+        // I moved this outside the (userGroups.length > 0) check.
+        // Previously, if an admin had 0 groups, the "None" forms wouldn't load!
+        fetchTasks.push(fetchAndRenderForms("None", "without_group"));
+        {% endif %}
+
+        // Await all network requests simultaneously
+        await Promise.all(fetchTasks);
+    }
+    async function lastRuns() {
+        try {
+            const response = await fetch(`/smaug/api/listruns?page=1&page_size=5`);
+            const json = await response.json();
+            if (isApiSuccess(json)) {
+                const data = getApiData(json);
+                if (data.table.length > 0) {
+                    generateJsonTable(data, "latest-runs-table");
+                } else {
+                    document.getElementById("latest-runs-table").innerHTML = `<p>Aucune donnée à afficher.</p>`;
+                }
+            } else {
+                showMessage("error", getApiMessage(json) || "Erreur inconnue");
+            }
+        } catch (error) {
+            showMessage("error", error);
+        }
+    }
+
+    function filterForms() {
+        const queryString = document.querySelector('#search-forms input[name="q"]').value;
+        const lowerQuery = queryString.toLowerCase();
+        userGroups.forEach(group => {
+            const table = document.getElementById(`forms-container-${group.id}`);
+            const rows = table.getElementsByTagName('tr');
+            for (let i = 1; i < rows.length; i++) {
+                const formNameCell = rows[i].getElementsByTagName('td')[0];
+                if (formNameCell) {
+                    const formName = formNameCell.textContent || formNameCell.innerText;
+                    if (formName.toLowerCase().indexOf(lowerQuery) > -1) {
+                        rows[i].style.display = "";
+                    } else {
+                        rows[i].style.display = "none";
+                    }
+                }
+            }
+        });
+    }
+
+    async function init() {
+        await loadGroupForms();
+        await lastRuns();
+    }
+</script>
 <script src="/smaug/static/scripts/smaug-dashboard.js"></script>
 {% endblock %}

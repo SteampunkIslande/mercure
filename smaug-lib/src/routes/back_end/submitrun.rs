@@ -49,7 +49,9 @@ pub async fn retry_run_get(
     run_id: i64,
 ) -> Result<Json<ApiResponse<Value>>, AuthError> {
     Run::get_run_from_id(run_id, pool).await?;
-    analysis::relaunch_run(run_id, pool).await?;
+    if let Err(e) = analysis::relaunch_run(run_id, pool).await {
+        return Ok(Json(ApiResponse::error(e.to_string())));
+    }
     Ok(Json(ApiResponse::success(
         json!({"message":"Le run est à nouveau à valider"}),
     )))

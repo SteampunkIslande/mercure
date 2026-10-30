@@ -32,7 +32,7 @@ p,
 }
 
 /* =========================================
-   2. UTILITAIRES & ALIGNEMENTS
+   2. UTILITIES & ALIGNMENT
    ========================================= */
 .container,
 .centered {
@@ -71,7 +71,7 @@ p,
 }
 
 /* =========================================
-   3. BOUTONS
+   3. BUTTONS
    ========================================= */
 .btn {
   display: inline-block;
@@ -101,7 +101,7 @@ p,
 }
 
 /* =========================================
-   4. MESSAGES D'ALERTE
+   4. ALERT MESSAGES
    ========================================= */
 @keyframes fadeout {
   from {
@@ -154,7 +154,7 @@ p,
 }
 
 /* =========================================
-   5. CONTENEURS & CARTES
+   5. CONTAINERS & CARDS
    ========================================= */
 .banner {
   background-color: #007bff;
@@ -211,7 +211,7 @@ p,
 }
 
 /* =========================================
-   6. FORMULAIRES
+   6. FORMS
    ========================================= */
 label {
   display: inline-block;
@@ -316,7 +316,7 @@ fieldset {
 }
 
 /* =========================================
-   7. ONGLETS (TABS) & DROPDOWN
+   7. TABS & DROPDOWN
    ========================================= */
 .tab {
   overflow: hidden;
@@ -404,7 +404,7 @@ fieldset {
 }
 
 /* =========================================
-   8. TABLEAUX
+   8. TABLES
    ========================================= */
 table {
   width: 100%;
@@ -456,7 +456,7 @@ table td.content-column {
   min-width: 170px;
 }
 
-/* Liens génériques dans le tableau */
+/* Generic links in the table */
 table a {
   display: inline-block;
   padding: 5px 10px;
@@ -471,7 +471,7 @@ table td:hover a {
   background-color: #0056b3;
 }
 
-/* Liens spécifiques à la colonne de contenu */
+/* Links specific to the content column */
 table td.content-column a,
 table tbody tr:hover td.content-column a {
   color: #007bff;

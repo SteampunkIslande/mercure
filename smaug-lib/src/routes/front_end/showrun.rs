@@ -1,12 +1,15 @@
 use std::collections::HashSet;
 use std::ops::Not;
+use std::path::PathBuf;
 
 use anyhow::Context;
 use rocket::State;
 use rocket::get;
+use serde::Serialize;
 use sqlx::SqlitePool;
 use time::UtcOffset;
 
+use crate::config::get_smaug_config;
 use crate::routes::frontend::FrontendError;
 use crate::templates::{Template, context};
 
@@ -16,6 +19,106 @@ use crate::models::Group;
 use crate::models::Run;
 use crate::models::RunStatus;
 use crate::utils;
+
+#[derive(Debug, Serialize)]
+pub struct ExportFile {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExportSection {
+    pub title: String,
+    pub files: Vec<ExportFile>,
+}
+
+/// Lists the files produced by a script in `exports-<attempt_number>`.
+///
+/// Each immediate subdirectory becomes a section; files stored directly in
+/// `exports-<attempt_number>` are grouped under a generic "Fichiers" section.
+fn list_export_files(run_id: i64, attempt_number: u32) -> Vec<ExportSection> {
+    let export_dir = PathBuf::from(&get_smaug_config().analysis_dir)
+        .join(format!("run-{:0>8}", run_id))
+        .join(format!("exports-{:0>8}", attempt_number));
+
+    let Ok(entries) = std::fs::read_dir(&export_dir) else {
+        return Vec::new();
+    };
+
+    let mut sections: Vec<ExportSection> = Vec::new();
+    let mut root_files: Vec<ExportFile> = Vec::new();
+
+    let mut entries: Vec<_> = entries.filter_map(Result::ok).collect();
+    entries.sort_by_key(|entry| entry.file_name());
+
+    for entry in entries {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+
+        if file_type.is_dir() {
+            let mut files: Vec<ExportFile> = std::fs::read_dir(&path)
+                .into_iter()
+                .flatten()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().map(|t| t.is_file()).unwrap_or(false))
+                .map(|entry| {
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    ExportFile {
+                        url: format!(
+                            "/smaug/data/{}/{}/{}/{}",
+                            run_id,
+                            attempt_number,
+                            urlencode(&name),
+                            urlencode(&file_name)
+                        ),
+                        name: file_name,
+                    }
+                })
+                .collect();
+            files.sort_by(|a, b| a.name.cmp(&b.name));
+            if !files.is_empty() {
+                sections.push(ExportSection { title: name, files });
+            }
+        } else if file_type.is_file() {
+            root_files.push(ExportFile {
+                url: format!(
+                    "/smaug/data/{}/{}/{}",
+                    run_id,
+                    attempt_number,
+                    urlencode(&name)
+                ),
+                name,
+            });
+        }
+    }
+
+    root_files.sort_by(|a, b| a.name.cmp(&b.name));
+    if !root_files.is_empty() {
+        sections.push(ExportSection {
+            title: "Fichiers".to_string(),
+            files: root_files,
+        });
+    }
+
+    sections
+}
+
+/// Percent-encodes a single path component for use in a URL.
+fn urlencode(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
+}
 
 #[get("/show/run/<run_id>?<attempt_number>")]
 pub async fn show_run_get(
@@ -64,7 +167,7 @@ pub async fn show_run_get(
     };
 
     if can_see_run {
-        // Récupérer l'historique des tentatives pour la navigation
+        // Retrieve the attempt history for navigation
         let history = Attempt::list_attempts_for_run(run_id, pool)
             .await
             .unwrap_or_default();
@@ -77,12 +180,13 @@ pub async fn show_run_get(
             "".to_string()
         };
 
-        // MODE ÉDITION : Si le run est Idle ET qu'on demande la dernière tentative
+        // EDIT MODE: If the run is Idle AND the latest attempt is requested
         if run.status == RunStatus::Idle && attempt_number.is_none() {
             let attempt = Attempt::get_hypothetic_attempt(&run)?;
             let form = &run.get_form().await.with_context(|| {
                 "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible"
             })?;
+            let exports = list_export_files(run_id, attempt.attempt_number);
 
             Ok(Template::render(
                 "common/idlerun",
@@ -92,14 +196,15 @@ pub async fn show_run_get(
                     run_creation_date,
                     attempt=> &attempt,
                     history=> history,
+                    exports=> exports,
                     user=> auth.user,
                 },
             ))
         } else {
-            // MODE VISUALISATION : Run non Idle OU tentative spécifique demandée
+            // VIEW MODE: Non-Idle run OR specific attempt requested
             let attempt_number = attempt_number.unwrap_or(run.attempt_count);
 
-            // On cherche la tentative demandée
+            // Look up the requested attempt
             let attempt = Attempt::get_attempt_from_number(attempt_number, run_id, pool)
                 .await
                 .with_context(|| {
@@ -109,12 +214,16 @@ pub async fn show_run_get(
                     )
                 })?;
 
-            let attempt_form = attempt.get_form().await?;
+            let attempt_form = attempt.get_form().await.with_context(|| {
+                "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible"
+            })?;
 
             let attempt_date =
                 utils::format_french_date(&attempt.attempt_date.to_offset(local_offset), true);
 
-            // On affiche le template correspondant au statut de la TENTATIVE (et non du Run)
+            let exports = list_export_files(run_id, attempt_number);
+
+            // Display the template corresponding to the status of the ATTEMPT (not the Run)
             match attempt.status {
                 RunStatus::Pending => Ok(Template::render(
                     "common/pendingrun",
@@ -125,6 +234,7 @@ pub async fn show_run_get(
                         attempt_date,
                         attempt=> &attempt,
                         history=> &history,
+                        exports=> &exports,
                         user=> auth.user,
                     },
                 )),
@@ -137,6 +247,7 @@ pub async fn show_run_get(
                         attempt_date,
                         attempt=> &attempt,
                         history=> &history,
+                        exports=> &exports,
                         user=> auth.user,
                     },
                 )),
@@ -149,6 +260,7 @@ pub async fn show_run_get(
                         attempt_date,
                         attempt=> &attempt,
                         history=> &history,
+                        exports=> &exports,
                         user=> auth.user,
                     },
                 )),
@@ -156,11 +268,12 @@ pub async fn show_run_get(
                     "common/failurerun",
                     context! {
                         run=> &run,
-                        form=> &run.get_form().await?,
+                        form=> &attempt_form,
                         run_creation_date,
                         attempt_date,
                         attempt=> &attempt,
                         history=> &history,
+                        exports=> &exports,
                         user=> auth.user,
                         fail_reason=> fail_reason,
                     },

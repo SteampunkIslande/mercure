@@ -1,4 +1,4 @@
-// Fonction unique pour afficher les messages dans les divs dédiées
+// Single function to display messages in the dedicated divs
 function showMessage(type, message) {
   // type: 'error', 'info', 'success'
   const icons = {
@@ -16,12 +16,12 @@ function showMessage(type, message) {
     info: "info-message",
     success: "success-message",
   };
-  // Masquer tous les messages
+  // Hide all messages
   Object.values(divId).forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   });
-  // Afficher le bon message
+  // Display the correct message
   const msgDiv = document.getElementById(divId[type]);
   if (msgDiv) {
     msgDiv.style.display = "block";

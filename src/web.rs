@@ -70,36 +70,37 @@ async fn rocket(
 
     let mut r = rocket::custom(figment)
         .register("/smaug", catchers![unauthorized])
-        .mount("/smaug/uploads", FileServer::from(&config.upload_dir))
-        .mount("/smaug/logs", FileServer::from(&config.logs_dir))
+        .mount("/smaug/uploads", routes![routes::backend::serve_upload])
+        .mount("/smaug/logs", routes![routes::backend::serve_run_log])
+        .mount("/smaug/data", routes![routes::backend::serve_export_file])
         .mount(
             "/smaug",
             routes![
-                // Page d'accueil
+                // Home page
                 routes::frontend::welcome_page_get,
-                // Page de login
+                // Login page
                 routes::frontend::login_get,
-                // Simple GET pour se déconnecter, la seule route GET qui appartient au backend
+                // Simple GET to log out; the only GET route that belongs to the backend
                 routes::backend::logout_get,
-                // Routes pour le frontend: renvoie toujours du HTML
+                // Frontend routes: always return HTML
                 routes::frontend::home_get,
                 routes::frontend::password_edit_get,
                 routes::frontend::new_run_get,
-                // Affichage d'un run spécifique
+                // Display a specific run
                 routes::frontend::show_run_get,
-                // Affichage de la liste des runs
+                // Display the list of runs
                 routes::frontend::list_runs,
-                // Recherche avancée de runs
+                // Advanced run search
                 routes::frontend::search_run,
-                // Edition d'un run
+                // Edit a run
                 routes::frontend::edit_run_get,
-                // Redirection pour la doc
+                // Redirect to the documentation
                 doc_redirect
             ],
         )
         .mount(
             "/smaug/admin",
-            //Routes réservées à l'admin
+            // Admin-only routes
             routes![
                 routes::frontend::register_get,
                 routes::frontend::admin_dashboard_get,
@@ -113,19 +114,19 @@ async fn rocket(
         .mount(
             "/smaug/api",
             routes![
-                // Routes pour le backend: renvoie toujours du JSON
+                // Backend routes: always return JSON
                 routes::backend::register_post,
-                // Route mettant à jour le cache des formulaires à partir d'un webhook
+                // Route updating the form cache from a webhook
                 routes::backend::gitea_webhook_update_form_cache,
-                // Route mettant à jour le cache des formulaires à partir d'un simple get authentifié
+                // Route updating the form cache from a simple authenticated GET
                 routes::backend::update_cache_get,
                 routes::backend::login_post,
                 routes::backend::newgroup_get,
                 routes::backend::list_groups,
                 routes::backend::get_all_forms_for_group,
-                // Simple GET pour lister les utilisateurs
+                // Simple GET to list users
                 routes::backend::list_users,
-                // Simple GET pour lister les groupes d'un utilisateur
+                // Simple GET to list the groups of a user
                 routes::backend::list_groups_for_user,
                 routes::backend::update_groups,
                 routes::backend::get_all_forms,
@@ -137,19 +138,19 @@ async fn rocket(
                 routes::backend::list_runs_get,
                 routes::backend::check_samplesheet,
                 routes::backend::list_samples_from_samplesheet,
-                // Route renvoyant les informations de progression d'un run
+                // Route returning a run's progress information
                 routes::backend::watch,
-                // Route d'interrogation directe de squeue
+                // Route querying squeue directly
                 routes::backend::get_squeue,
-                // Route pour rechercher des runs
+                // Route to search runs
                 routes::backend::search_run_get,
-                // Route pour traduire les noms des séquenceurs
+                // Route to translate sequencer names
                 routes::backend::prettify_seqname,
-                // Route pour toutes les redirections
+                // Route for all redirects
                 routes::frontend::redirect_get,
-                // Route pour relancer un run (une fois terminé)
+                // Route to relaunch a run (once it is finished)
                 routes::backend::retry_run_get,
-                // Routes de configuration d'exécution
+                // Runtime configuration routes
                 routes::backend::runtime_config_get,
                 routes::backend::runtime_config_set,
             ],
@@ -182,7 +183,7 @@ async fn rocket(
 
 #[derive(Parser)]
 pub struct Web {
-    /// L'adresse IP sur laquelle écouter
+    /// The IP address to listen on
     #[arg(short = 'H', long = "host")]
     ip: Option<Ipv4Addr>,
 
@@ -205,7 +206,7 @@ impl Web {
         };
         let shutdown_handle = rocket_app.shutdown();
 
-        // Canal pour prévenir la routine qu'elle doit s'arrêter
+        // Channel used to tell the routine that it must stop
         let (routine_shutdown_tx, routine_shutdown_rx) = broadcast::channel(1);
 
         let mut sigterm =
@@ -214,27 +215,27 @@ impl Web {
             signal(SignalKind::interrupt()).expect("Impossible d'écouter le signal SIGINT");
         let mut sigquit =
             signal(SignalKind::quit()).expect("Impossible d'écouter le signal SIGQUIT");
-        // On lance une tâche dédiée à l'écoute des signaux OS
+        // Spawn a dedicated task listening for OS signals
         tokio::spawn(async move {
             tokio::select! {
                 _ = sigterm.recv() => info!("SIGTERM reçu."),
                 _ = sigint.recv() => info!("SIGINT (Ctrl+C) reçu."),
                 _ = sigquit.recv() => info!("SIGQUIT reçu."),
             }
-            // Notification de l'arrêt au runtime de Rocket
+            // Notify the Rocket runtime that it must shut down
             shutdown_handle.notify();
 
-            // Envoi d'un signal de shutdown à la routine
+            // Send a shutdown signal to the routine
             let _ = routine_shutdown_tx.send(());
         });
 
-        // Démarrage de la routine (exécution des jobs)
+        // Start the routine (job execution)
         let routine = run_routine_loop(&pool, progress_cache, routine_shutdown_rx);
 
-        // Démarrage de l'application web
+        // Start the web application
         let webapp = rocket_app.launch();
 
-        // Attendre que l'application web et la routine sont tous les deux terminés
+        // Wait for both the web application and the routine to finish
         let (web_res, routine_res) = tokio::join!(webapp, routine);
 
         if let Err(e) = web_res {

@@ -9,39 +9,39 @@ use anyhow::{Result, bail};
 
 #[derive(Subcommand)]
 pub enum Admin {
-    /// Créer un nouvel utilisateur
+    /// Create a new user
     CreateUser {
-        /// Adrese email
+        /// Email address
         #[arg(short = 'u', long = "mail")]
         usermail: String,
-        /// Nom d'utilisateur
+        /// Username
         #[arg(short = 'n', long = "name")]
         username: String,
-        /// Mot de passe
+        /// Password
         #[arg(short = 'p', long = "password")]
         password: String,
-        /// Définir comme administrateur
+        /// Set as administrator
         #[arg(short = 'a', long = "admin")]
         admin: bool,
     },
-    /// Réinitialiser le mot de passe d'un utilisateur
+    /// Reset a user's password
     ResetPassword {
-        /// Nom d'utilisateur
+        /// Username
         #[arg(short = 'u', long = "mail")]
         usermail: String,
-        /// Nouveau mot de passe
+        /// New password
         #[arg(short = 'p', long = "password")]
         password: String,
     },
-    /// Rendre un utilisateur admin
+    /// Make a user an admin
     UpgradeUser {
-        /// Adresse email
+        /// Email address
         #[arg(short = 'u', long = "mail")]
         usermail: String,
     },
-    /// Supprimer ses droits d'administrateur à un utilisateur
+    /// Remove a user's administrator rights
     DowngradeUser {
-        /// Adresse email
+        /// Email address
         #[arg(short = 'u', long = "mail")]
         usermail: String,
     },
@@ -64,7 +64,7 @@ impl Admin {
                 match User::create(new_user, &pool).await {
                     Ok(user) => {
                         if admin {
-                            // Mettre à jour l'utilisateur comme administrateur
+                            // Update the user as administrator
                             if let Err(e) =
                                 sqlx::query("UPDATE Users SET is_admin = true WHERE id = ?")
                                     .bind(user.id)
@@ -90,10 +90,10 @@ impl Admin {
                 }
             }
             Self::ResetPassword { usermail, password } => {
-                // Vérifier si l'utilisateur existe
+                // Check whether the user exists
                 match User::find_by_usermail(&usermail, &pool).await {
                     Ok(Some(_)) => {
-                        // Hasher le nouveau mot de passe
+                        // Hash the new password
                         let password_hash = match hash(password.as_bytes(), DEFAULT_COST) {
                             Ok(hash) => hash,
                             Err(e) => {
@@ -102,7 +102,7 @@ impl Admin {
                             }
                         };
 
-                        // Mettre à jour le mot de passe
+                        // Update the password
                         if let Err(e) =
                             sqlx::query("UPDATE Users SET password_hash = ? WHERE usermail = ?")
                                 .bind(&password_hash)
@@ -132,7 +132,7 @@ impl Admin {
             Self::UpgradeUser { usermail } => {
                 match User::find_by_usermail(&usermail, &pool).await {
                     Ok(Some(user)) => {
-                        // Mettre à jour le mot de passe
+                        // Update the password
                         if let Err(e) = sqlx::query("UPDATE Users SET is_admin = 1 WHERE id = ?")
                             .bind(user.id)
                             .execute(&pool)
@@ -160,7 +160,7 @@ impl Admin {
             Self::DowngradeUser { usermail } => {
                 match User::find_by_usermail(&usermail, &pool).await {
                     Ok(Some(user)) => {
-                        // Mettre à jour le mot de passe
+                        // Update the password
                         if let Err(e) = sqlx::query("UPDATE Users SET is_admin = 0 WHERE id = ?")
                             .bind(user.id)
                             .execute(&pool)

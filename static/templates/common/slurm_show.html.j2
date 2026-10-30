@@ -9,7 +9,7 @@
                 <label for="field-preset">Sélection de champs :</label>
                 <select id="field-preset" onchange="applyFieldPreset()">
                     <option value="">Tous les champs</option>
-                    <!-- Les options seront ajoutées dynamiquement depuis field_presets.json -->
+                    <!-- Options will be added dynamically from field_presets.json -->
                 </select>
             </div>
             <div class="refresh-controls">
@@ -41,21 +41,21 @@
     </div>
 
     <script>
-        // Configuration et variables globales
+        // Configuration and global variables
         let jobsData = {};
         let filteredData = {};
         let columnNames = [];
-        let visibleColumns = []; // Colonnes actuellement visibles
-        let allColumns = []; // Toutes les colonnes disponibles
-        let fieldPresets = {}; // Presets de champs chargés depuis le JSON
+        let visibleColumns = []; // Currently visible columns
+        let allColumns = []; // All available columns
+        let fieldPresets = {}; // Field presets loaded from the JSON
 
-        // Fonction pour afficher les erreurs
+        // Function to display errors
         function showError(message) {
             const errorContainer = document.getElementById('error-container');
             errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
         }
 
-        // Fonction pour cacher le loading et afficher le tableau
+        // Function to hide loading and display the table
         function hideLoading() {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('squeue-table').style.display = 'table';
@@ -66,7 +66,7 @@
             document.getElementById('squeue-table').style.display = 'none';
         }
 
-        // Fonction pour obtenir une classe CSS pour l'état
+        // Function to get a CSS class for the state
         function getStatusClass(state) {
             const stateUpper = state.toUpperCase();
             switch (stateUpper) {
@@ -99,7 +99,7 @@
             }
         }
 
-        // Fonction pour obtenir une classe CSS pour le QOS
+        // Function to get a CSS class for the QOS
         function getQosClass(qos) {
             const qosLower = qos.toLowerCase();
             switch (qosLower) {
@@ -116,7 +116,7 @@
             }
         }
 
-        // Fonction pour formater une valeur de cellule
+        // Function to format a cell value
         function formatCellValue(columnName, value) {
             if (columnName === 'STATE') {
                 const statusClass = getStatusClass(value);
@@ -128,7 +128,7 @@
             return value;
         }
 
-        // Fonction pour charger les presets de champs depuis le JSON
+        // Function to load field presets from the JSON
         async function loadFieldPresets() {
             try {
                 const response = await fetch('/squeue/smaug/static/field_presets.json');
@@ -139,7 +139,7 @@
                 populatePresetSelect();
             } catch (error) {
                 console.error('Erreur lors du chargement des presets:', error);
-                // Utiliser un preset par défaut si le fichier ne peut pas être chargé
+                // Use a default preset if the file cannot be loaded
                 fieldPresets = {
                     "__default__": {
                         "name": "Surveillance administrateur",
@@ -161,14 +161,14 @@
             }
         }
 
-        // Fonction pour remplir la liste déroulante des presets
+        // Function to populate the preset dropdown
         function populatePresetSelect() {
             const selectElement = document.getElementById('field-preset');
 
-            // Garder l'option "Tous les champs"
+            // Keep the "All fields" option
             selectElement.innerHTML = '<option value="">Tous les champs</option>';
 
-            // Ajouter les presets depuis le JSON
+            // Add the presets from the JSON
             Object.keys(fieldPresets).forEach(presetKey => {
                 const preset = fieldPresets[presetKey];
                 const option = document.createElement('option');
@@ -177,17 +177,17 @@
                 selectElement.appendChild(option);
             });
 
-            // Sélectionner le preset __default__ s'il existe
+            // Select the __default__ preset if it exists
             if (fieldPresets['__default__']) {
                 selectElement.value = '__default__';
             }
         }
 
-        // Fonction pour charger les données depuis l'API
+        // Function to load data from the API
         async function loadData(slurm_jobname) {
             try {
 
-                // Afficher un message de chargement
+                // Display a loading message
                 showLoading();
                 const jobname_option = slurm_jobname ? `&jobname=${slurm_jobname}` : "";
                 const response = await fetch(`/squeue?format=json${jobname_option}`);
@@ -199,11 +199,11 @@
                 jobsData = data;
                 filteredData = { ...data };
 
-                // Extraire les noms de colonnes du premier job
+                // Extract the column names from the first job
                 const firstJobId = Object.keys(data)[0];
                 if (firstJobId) {
                     allColumns = Object.keys(data[firstJobId]);
-                    columnNames = [...allColumns]; // Par défaut, toutes les colonnes sont visibles
+                    columnNames = [...allColumns]; // By default, all columns are visible
                     visibleColumns = [...allColumns];
                     generateTable();
                     hideLoading();
@@ -218,24 +218,24 @@
             }
         }
 
-        // Fonction pour générer les en-têtes et filtres du tableau
+        // Function to generate the table headers and filters
         function generateTable() {
             const headersRow = document.getElementById('headers-row');
             const filtersRow = document.getElementById('filters-row');
 
-            // Générer les en-têtes avec les colonnes visibles
+            // Generate the headers with the visible columns
             headersRow.innerHTML = visibleColumns.map(col => `<th>${col}</th>`).join('');
 
-            // Générer les filtres avec les colonnes visibles
+            // Generate the filters with the visible columns
             filtersRow.innerHTML = visibleColumns.map(col =>
                 `<th><input type="text" class="search-input" placeholder="Rechercher..." data-column="${col}" oninput="filterTable()"></th>`
             ).join('');
 
-            // Générer le contenu du tableau
+            // Generate the table content
             renderTableBody();
         }
 
-        // Fonction pour rendre le corps du tableau
+        // Function to render the table body
         function renderTableBody() {
             const tableBody = document.getElementById('table-body');
             const noResults = document.getElementById('no-results');
@@ -258,46 +258,46 @@
             }).join('');
         }
 
-        // Fonction pour afficher le message "aucun résultat"
+        // Function to display the "no results" message
         function showNoResults() {
             document.getElementById('no-results').style.display = 'block';
             document.getElementById('table-body').innerHTML = '';
         }
 
-        // Fonction pour cacher le message "aucun résultat"
+        // Function to hide the "no results" message
         function hideNoResults() {
             document.getElementById('no-results').style.display = 'none';
         }
 
-        // Fonction pour appliquer un preset de champs
+        // Function to apply a field preset
         function applyFieldPreset() {
             const preset = document.getElementById('field-preset').value;
 
             if (preset === '') {
-                // Afficher toutes les colonnes
+                // Display all columns
                 visibleColumns = [...allColumns];
             } else {
-                // Utiliser les champs du preset depuis le JSON
+                // Use the preset fields from the JSON
                 if (fieldPresets[preset] && fieldPresets[preset].fields) {
                     visibleColumns = fieldPresets[preset].fields.filter(col => allColumns.includes(col));
                 } else if (fieldPresets[preset] && Array.isArray(fieldPresets[preset])) {
-                    // Fallback pour l'ancien schéma (array direct)
+                    // Fallback for the old schema (direct array)
                     visibleColumns = fieldPresets[preset].filter(col => allColumns.includes(col));
                 } else {
-                    // Fallback pour l'ancien système (split par virgule)
+                    // Fallback for the old system (comma split)
                     visibleColumns = preset.split(',');
                 }
             }
 
-            // Régénérer le tableau avec les nouvelles colonnes
+            // Regenerate the table with the new columns
             generateTable();
         }
 
-        // Fonction de filtrage du tableau
+        // Function for table filtering
         function filterTable() {
             const filters = {};
 
-            // Récupérer tous les filtres actifs
+            // Retrieve all active filters
             document.querySelectorAll('.search-input').forEach(input => {
                 const column = input.dataset.column;
                 const value = input.value.toLowerCase().trim();
@@ -306,13 +306,13 @@
                 }
             });
 
-            // Filtrer les données
+            // Filter the data
             filteredData = {};
             Object.keys(jobsData).forEach(jobId => {
                 const job = jobsData[jobId];
                 let matchesAllFilters = true;
 
-                // Vérifier chaque filtre
+                // Check each filter
                 Object.keys(filters).forEach(column => {
                     const filterValue = filters[column];
                     const cellValue = (job[column] || '').toLowerCase();
@@ -327,16 +327,16 @@
                 }
             });
 
-            // Re-rendre le tableau avec les données filtrées
+            // Re-render the table with the filtered data
             renderTableBody();
         }
 
-        // Fonction de rafraîchissement manuel
+        // Function for manual refresh
         async function refreshData(slurm_jobname) {
             const refreshBtn = document.getElementById('refresh-btn');
             const originalText = refreshBtn.innerHTML;
 
-            // Désactiver le bouton et afficher un indicateur de chargement
+            // Disable the button and display a loading indicator
             refreshBtn.disabled = true;
             refreshBtn.innerHTML = '⏳ Actualisation...';
 
@@ -347,7 +347,7 @@
             } catch (error) {
                 console.error('Erreur lors du rafraîchissement:', error);
             } finally {
-                // Réactiver le bouton
+                // Re-enable the button
                 refreshBtn.disabled = false;
                 refreshBtn.innerHTML = originalText;
             }
