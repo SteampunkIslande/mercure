@@ -46,6 +46,8 @@ un lien http (`<a href=...>`) par fichier. Ainsi, on aurait par exemple:
 
 - [X] Déplacer la route `/smaug/data` dans le module backend...
 
+- [ ] En cas d'interruption de l'exécution d'un run, le code d'erreur n'est pas correctement récupéré (affiche exit code: ?)
+
 ## Intégration continue
 
 - [X] Ajouter au fichier `.github/workflows/release.yml` de lire la version dans `Cargo.toml`. La version est lue dans `Cargo.toml` (étape `Read version from Cargo.toml`) et utilisée pour le tag par défaut (`v<version>`), sauf si un `tag_name` est fourni manuellement. Un script `scripts/release.sh` permet de bump la version (major/minor/patch), de maj `Cargo.toml` + `Cargo.lock`, de commit/tag/pusher, et de déclencher la release.
