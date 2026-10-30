@@ -82,3 +82,224 @@ body.smaug-dashboard-page .sd-category-feedback {
   background: #f0f7ff; border: 1px solid #cfe4fa; border-radius: 10px; font-size: 13px;
 }
 body.smaug-dashboard-page .sd-category-feedback[hidden] { display: none; }
+
+/* Compatibilité avec les identifiants, tableaux et boutons du main SMAUG.
+   Le JS des APIs et le lancement historique des runs sont inchangés. */
+body.smaug-dashboard-page .forms-panel .tab { background:transparent; border:0; padding:0; float:none; width:auto; overflow:auto; }
+body.smaug-dashboard-page .forms-panel .tablinks { border:0; border-bottom:3px solid transparent; background:none; float:none; width:auto; margin:0; padding:12px 10px; font-size:12px; color:#607a96; font-weight:650; }
+body.smaug-dashboard-page .forms-panel .tablinks.active { border-bottom-color:#087aea; color:#0874e1; background:transparent; }
+body.smaug-dashboard-page .smaug-forms-table-wrap { padding-top:10px; overflow-x:auto; min-height:130px; max-height:385px; overflow-y:auto; }
+body.smaug-dashboard-page .forms-panel .tabcontent { width:100%; min-width:400px; height:auto!important; overflow:visible!important; border:0; margin:0; padding:0; }
+body.smaug-dashboard-page .forms-panel .smaug-forms-table { border-collapse:collapse; }
+body.smaug-dashboard-page .forms-panel table th,body.smaug-dashboard-page .forms-panel table td { width:auto; padding:12px 10px; font-size:12px; border-bottom:1px solid #e8eef5; }
+body.smaug-dashboard-page .forms-panel table td:first-child { color:#233b58; font-weight:500; }
+body.smaug-dashboard-page .forms-panel table td a.inline-table { display:inline-flex; padding:9px 11px; border-radius:8px; background:#0878e8; color:#fff!important; font-weight:700; text-decoration:none; white-space:nowrap; }
+body.smaug-dashboard-page .forms-panel table td a.inline-table:hover { background:#075cbb; }
+body.smaug-dashboard-page #categoryFeedback[hidden] { display:none!important; }
+body.smaug-dashboard-page .tabcontent:not([style*="display: block"]):not([style*="display:block"]) { display:none; }
+
+
+/* ========================================================================
+   SMAUG — Bureau : tableau de bord contenu dans une hauteur de fenêtre
+
+   Les pages /smaug/home (utilisateur et administrateur) utilisent ce style.
+   On ne modifie ni les appels API, ni les routes, ni le JS historique.
+
+   Sur un écran suffisamment large/haut, la page ne défile plus dans son
+   ensemble ; seuls les panneaux "Formulaires" et "Runs récents" défilent.
+   Sur écran étroit, petite fenêtre ou fort zoom, le défilement normal reste
+   possible pour ne jamais rendre les actions inaccessibles.
+   ======================================================================== */
+@media screen and (min-width: 980px) and (min-height: 600px) {
+  html:has(body.smaug-dashboard-page) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body.smaug-dashboard-page {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body.smaug-dashboard-page .app {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+
+  body.smaug-dashboard-page .topbar {
+    height: 64px;
+    min-height: 0;
+  }
+
+  body.smaug-dashboard-page .brand img {
+    width: 56px;
+    height: 56px;
+  }
+
+  body.smaug-dashboard-page .sidebar {
+    top: 64px;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
+
+  body.smaug-dashboard-page .main {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    padding: 12px 18px 9px;
+    display: grid;
+    grid-template-rows: clamp(108px, 16vh, 156px) auto minmax(150px, 1fr) auto;
+    gap: 10px;
+    align-content: stretch;
+  }
+
+  /* Bandeau ADN conservé, mais ajusté à la hauteur de l'écran. */
+  body.smaug-dashboard-page .hero {
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+  }
+  body.smaug-dashboard-page .hero-text {
+    padding: 12px 25px;
+  }
+  body.smaug-dashboard-page .hero h1 {
+    font-size: clamp(21px, 2vw, 29px);
+    margin: 0 0 5px;
+  }
+  body.smaug-dashboard-page .hero p {
+    font-size: clamp(11px, 1vw, 14px);
+    line-height: 1.35;
+  }
+  body.smaug-dashboard-page .hero-red-stroke {
+    margin-top: 10px;
+  }
+  body.smaug-dashboard-page .hero-motto {
+    font-size: 8px;
+    gap: 2px;
+    letter-spacing: .19em;
+  }
+
+  /* Six catégories affichées en deux rangées de trois, sans coupure. */
+  body.smaug-dashboard-page .section.modules {
+    min-height: 0;
+    margin: 0;
+  }
+  body.smaug-dashboard-page .section-heading {
+    margin-bottom: 8px;
+  }
+  body.smaug-dashboard-page .section-heading h2 {
+    font-size: 17px;
+  }
+  body.smaug-dashboard-page .section-heading p {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+  body.smaug-dashboard-page .module-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  body.smaug-dashboard-page .module-card {
+    height: clamp(75px, 10.5vh, 102px);
+    min-height: 0;
+    padding: 8px 24px 8px 10px;
+    gap: 10px;
+  }
+  body.smaug-dashboard-page .module-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 10px;
+  }
+  body.smaug-dashboard-page .module-icon .icon {
+    width: 27px;
+    height: 27px;
+  }
+  body.smaug-dashboard-page .module-card strong {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  body.smaug-dashboard-page .module-card p {
+    font-size: 10px;
+    line-height: 1.24;
+    margin-top: 4px;
+  }
+
+  /* Panneaux côte à côte avec défilement interne indépendant. */
+  body.smaug-dashboard-page .bottom-grid {
+    min-height: 0;
+    height: 100%;
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  body.smaug-dashboard-page .bottom-grid > .panel {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 11px 13px;
+  }
+  body.smaug-dashboard-page .panel-title {
+    flex: 0 0 auto;
+    margin-bottom: 8px;
+  }
+  body.smaug-dashboard-page .panel-title h2 {
+    font-size: 15px;
+  }
+  body.smaug-dashboard-page .filterline {
+    flex: 0 0 auto;
+    margin-bottom: 5px;
+  }
+  body.smaug-dashboard-page .panel-search {
+    height: 32px;
+  }
+  body.smaug-dashboard-page #groupTabs {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  body.smaug-dashboard-page .forms-panel .tablinks {
+    padding: 7px 9px;
+  }
+  body.smaug-dashboard-page .smaug-forms-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  body.smaug-dashboard-page #latest-runs-table {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  body.smaug-dashboard-page .forms-panel table th,
+  body.smaug-dashboard-page .forms-panel table td {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  body.smaug-dashboard-page #latest-runs-table table th,
+  body.smaug-dashboard-page #latest-runs-table table td {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  body.smaug-dashboard-page .panel-footnote {
+    flex: 0 0 auto;
+    margin-top: 6px;
+  }
+  body.smaug-dashboard-page .footer {
+    margin: 0;
+    min-height: 12px;
+    align-items: center;
+    line-height: 1.2;
+  }
+}
