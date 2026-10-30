@@ -297,11 +297,11 @@ pub async fn show_run_get(
 }
 
 #[get("/show/runs")]
-pub async fn list_runs(_auth: Authenticated) -> Template {
-    Template::render("common/listruns", context! {})
+pub async fn list_runs(auth: Authenticated) -> Template {
+    Template::render("common/listruns", context! {user => auth.user})
 }
 
 #[get("/search/run")]
-pub async fn search_run(_auth: Authenticated) -> Template {
-    Template::render("common/searchrun", context! {})
+pub async fn search_run(auth: Authenticated) -> Template {
+    Template::render("common/searchrun", context! {user => auth.user})
 }

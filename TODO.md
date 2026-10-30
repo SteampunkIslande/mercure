@@ -49,3 +49,7 @@ un lien http (`<a href=...>`) par fichier. Ainsi, on aurait par exemple:
 ## Intégration continue
 
 - [X] Ajouter au fichier `.github/workflows/release.yml` de lire la version dans `Cargo.toml`. La version est lue dans `Cargo.toml` (étape `Read version from Cargo.toml`) et utilisée pour le tag par défaut (`v<version>`), sauf si un `tag_name` est fourni manuellement. Un script `scripts/release.sh` permet de bump la version (major/minor/patch), de maj `Cargo.toml` + `Cargo.lock`, de commit/tag/pusher, et de déclencher la release.
+
+## Vérifications post-IA
+
+- [ ] Dans `routes/front_end/admin.rs`, les fonctions `password_edit_get` et `register_get` passent des variables curieuses au contexte (pages `admin/passedit` et `admin/register`).
