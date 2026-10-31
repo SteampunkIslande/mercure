@@ -186,7 +186,6 @@ pub async fn show_run_get(
             let form = &run.get_form().await.with_context(|| {
                 "Le formulaire avec lequel ce run a été initialement déclaré n'est plus disponible"
             })?;
-            let exports = list_export_files(run_id, attempt.attempt_number);
 
             Ok(Template::render(
                 "common/idlerun",
@@ -196,7 +195,6 @@ pub async fn show_run_get(
                     run_creation_date,
                     attempt=> &attempt,
                     history=> history,
-                    exports=> exports,
                     user=> auth.user,
                 },
             ))
@@ -297,11 +295,11 @@ pub async fn show_run_get(
 }
 
 #[get("/show/runs")]
-pub async fn list_runs(_auth: Authenticated) -> Template {
-    Template::render("common/listruns", context! {})
+pub async fn list_runs(auth: Authenticated) -> Template {
+    Template::render("common/listruns", context! {user => auth.user})
 }
 
 #[get("/search/run")]
-pub async fn search_run(_auth: Authenticated) -> Template {
-    Template::render("common/searchrun", context! {})
+pub async fn search_run(auth: Authenticated) -> Template {
+    Template::render("common/searchrun", context! {user => auth.user})
 }
